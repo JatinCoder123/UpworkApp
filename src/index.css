@@ -3,8 +3,10 @@
 
 :root {
   --ink: #151713;
+  --text: #151713;
   --paper: #f1f0e9;
   --surface: #faf9f4;
+  --raised: #ffffff;
   --muted: #777a70;
   --line: #d7d7cc;
   --lime: #c8f55d;
@@ -14,12 +16,37 @@
   --danger: #d75c4a;
 }
 
+:root[data-theme='dark'] {
+  --text: #f1f2ea;
+  --paper: #0f110e;
+  --surface: #191b17;
+  --raised: #21241e;
+  --muted: #a4a89a;
+  --line: #353930;
+  --lime: #b9e653;
+  --lime-dark: #9fc936;
+  --lavender: #a9a3d3;
+}
+
 * { box-sizing: border-box; }
-html { background: var(--paper); }
-body { margin: 0; min-width: 320px; min-height: 100vh; color: var(--ink); background: var(--paper); font-family: 'Manrope', sans-serif; }
+html { background: var(--paper); transition: background-color 700ms cubic-bezier(.32,.72,0,1); }
+body { margin: 0; min-width: 320px; min-height: 100vh; color: var(--text); background: var(--paper); font-family: 'Manrope', sans-serif; transition: color 700ms cubic-bezier(.32,.72,0,1), background-color 700ms cubic-bezier(.32,.72,0,1); }
 button, input, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
+[data-theme='dark'] [class~="bg-white"] { background-color: var(--raised) !important; }
+[data-theme='dark'] [class*="text-[var(--ink)]"] { color: var(--text); }
+[data-theme='dark'] [class*="text-[#3f413b]"] { color: #c9ccc0; }
+[data-theme='dark'] button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
+[data-theme='dark'] input, [data-theme='dark'] textarea { color: var(--text); }
+[data-theme='dark'] .shadow-sm { box-shadow: 0 4px 16px rgba(0,0,0,.18); }
 ::selection { background: var(--lime); color: var(--ink); }
 ::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-thumb { background: #b9baaf; border-radius: 999px; }
+
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-new(root) { animation: theme-reveal 850ms cubic-bezier(.32,.72,0,1); }
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+@keyframes theme-reveal { from { clip-path: circle(0 at var(--theme-x) var(--theme-y)); } to { clip-path: circle(150vmax at var(--theme-x) var(--theme-y)); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

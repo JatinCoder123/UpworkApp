@@ -10,7 +10,16 @@ export function Mark({ dark = false }) {
 }
 
 export function StatusPill({ status }) {
-  const colors = status === 'Applied' ? 'bg-[var(--lime)] text-[#2d3a0c]' : status === 'Rejected' ? 'bg-[#f5d6cf] text-[#8f3427]' : 'bg-[var(--lavender)]/60 text-[#494268]'
+  const colors = {
+    New: 'bg-[var(--lavender)]/60 text-[#494268]',
+    Shortlisted: 'bg-[#dce7f5] text-[#31506f]',
+    Drafting: 'bg-[#f6e8b8] text-[#655419]',
+    Applied: 'bg-[var(--lime)] text-[#2d3a0c]',
+    Interview: 'bg-[#d8e8dd] text-[#28533a]',
+    Won: 'bg-[#bce8cd] text-[#174b2b]',
+    Lost: 'bg-[#e5e1dc] text-[#5b5550]',
+    Rejected: 'bg-[#f5d6cf] text-[#8f3427]',
+  }[status] || 'bg-[var(--paper)] text-[var(--muted)]'
   return <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[.14em] ${colors}`}><span className="size-1.5 rounded-full bg-current" />{status}</span>
 }
 

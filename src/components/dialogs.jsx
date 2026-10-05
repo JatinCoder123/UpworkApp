@@ -45,3 +45,8 @@ export function DateFilterDialog({ value, skills, skillOptions, onApply, onClose
     <button disabled={preset === 'custom' && (!from || !to)} onClick={submit} className={`${primaryButton} mt-7 w-full`}><span>Apply time filter</span><span className="ml-auto grid size-8 place-items-center rounded-full bg-white/10"><ArrowUpRight size={15} /></span></button>
   </Modal>
 }
+
+export function SaveViewDialog({ onSave, onClose }) {
+  const [name, setName] = useState('')
+  return <Modal onClose={onClose}><DialogHeader eyebrow="Reusable workflow" title="Save this view" onClose={onClose} /><p className="mt-3 text-sm leading-6 text-[var(--muted)]">Save the current status, skills, search, layout, and time window as a one-click view.</p><label className="mt-7 block text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">View name<input autoFocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && name.trim() && onSave(name.trim())} placeholder="e.g. High-fit React jobs" className="mt-2 block w-full rounded-2xl bg-[var(--paper)] px-4 py-3.5 text-sm font-medium normal-case tracking-normal text-[var(--ink)] outline-none ring-1 ring-black/5 focus:ring-[var(--lime-dark)]" /></label><button disabled={!name.trim()} onClick={() => onSave(name.trim())} className={`${primaryButton} mt-7 w-full`}><span>Save current view</span><span className="ml-auto grid size-8 place-items-center rounded-full bg-white/10"><CheckCircle size={15} /></span></button></Modal>
+}
