@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;1,500&display=swap');
+@import "tailwindcss";
+
+:root {
+  --ink: #151713;
+  --paper: #f1f0e9;
+  --surface: #faf9f4;
+  --muted: #777a70;
+  --line: #d7d7cc;
+  --lime: #c8f55d;
+  --lime-dark: #a9d83d;
+  --orange: #f37a45;
+  --lavender: #cbc6ef;
+  --danger: #d75c4a;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--paper); }
+body { margin: 0; min-width: 320px; min-height: 100vh; color: var(--ink); background: var(--paper); font-family: 'Manrope', sans-serif; }
+button, input, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
+::selection { background: var(--lime); color: var(--ink); }
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-thumb { background: #b9baaf; border-radius: 999px; }
