@@ -23,7 +23,8 @@ export function scoreJob(job, preferences = loadPreferences()) {
   const skillMatches = job.tags.filter((tag) => preferences.skills.includes(tag))
   const skillRatio = skillMatches.length / Math.max(job.tags.length, 1)
   const skillPoints = Math.round(skillRatio * 35)
-  const rating = Number(job.clientStats?.rating || 0)
+  const parsedRating = Number(job.clientStats?.rating)
+  const rating = Number.isFinite(parsedRating) ? parsedRating : 0
   const clientPoints = rating >= 4.95 ? 20 : rating >= 4.8 ? 16 : rating >= 4.5 ? 10 : 4
   const spent = numberFrom(job.clientStats?.spent)
   const historyPoints = spent >= 100000 ? 12 : spent >= 50000 ? 10 : spent >= 10000 ? 7 : 3

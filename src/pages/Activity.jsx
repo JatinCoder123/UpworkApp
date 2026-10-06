@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowUpRight, Clock, PaperPlaneTilt, PlusCircle, Prohibit, ShieldCheck } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
 import Shell from '../components/Shell'
-import { api } from '../mockApi'
+import { api } from '../services/api'
 
 const eventIcon = (text) => text.includes('Applied') || text.includes('application') ? PaperPlaneTilt : text.includes('Rejected') || text.includes('Reason') ? Prohibit : text.includes('Duplicate') ? ShieldCheck : PlusCircle
 

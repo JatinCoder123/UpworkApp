@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUpRight, CalendarBlank, CheckCircle, Copy, LinkSimple, PaperPlaneTilt, X } from '@phosphor-icons/react'
-import { api } from '../mockApi'
+import { api } from '../services/api'
 import { coverLetterTemplate } from '../data'
 import { DialogHeader, Modal, primaryButton } from './ui'
 

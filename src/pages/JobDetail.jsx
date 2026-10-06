@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowUpRight, Clock, DotsThree, Sparkle, Star } from '@phosp
 import Shell from '../components/Shell'
 import { ActionDialog } from '../components/dialogs'
 import { iconButton, primaryButton, StatusPill } from '../components/ui'
-import { api } from '../mockApi'
+import { api } from '../services/api'
 import ScoreBreakdown from '../components/ScoreBreakdown'
 import { scoreJob } from '../lib/scoring'
 
