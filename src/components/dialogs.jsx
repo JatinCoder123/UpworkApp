@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUpRight, CalendarBlank, CheckCircle, Copy, LinkSimple, PaperPlaneTilt, X } from '@phosphor-icons/react'
 import { api } from '../services/api'
-import { coverLetterTemplate } from '../data'
 import { DialogHeader, Modal, primaryButton } from './ui'
 
 export function AddJobDialog({ onClose }) {
@@ -16,7 +15,7 @@ export function ActionDialog({ type, job, onClose }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [reason, setReason] = useState('')
-  const [letter, setLetter] = useState(coverLetterTemplate.replace('{company}', job.company))
+  const [letter, setLetter] = useState(job.coverLetter || '')
   const apply = type === 'apply'
   const mutation = useMutation({ mutationFn: api.updateStatus, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['jobs'] }); queryClient.invalidateQueries({ queryKey: ['job', job.id] }); onClose(); navigate('/jobs') } })
   return <Modal onClose={onClose} wide={apply}><DialogHeader eyebrow={apply ? 'Final review' : 'Archive opportunity'} title={apply ? 'Ready to make your move?' : 'Why isn’t this a fit?'} onClose={onClose} /><div className="mt-7 rounded-2xl bg-[var(--paper)] p-4"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-[var(--muted)]">{job.company}</p><p className="mt-1 text-sm font-semibold">{job.title}</p></div>{apply ? <><div className="mt-6 flex items-center justify-between"><label className="text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Cover letter</label><button onClick={() => navigator.clipboard?.writeText(letter)} className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--muted)]"><Copy size={13} />Copy</button></div><textarea value={letter} onChange={(event) => setLetter(event.target.value)} rows={12} className="mt-2 w-full resize-none rounded-2xl bg-[var(--paper)] p-5 text-sm leading-6 outline-none ring-1 ring-black/5 focus:ring-[var(--lime-dark)]" /></> : <><label className="mt-7 block text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Rejection reason · required</label><textarea autoFocus value={reason} onChange={(event) => setReason(event.target.value)} rows={5} placeholder="e.g. Budget is below our project minimum…" className="mt-2 w-full resize-none rounded-2xl bg-[var(--paper)] p-4 text-sm outline-none ring-1 ring-black/5 focus:ring-[var(--danger)]" /><p className="mt-2 text-[10px] text-[var(--muted)]">This note is stored in the opportunity activity log.</p></>}

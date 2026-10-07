@@ -84,6 +84,7 @@ export function mapGatewayJob(record) {
     url: descriptionValue(record.description, "Upwork link"),
     description: record.description || "No description provided.",
     pitch: record.pitch || "",
+    coverLetter: record.cover_letter || "",
     clientStats,
     activity: changes.activity || [`Imported from Smart Gateway as ${record.job_id || record.name}`, `Last updated ${record.date_modified_time_ago || "recently"}`],
     raw: record,
