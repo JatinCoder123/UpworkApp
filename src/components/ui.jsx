@@ -12,6 +12,7 @@ export function Mark({ dark = false }) {
 export function StatusPill({ status }) {
   const colors = {
     New: 'bg-[var(--lavender)]/60 text-[#494268]',
+    Seen: 'bg-[#e5e9de] text-[#566044]',
     Shortlisted: 'bg-[#dce7f5] text-[#31506f]',
     Drafting: 'bg-[#f6e8b8] text-[#655419]',
     Applied: 'bg-[var(--lime)] text-[#2d3a0c]',

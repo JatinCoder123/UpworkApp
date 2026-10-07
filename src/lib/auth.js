@@ -1,36 +1,39 @@
-const SESSION_KEY = "pitchflow-session";
-export const DEMO_PASSWORD = "upwork@123";
+const AUTH_ORIGIN = "https://upworkapp.backend.outrightcrm.in".replace(/\/$/, "");
+const LOGIN_INTRO_KEY = "upworkapp-login-intro";
 
-export function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(value.trim());
+export function startMicrosoftLogin() {
+  sessionStorage.setItem(LOGIN_INTRO_KEY, "pending");
+  window.location.assign(`${AUTH_ORIGIN}/`);
 }
 
-export function nameFromEmail(email) {
-  const localPart = email.split("@")[0] || "User";
-  return localPart
-    .split(/[._+-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(" ") || "User";
+export function consumeLoginIntro() {
+  const pending = sessionStorage.getItem(LOGIN_INTRO_KEY) === "pending";
+  if (pending) sessionStorage.removeItem(LOGIN_INTRO_KEY);
+  return pending;
 }
 
-export function createSession(email) {
-  const user = { email: email.trim().toLowerCase(), name: nameFromEmail(email.trim()) };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-  return user;
+export async function fetchSessionUser({ signal } = {}) {
+  const response = await fetch(`${AUTH_ORIGIN}/api/auth/me`, {
+    credentials: "include",
+    signal,
+  });
+
+  if (response.status === 401) return null;
+  if (!response.ok) throw new Error("Unable to verify your session. Please try again.");
+
+  const data = await response.json();
+  return data?.authenticated && data?.user ? data.user : null;
 }
 
-export function getSessionUser() {
-  try {
-    const user = JSON.parse(localStorage.getItem(SESSION_KEY));
-    return user?.email && user?.name ? user : null;
-  } catch {
-    return null;
+export async function endSession() {
+  const response = await fetch(`${AUTH_ORIGIN}/api/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (!response.ok && response.status !== 401) {
+    throw new Error("Unable to sign out. Please try again.");
   }
-}
-
-export function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
 }
 
 export function userInitials(name) {

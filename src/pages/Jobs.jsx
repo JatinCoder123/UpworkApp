@@ -14,28 +14,30 @@ import {
 } from "@phosphor-icons/react";
 import Shell from "../components/Shell";
 import JobCard from "../components/JobCard";
+import LogoLoader from "../components/LogoLoader";
 import {
   AddJobDialog,
   DateFilterDialog,
   SaveViewDialog,
+  StatusConfirmDialog,
 } from "../components/dialogs";
 import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
 import { Link } from "react-router-dom";
 import { scoreJob } from "../lib/scoring";
-import { loadSavedViews, saveViews } from "../lib/preferences";
+import { loadJobStatus, loadSavedViews, saveJobStatus, saveViews } from "../lib/preferences";
 
-const pipeline = ["New", "Applied", "Rejected"];
+const pipeline = ["New", "Seen", "Applied", "Rejected"];
 
-function KanbanCard({ job, onDragStart }) {
+function KanbanCard({ job, onDragStart, onStatusChange }) {
   const fit = scoreJob(job);
   return (
-    <Link
-      to={`/jobs/${job.id}`}
+    <div
       draggable
       onDragStart={(event) => onDragStart(event, job.id)}
-      className="group block cursor-grab rounded-2xl bg-white p-4 ring-1 ring-black/5 transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-0.5 hover:shadow-[0_15px_35px_rgba(30,32,25,.08)] active:cursor-grabbing"
+      className="group relative cursor-grab overflow-hidden rounded-2xl bg-white p-2 ring-1 ring-black/5 transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-0.5 hover:shadow-[0_15px_35px_rgba(30,32,25,.08)] active:cursor-grabbing"
     >
+      <Link to={`/jobs/${job.id}`} className="block p-2">
       <div className="flex items-center justify-between gap-3">
         <span className="text-[9px] font-bold uppercase tracking-[.12em] text-[var(--muted)]">
           {job.company}
@@ -56,7 +58,12 @@ function KanbanCard({ job, onDragStart }) {
           <ArrowUpRight size={12} />
         </span>
       </div>
-    </Link>
+      </Link>
+      {!['Applied', 'Rejected'].includes(job.status) && <div className="absolute bottom-2 right-2 z-20 flex gap-1.5 rounded-full bg-white/92 p-1.5 shadow-[0_8px_24px_rgba(30,32,25,.15)] ring-1 ring-black/5 backdrop-blur-md transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] sm:translate-y-2 sm:opacity-0 sm:pointer-events-none sm:group-hover:translate-y-0 sm:group-hover:opacity-100 sm:group-hover:pointer-events-auto sm:group-focus-within:translate-y-0 sm:group-focus-within:opacity-100 sm:group-focus-within:pointer-events-auto">
+        <button type="button" onClick={() => onStatusChange(job, 'Applied')} className="rounded-full bg-[var(--lime)]/55 px-2.5 py-1.5 text-[8px] font-bold text-[#34420f] ring-1 ring-[var(--lime-dark)]/20 transition-colors hover:bg-[var(--lime)]">Accept</button>
+        <button type="button" onClick={() => onStatusChange(job, 'Rejected')} className="rounded-full px-2.5 py-1.5 text-[8px] font-bold text-[var(--danger)] ring-1 ring-[var(--danger)]/20 transition-colors hover:bg-[#f5d6cf]/65">Reject</button>
+      </div>}
+    </div>
   );
 }
 
@@ -105,7 +112,7 @@ export default function Jobs() {
     queryKey: ["jobs"],
     queryFn: api.getJobs,
   });
-  const [tab, setTab] = useState("New"),
+  const [tab, setTab] = useState(loadJobStatus),
     [view, setView] = useState("list"),
     [search, setSearch] = useState(""),
     [adding, setAdding] = useState(false),
@@ -113,7 +120,8 @@ export default function Jobs() {
     [dateDialog, setDateDialog] = useState(false),
     [dateFilter, setDateFilter] = useState({ preset: "all", from: "", to: "" }),
     [savedViews, setSavedViews] = useState(loadSavedViews),
-    [savingView, setSavingView] = useState(false);
+    [savingView, setSavingView] = useState(false),
+    [statusConfirmation, setStatusConfirmation] = useState(null);
   const root = useRef(null);
   const skillOptions = useMemo(
     () => [...new Set(jobs.flatMap((job) => job.tags))].sort(),
@@ -269,6 +277,7 @@ export default function Jobs() {
                     key={item}
                     onClick={() => {
                       setTab(item);
+                      saveJobStatus(item);
                       setView("list");
                     }}
                     className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${tab === item && view === "list" ? "bg-[var(--ink)] text-white" : "text-[var(--muted)]"}`}
@@ -369,9 +378,7 @@ export default function Jobs() {
           </div>
         </section>
         {isLoading ? (
-          <div className="py-24 text-center text-sm text-[var(--muted)]">
-            Curating opportunities…
-          </div>
+          <LogoLoader className="min-h-[38dvh]" label="Loading opportunities" />
         ) : isError ? (
           <section className="py-24 text-center">
             <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--danger)]/10">
@@ -422,6 +429,7 @@ export default function Jobs() {
                           key={job.id}
                           job={job}
                           onDragStart={startDrag}
+                          onStatusChange={(selectedJob, status) => setStatusConfirmation({ job: selectedJob, status })}
                         />
                       ))}
                   </div>
@@ -432,7 +440,7 @@ export default function Jobs() {
         ) : filtered.length ? (
           <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((job) => (
-              <JobCard key={job.id} job={job} />
+              <JobCard key={job.id} job={job} onStatusChange={(selectedJob, status) => setStatusConfirmation({ job: selectedJob, status })} />
             ))}
           </section>
         ) : (
@@ -468,6 +476,7 @@ export default function Jobs() {
             onSave={storeView}
           />
         )}
+        {statusConfirmation && <StatusConfirmDialog job={statusConfirmation.job} status={statusConfirmation.status} onClose={() => setStatusConfirmation(null)} />}
       </main>
     </Shell>
   );

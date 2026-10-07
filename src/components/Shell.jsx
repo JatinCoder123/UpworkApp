@@ -4,21 +4,30 @@ import { CaretDown, SignOut, SlidersHorizontal, User, UserCircle } from '@phosph
 import { useQueryClient } from '@tanstack/react-query'
 import { Mark, iconButton } from './ui'
 import ThemeToggle from './ThemeToggle'
-import { clearSession, getSessionUser, userInitials } from '../lib/auth'
+import { userInitials } from '../lib/auth'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function Shell({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [profileOpen, setProfileOpen] = useState(false)
-  const user = getSessionUser()
+  const { user, logout: endAuthSession } = useAuth()
   const menuRef = useRef(null)
   useEffect(() => {
     const dismiss = (event) => !menuRef.current?.contains(event.target) && setProfileOpen(false)
     document.addEventListener('pointerdown', dismiss)
     return () => document.removeEventListener('pointerdown', dismiss)
   }, [])
-  const logout = () => { queryClient.clear(); clearSession(); navigate('/login', { replace: true }) }
+  const logout = async () => {
+    try {
+      await endAuthSession()
+      queryClient.clear()
+      navigate('/login', { replace: true })
+    } catch (error) {
+      window.alert(error.message)
+    }
+  }
   const active = (path) => location.pathname.startsWith(path)
   return <div className="min-h-[100dvh] bg-[var(--paper)]">
     <header className="sticky top-0 z-30 px-3 pt-3 md:px-6 md:pt-5">

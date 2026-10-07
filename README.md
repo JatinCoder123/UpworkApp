@@ -1,4 +1,18 @@
-# React + Vite
+# UpWorkApp frontend
+
+## Microsoft authentication
+
+Authentication is handled by the separate Express backend. In production the frontend uses
+`https://upworkapp.backend.outrightcrm.in`. Set `VITE_AUTH_BASE_URL` to override that origin.
+
+For local development, copy `.env.example` to `.env.local` and ensure the backend permits the
+frontend origin through its `APP_URL` configuration. The browser must be able to send credentialed
+CORS requests to the authentication backend.
+
+The backend must set `LOGIN_SUCCESS_PATH=/jobs` so a successful Microsoft callback returns users
+to the application.
+
+## Development
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

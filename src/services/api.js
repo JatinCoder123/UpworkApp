@@ -77,7 +77,7 @@ export function mapGatewayJob(record) {
     type: /hour|\/hr/i.test(record.budget || "") ? "Hourly" : "Fixed price",
     level: "Not specified",
     duration: "See job description",
-    status: changes.status || descriptionValue(record.description, "Status") || "New",
+    status: changes.status || record.status?.trim() || descriptionValue(record.description, "Status") || "New",
     match: Number(record.fit) || 0,
     tags: tags.length ? tags : ["General"],
     image: "",
@@ -116,6 +116,12 @@ export const api = {
   getJob: fetchJobById,
   async updateStatus({ id, status, reason, coverLetter }) {
     const current = await fetchJobById(id);
+    await smartGateway({
+      action: "update",
+      module: JOBS_MODULE,
+      id,
+      data: { status },
+    });
     const changes = { status, reason, coverLetter, activity: [`Status changed from ${current.status} to ${status}`, ...current.activity] };
     localChanges.set(id, changes);
     return { ...current, ...changes };

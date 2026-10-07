@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import gsap from 'gsap'
 import { ArrowLeft, ArrowUpRight, Clock, DotsThree, Sparkle, Star } from '@phosphor-icons/react'
@@ -8,15 +8,32 @@ import { ActionDialog } from '../components/dialogs'
 import { iconButton, primaryButton, StatusPill } from '../components/ui'
 import { api } from '../services/api'
 import ScoreBreakdown from '../components/ScoreBreakdown'
+import JobDetailSkeleton from '../components/JobDetailSkeleton'
 import { scoreJob } from '../lib/scoring'
 
 function Metric({ label, value, note, last }) { return <div className={`py-3 sm:px-6 ${!last ? 'border-b border-black/[.07] sm:border-b-0 sm:border-r' : ''} first:pl-0`}><p className="text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">{label}</p><p className="mt-2 text-xl font-semibold tracking-[-.035em]">{value}</p><p className="mt-1 text-[10px] text-[var(--muted)]">{note}</p></div> }
 
 export default function JobDetail() {
-  const { id } = useParams(), [dialog, setDialog] = useState(null), root = useRef(null)
+  const { id } = useParams(), [dialog, setDialog] = useState(null), root = useRef(null), seenJob = useRef(null), queryClient = useQueryClient()
   const { data: job, isLoading, isError } = useQuery({ queryKey: ['job', id], queryFn: () => api.getJob(id), retry: false })
-  useEffect(() => { if (!job || !root.current) return; const ctx = gsap.context(() => gsap.fromTo('[data-detail]', { y: 24, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .72, stagger: .07, ease: 'power3.out', clearProps: 'opacity,visibility,transform' }), root); return () => ctx.revert() }, [job])
-  if (isLoading) return <Shell><div className="grid min-h-[70dvh] place-items-center text-sm text-[var(--muted)]">Opening opportunity…</div></Shell>
+  const jobId = job?.id
+  const { mutate: markJobSeen } = useMutation({
+    mutationFn: () => api.updateStatus({ id, status: 'Seen' }),
+    onSuccess: (updatedJob) => {
+      queryClient.setQueryData(['job', id], updatedJob)
+      queryClient.setQueryData(['jobs'], (jobs = []) => jobs.map((item) => item.id === id ? { ...item, status: 'Seen' } : item))
+    },
+  })
+  useEffect(() => {
+    if (job?.status !== 'New' || seenJob.current === id) return
+    const timer = window.setTimeout(() => {
+      seenJob.current = id
+      markJobSeen()
+    }, 3000)
+    return () => window.clearTimeout(timer)
+  }, [job?.status, id, markJobSeen])
+  useEffect(() => { if (!jobId || !root.current) return; const ctx = gsap.context(() => gsap.fromTo('[data-detail]', { y: 24, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .72, stagger: .07, ease: 'power3.out', clearProps: 'opacity,visibility,transform' }), root); return () => ctx.revert() }, [jobId])
+  if (isLoading) return <Shell><JobDetailSkeleton /></Shell>
   if (isError || !job) return <Navigate to="/jobs" replace />
   const fit = scoreJob(job)
   return <Shell><main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-10 sm:px-6 md:pt-14"><div data-detail className="flex items-center justify-between"><Link to="/jobs" className="inline-flex items-center gap-2 text-xs font-bold text-[var(--muted)]"><span className="grid size-9 place-items-center rounded-full bg-black/5"><ArrowLeft size={15} /></span>All opportunities</Link><button className={iconButton}><DotsThree size={20} /></button></div><section className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1.25fr)_minmax(19rem,.75fr)] xl:gap-16"><div><div data-detail className="flex flex-wrap items-center gap-3"><StatusPill status={job.status} /><span className="text-[10px] font-bold uppercase tracking-[.15em] text-[var(--muted)]">Posted {job.posted}</span></div><h1 data-detail className="mt-6 max-w-5xl text-[clamp(2.35rem,4.6vw,4.9rem)] font-semibold leading-[.96] tracking-[-.065em]">{job.title}</h1><div data-detail className="mt-8 flex flex-wrap items-center gap-4"><div className="relative size-12 overflow-hidden rounded-2xl bg-[var(--ink)] text-white"><img src={job.image} className="size-full object-cover opacity-70" alt="" /><span className="absolute inset-0 grid place-items-center text-xs font-bold">{job.client}</span></div><div><p className="font-bold">{job.company}</p><p className="mt-1 text-xs text-[var(--muted)]">{job.location}</p></div><div className="ml-2 flex items-center gap-1 rounded-full bg-[var(--lime)]/60 px-3 py-1.5 text-xs font-bold"><Star size={13} weight="fill" />{job.clientStats.rating}</div></div>

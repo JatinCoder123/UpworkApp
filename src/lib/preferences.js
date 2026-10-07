@@ -22,3 +22,14 @@ export function loadSavedViews() {
 export function saveViews(views) {
   localStorage.setItem('pitchflow-saved-views', JSON.stringify(views))
 }
+
+const JOB_STATUS_KEY = 'pitchflow-job-status'
+
+export function loadJobStatus() {
+  const status = localStorage.getItem(JOB_STATUS_KEY)
+  return ['New', 'Seen', 'Applied', 'Rejected'].includes(status) ? status : 'New'
+}
+
+export function saveJobStatus(status) {
+  localStorage.setItem(JOB_STATUS_KEY, status)
+}
