@@ -28,7 +28,7 @@ export async function smartGateway(payload) {
   const response = await apiClient.post("", payload, {
     headers: { "X-Api-Token": token },
   });
-  if (!response.data?.success) throw new Error(response.data?.message || "Smart Gateway request failed");
+  if (!response.data?.success) throw new Error(response.data?.message || "The request could not be completed");
   return response.data;
 }
 
@@ -86,7 +86,7 @@ export function mapGatewayJob(record) {
     pitch: record.pitch || "",
     coverLetter: record.cover_letter || "",
     clientStats,
-    activity: changes.activity || [`Imported from Smart Gateway as ${record.job_id || record.name}`, `Last updated ${record.date_modified_time_ago || "recently"}`],
+    activity: changes.activity || [`Opportunity imported as ${record.job_id || record.name}`, `Last updated ${record.date_modified_time_ago || "recently"}`],
     raw: record,
     ...changes,
   };

@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import gsap from "gsap";
 import {
-  ArrowUpRight,
   BookmarkSimple,
   Briefcase,
   Funnel,
-  ListBullets,
   MagnifyingGlass,
   Plus,
-  SquaresFour,
   X,
 } from "@phosphor-icons/react";
 import Shell from "../components/Shell";
@@ -23,49 +20,9 @@ import {
 } from "../components/dialogs";
 import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
-import { Link } from "react-router-dom";
-import { scoreJob } from "../lib/scoring";
 import { loadJobStatus, loadSavedViews, saveJobStatus, saveViews } from "../lib/preferences";
 
 const pipeline = ["New", "Seen", "Applied", "Rejected"];
-
-function KanbanCard({ job, onDragStart, onStatusChange }) {
-  const fit = scoreJob(job);
-  return (
-    <div
-      draggable
-      onDragStart={(event) => onDragStart(event, job.id)}
-      className="group relative cursor-grab overflow-hidden rounded-2xl bg-white p-2 ring-1 ring-black/5 transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-0.5 hover:shadow-[0_15px_35px_rgba(30,32,25,.08)] active:cursor-grabbing"
-    >
-      <Link to={`/jobs/${job.id}`} className="block p-2">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[9px] font-bold uppercase tracking-[.12em] text-[var(--muted)]">
-          {job.company}
-        </span>
-        <span className="text-[9px] font-bold text-[#587814]">
-          {fit.score}%
-        </span>
-      </div>
-      <h3 className="mt-3 text-sm font-semibold leading-5 tracking-[-.02em]">
-        {job.title}
-      </h3>
-      <div className="mt-4 flex items-end justify-between">
-        <div>
-          <p className="text-xs font-bold">{job.budget}</p>
-          <p className="mt-1 text-[9px] text-[var(--muted)]">{job.posted}</p>
-        </div>
-        <span className="grid size-7 place-items-center rounded-full bg-black/5 transition-transform duration-500 group-hover:rotate-12">
-          <ArrowUpRight size={12} />
-        </span>
-      </div>
-      </Link>
-      {!['Applied', 'Rejected'].includes(job.status) && <div className="absolute bottom-2 right-2 z-20 flex gap-1.5 rounded-full bg-white/92 p-1.5 shadow-[0_8px_24px_rgba(30,32,25,.15)] ring-1 ring-black/5 backdrop-blur-md transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] sm:translate-y-2 sm:opacity-0 sm:pointer-events-none sm:group-hover:translate-y-0 sm:group-hover:opacity-100 sm:group-hover:pointer-events-auto sm:group-focus-within:translate-y-0 sm:group-focus-within:opacity-100 sm:group-focus-within:pointer-events-auto">
-        <button type="button" onClick={() => onStatusChange(job, 'Applied')} className="rounded-full bg-[var(--lime)]/55 px-2.5 py-1.5 text-[8px] font-bold text-[#34420f] ring-1 ring-[var(--lime-dark)]/20 transition-colors hover:bg-[var(--lime)]">Accept</button>
-        <button type="button" onClick={() => onStatusChange(job, 'Rejected')} className="rounded-full px-2.5 py-1.5 text-[8px] font-bold text-[var(--danger)] ring-1 ring-[var(--danger)]/20 transition-colors hover:bg-[#f5d6cf]/65">Reject</button>
-      </div>}
-    </div>
-  );
-}
 
 const dateLabels = {
   all: "Any time",
@@ -107,13 +64,11 @@ function isInsideDateFilter(postedAt, filter) {
 }
 
 export default function Jobs() {
-  const queryClient = useQueryClient();
   const { data: jobs = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["jobs"],
     queryFn: api.getJobs,
   });
   const [tab, setTab] = useState(loadJobStatus),
-    [view, setView] = useState("list"),
     [search, setSearch] = useState(""),
     [adding, setAdding] = useState(false),
     [skills, setSkills] = useState([]),
@@ -151,24 +106,10 @@ export default function Jobs() {
         ? current.filter((item) => item !== skill)
         : [...current, skill],
     );
-  const moveJob = useMutation({
-    mutationFn: ({ id, status }) => api.updateStatus({ id, status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-  });
-  const startDrag = (event, id) => {
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/job-id", id);
-  };
-  const dropInto = (event, status) => {
-    event.preventDefault();
-    const id = event.dataTransfer.getData("text/job-id");
-    const job = jobs.find((item) => item.id === id);
-    if (job && job.status !== status) moveJob.mutate({ id, status });
-  };
   const storeView = (name) => {
     const next = [
       ...savedViews,
-      { id: crypto.randomUUID(), name, tab, view, search, skills, dateFilter },
+      { id: crypto.randomUUID(), name, tab, search, skills, dateFilter },
     ];
     setSavedViews(next);
     saveViews(next);
@@ -176,7 +117,7 @@ export default function Jobs() {
   };
   const applyView = (saved) => {
     setTab(saved.tab);
-    setView(saved.view);
+    saveJobStatus(saved.tab);
     setSearch(saved.search);
     setSkills(saved.skills);
     setDateFilter(saved.dateFilter);
@@ -278,13 +219,12 @@ export default function Jobs() {
                     onClick={() => {
                       setTab(item);
                       saveJobStatus(item);
-                      setView("list");
                     }}
-                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${tab === item && view === "list" ? "bg-[var(--ink)] text-white" : "text-[var(--muted)]"}`}
+                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${tab === item ? "bg-[var(--ink)] text-white" : "text-[var(--muted)]"}`}
                   >
                     {item}
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[9px] ${tab === item && view === "list" ? "bg-white/12" : "bg-black/5"}`}
+                      className={`rounded-full px-2 py-0.5 text-[9px] ${tab === item ? "bg-white/12" : "bg-black/5"}`}
                     >
                       {jobs.filter((job) => job.status === item).length}
                     </span>
@@ -299,22 +239,6 @@ export default function Jobs() {
                 >
                   <BookmarkSimple size={16} />
                 </button>
-                <div className="flex rounded-full bg-[var(--paper)] p-1">
-                  <button
-                    onClick={() => setView("list")}
-                    aria-label="List view"
-                    className={`grid size-8 place-items-center rounded-full ${view === "list" ? "bg-white shadow-sm" : "text-[var(--muted)]"}`}
-                  >
-                    <ListBullets size={15} />
-                  </button>
-                  <button
-                    onClick={() => setView("board")}
-                    aria-label="Board view"
-                    className={`grid size-8 place-items-center rounded-full ${view === "board" ? "bg-white shadow-sm" : "text-[var(--muted)]"}`}
-                  >
-                    <SquaresFour size={15} />
-                  </button>
-                </div>
                 <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-4 py-2.5 md:w-64">
                   <MagnifyingGlass size={15} className="text-[var(--muted)]" />
                   <input
@@ -387,55 +311,12 @@ export default function Jobs() {
             <h3 className="mt-5 text-xl font-semibold">Could not load opportunities</h3>
             <p className="mx-auto mt-2 max-w-lg text-sm text-[var(--muted)]">
               {error?.response?.status === 401
-                ? "The Smart Gateway rejected the request. Configure its secret or route the request through your backend."
-                : error?.message || "Check the gateway connection and try again."}
+                ? "The service rejected the request. Please sign in again or contact your administrator."
+                : error?.message || "Check the connection and try again."}
             </p>
             <button onClick={() => refetch()} className={`${primaryButton} mt-5`}>
               Try again
             </button>
-          </section>
-        ) : view === "board" ? (
-          <section className="mt-6 overflow-x-auto pb-5">
-            <div className="grid min-w-[1500px] grid-cols-8 gap-3">
-              {pipeline.map((status) => (
-                <div
-                  key={status}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => dropInto(event, status)}
-                  className="min-h-72 rounded-[1.5rem] bg-black/[.035] p-2 ring-1 ring-black/5"
-                >
-                  <div className="flex items-center justify-between px-2 py-2">
-                    <span className="text-[10px] font-bold uppercase tracking-[.13em]">
-                      {status}
-                    </span>
-                    <span className="text-[9px] text-[var(--muted)]">
-                      {jobs.filter((job) => job.status === status).length}
-                    </span>
-                  </div>
-                  <div className="mt-1 space-y-2">
-                    {jobs
-                      .filter(
-                        (job) =>
-                          job.status === status &&
-                          (!skills.length ||
-                            skills.some((skill) => job.tags.includes(skill))) &&
-                          isInsideDateFilter(job.postedAt, dateFilter) &&
-                          `${job.title} ${job.company}`
-                            .toLowerCase()
-                            .includes(search.toLowerCase()),
-                      )
-                      .map((job) => (
-                        <KanbanCard
-                          key={job.id}
-                          job={job}
-                          onDragStart={startDrag}
-                          onStatusChange={(selectedJob, status) => setStatusConfirmation({ job: selectedJob, status })}
-                        />
-                      ))}
-                  </div>
-                </div>
-              ))}
-            </div>
           </section>
         ) : filtered.length ? (
           <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">

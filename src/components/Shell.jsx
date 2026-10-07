@@ -38,7 +38,6 @@ export default function Shell({ children }) {
           <Link to="/activity" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/activity') ? 'bg-white shadow-[0_4px_18px_rgba(0,0,0,.07)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Activity</Link>
         </nav>
         <div className="flex items-center gap-2">
-          <span className="hidden items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold text-[var(--muted)] sm:flex"><span className="size-2 rounded-full bg-[var(--lime-dark)]" />API connected</span>
           <ThemeToggle />
           <div ref={menuRef} className="relative">
             <button aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)} className={`${iconButton} size-9`} aria-label="Open profile menu"><User size={17} weight="light" /></button>

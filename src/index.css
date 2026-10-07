@@ -55,15 +55,24 @@ button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
 .session-loader-orbit { position: absolute; inset: 0; border-radius: 999px; animation: session-loader-orbit 1.7s linear infinite; }
 .session-loader-orbit i { position: absolute; left: 50%; top: -.2rem; width: .7rem; height: .7rem; translate: -50% 0; border-radius: 999px; background: var(--lime-dark); box-shadow: 0 0 0 .35rem color-mix(in srgb, var(--lime) 22%, transparent), 0 0 1.5rem color-mix(in srgb, var(--lime-dark) 48%, transparent); }
 .session-loader-progress { animation: session-loader-progress 1.45s cubic-bezier(.65,0,.35,1) infinite alternate; }
-.logo-loader-motion { position: relative; animation: logo-loader-motion 1.35s cubic-bezier(.32,.72,0,1) infinite; }
-.logo-loader-shadow { position: absolute; left: 50%; top: calc(100% + .65rem); width: 1.75rem; height: .3rem; translate: -50% 0; border-radius: 999px; background: var(--ink); opacity: .12; filter: blur(4px); animation: logo-loader-shadow 1.35s cubic-bezier(.32,.72,0,1) infinite; }
+.logo-loader-morph { position: relative; display: grid; width: 5.5rem; height: 5.5rem; place-items: center; }
+.logo-loader-dot-ring { position: absolute; inset: 0; animation: logo-loader-spin 1.8s cubic-bezier(.65,0,.35,1) infinite; }
+.logo-loader-dot-ring i { position: absolute; left: 50%; top: 50%; width: .42rem; height: .42rem; margin: -.21rem; border-radius: 999px; background: var(--lime-dark); animation: logo-loader-converge 1.8s cubic-bezier(.65,0,.35,1) infinite; }
+.logo-loader-dot-ring i:nth-child(1) { --dot-angle: 0deg; }
+.logo-loader-dot-ring i:nth-child(2) { --dot-angle: 90deg; }
+.logo-loader-dot-ring i:nth-child(3) { --dot-angle: 180deg; }
+.logo-loader-dot-ring i:nth-child(4) { --dot-angle: 270deg; }
+.logo-loader-circle { position: absolute; width: 4.25rem; height: 4.25rem; border: 1px solid var(--lime-dark); border-radius: 999px; animation: logo-loader-circle 1.8s cubic-bezier(.32,.72,0,1) infinite; }
+.logo-loader-mark { position: relative; z-index: 1; animation: logo-loader-mark 1.8s cubic-bezier(.32,.72,0,1) infinite; }
 .skeleton-bone { position: relative; overflow: hidden; background: color-mix(in srgb, var(--muted) 12%, var(--surface)); }
 .skeleton-bone::after { content: ''; position: absolute; inset: 0; translate: -110% 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--raised) 72%, transparent), transparent); animation: skeleton-sweep 1.65s ease-in-out infinite; }
 @keyframes session-loader-orbit { to { rotate: 360deg; } }
 @keyframes session-loader-breathe { 0%, 100% { scale: .92; opacity: .45; } 50% { scale: 1; opacity: 1; } }
 @keyframes session-loader-progress { from { translate: -105% 0; } to { translate: 205% 0; } }
-@keyframes logo-loader-motion { 0%, 100% { translate: 0 0; rotate: 0deg; } 45% { translate: 0 -.45rem; rotate: -4deg; } 65% { translate: 0 -.35rem; rotate: 3deg; } }
-@keyframes logo-loader-shadow { 0%, 100% { scale: 1; opacity: .12; } 50% { scale: .68; opacity: .06; } }
+@keyframes logo-loader-spin { 0% { rotate: 0deg; } 68% { rotate: 250deg; } 100% { rotate: 360deg; } }
+@keyframes logo-loader-converge { 0%, 55% { transform: rotate(var(--dot-angle)) translateY(-2.55rem) scale(1); opacity: 1; } 78%, 100% { transform: rotate(var(--dot-angle)) translateY(-2.12rem) scale(.25); opacity: 0; } }
+@keyframes logo-loader-circle { 0%, 48% { scale: .35; opacity: 0; } 72% { scale: 1; opacity: .65; } 100% { scale: 1.08; opacity: 0; } }
+@keyframes logo-loader-mark { 0%, 42% { scale: .82; opacity: .4; } 72% { scale: 1; opacity: 1; } 100% { scale: .94; opacity: .65; } }
 @keyframes skeleton-sweep { 55%, 100% { translate: 110% 0; } }
 
 .intro-grid {
