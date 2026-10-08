@@ -57,6 +57,18 @@ function parseClient(clientText) {
   };
 }
 
+function buildUpworkApplyUrl(value) {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    if (!/(^|\.)upwork\.com$/i.test(url.hostname)) return "";
+    const jobId = url.pathname.match(/~[a-zA-Z0-9]+/)?.[0];
+    return jobId ? `https://www.upwork.com/nx/proposals/job/${jobId}/apply` : "";
+  } catch {
+    return "";
+  }
+}
+
 export function mapGatewayJob(record) {
   const clientStats = parseClient(record.client);
   const changes = localChanges.get(record.id) || {};
@@ -64,6 +76,7 @@ export function mapGatewayJob(record) {
   const built = record.already_built?.trim();
   const tags = [...new Set([category, built].filter((value) => value && value !== "–" && value !== "—"))];
   const owner = descriptionValue(record.description, "Lead");
+  const url = descriptionValue(record.description, "Upwork link");
   return {
     id: record.id,
     jobId: record.job_id || record.name,
@@ -81,7 +94,8 @@ export function mapGatewayJob(record) {
     match: Number(record.fit) || 0,
     tags: tags.length ? tags : ["General"],
     image: "",
-    url: descriptionValue(record.description, "Upwork link"),
+    url,
+    applyUrl: buildUpworkApplyUrl(url),
     description: record.description || "No description provided.",
     pitch: record.pitch || "",
     coverLetter: record.cover_letter || "",

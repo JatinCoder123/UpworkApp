@@ -5,8 +5,11 @@ import {
   BookmarkSimple,
   Briefcase,
   Funnel,
+  ListBullets,
   MagnifyingGlass,
   Plus,
+  Rows,
+  SquaresFour,
   X,
 } from "@phosphor-icons/react";
 import Shell from "../components/Shell";
@@ -16,13 +19,17 @@ import {
   AddJobDialog,
   DateFilterDialog,
   SaveViewDialog,
-  StatusConfirmDialog,
 } from "../components/dialogs";
 import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
-import { loadJobStatus, loadSavedViews, saveJobStatus, saveViews } from "../lib/preferences";
+import { loadJobLayout, loadJobStatus, loadSavedViews, saveJobLayout, saveJobStatus, saveViews } from "../lib/preferences";
 
-const pipeline = ["New", "Seen", "Applied", "Rejected"];
+const pipeline = ["New", "Most recent", "Applied", "Rejected"];
+const layouts = [
+  { id: "grid", label: "Grid", icon: SquaresFour },
+  { id: "list", label: "List", icon: ListBullets },
+  { id: "compact", label: "Compact", icon: Rows },
+];
 
 const dateLabels = {
   all: "Any time",
@@ -68,15 +75,15 @@ export default function Jobs() {
     queryKey: ["jobs"],
     queryFn: api.getJobs,
   });
-  const [tab, setTab] = useState(loadJobStatus),
+  const [tab, setTab] = useState(() => loadJobStatus() === "Seen" ? "New" : loadJobStatus()),
+    [layout, setLayout] = useState(loadJobLayout),
     [search, setSearch] = useState(""),
     [adding, setAdding] = useState(false),
     [skills, setSkills] = useState([]),
     [dateDialog, setDateDialog] = useState(false),
     [dateFilter, setDateFilter] = useState({ preset: "all", from: "", to: "" }),
     [savedViews, setSavedViews] = useState(loadSavedViews),
-    [savingView, setSavingView] = useState(false),
-    [statusConfirmation, setStatusConfirmation] = useState(null);
+    [savingView, setSavingView] = useState(false);
   const root = useRef(null);
   const skillOptions = useMemo(
     () => [...new Set(jobs.flatMap((job) => job.tags))].sort(),
@@ -90,14 +97,14 @@ export default function Jobs() {
     () =>
       jobs.filter(
         (job) =>
-          job.status === tab &&
+          (tab === "New" ? ["New", "Seen"].includes(job.status) : tab === "Most recent" ? true : job.status === tab) &&
           `${job.title} ${job.company} ${job.tags.join(" ")}`
             .toLowerCase()
             .includes(search.toLowerCase()) &&
           (!skills.length ||
             skills.some((skill) => job.tags.includes(skill))) &&
           isInsideDateFilter(job.postedAt, dateFilter),
-      ),
+      ).sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt)),
     [jobs, tab, search, skills, dateFilter],
   );
   const toggleSkill = (skill) =>
@@ -116,8 +123,9 @@ export default function Jobs() {
     setSavingView(false);
   };
   const applyView = (saved) => {
-    setTab(saved.tab);
-    saveJobStatus(saved.tab);
+    const nextTab = saved.tab === "Seen" ? "New" : saved.tab;
+    setTab(nextTab);
+    saveJobStatus(nextTab);
     setSearch(saved.search);
     setSkills(saved.skills);
     setDateFilter(saved.dateFilter);
@@ -146,7 +154,7 @@ export default function Jobs() {
       );
       return () => ctx.revert();
     }
-  }, [tab, search, skills, dateFilter, isLoading]);
+  }, [tab, search, skills, dateFilter, layout, isLoading]);
   return (
     <Shell>
       <main
@@ -159,7 +167,7 @@ export default function Jobs() {
               <span className="h-px w-7 bg-[var(--ink)]/25" />
               Opportunity desk
             </div>
-            <h1 className="max-w-4xl text-[clamp(3.5rem,7vw,7.5rem)] font-semibold leading-[.82] tracking-[-.085em]">
+            <h1 className="max-w-4xl text-[clamp(2.75rem,5vw,5.5rem)] font-semibold leading-[.9] tracking-[-.065em]">
               The right work,
               <br />
               <span className="font-serif font-medium italic">in focus.</span>
@@ -181,7 +189,7 @@ export default function Jobs() {
             </button>
           </div>
         </section>
-        <section className="mt-16 rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+        <section className="mt-12 rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
           <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] px-4 py-4 sm:px-6">
             {savedViews.length > 0 && (
               <div className="mb-4 flex items-center gap-2 overflow-x-auto border-b border-black/[.06] pb-4">
@@ -226,12 +234,19 @@ export default function Jobs() {
                     <span
                       className={`rounded-full px-2 py-0.5 text-[9px] ${tab === item ? "bg-white/12" : "bg-black/5"}`}
                     >
-                      {jobs.filter((job) => job.status === item).length}
+                      {item === "New" ? jobs.filter((job) => ["New", "Seen"].includes(job.status)).length : item === "Most recent" ? jobs.length : jobs.filter((job) => job.status === item).length}
                     </span>
                   </button>
                 ))}
               </div>
               <div className="flex items-center gap-2">
+                <div className="flex items-center rounded-full bg-[var(--paper)] p-1" aria-label="Job layout">
+                  {layouts.map(({ id, label, icon: Icon }) => (
+                    <button key={id} type="button" title={`${label} view`} aria-label={`${label} view`} aria-pressed={layout === id} onClick={() => { setLayout(id); saveJobLayout(id); }} className={`grid size-8 place-items-center rounded-full transition-all duration-300 ${layout === id ? "bg-[var(--raised)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}>
+                      <Icon size={15} weight={layout === id ? "fill" : "regular"} />
+                    </button>
+                  ))}
+                </div>
                 <button
                   onClick={() => setSavingView(true)}
                   className="grid size-10 place-items-center rounded-full bg-[var(--paper)] text-[var(--muted)] hover:text-[var(--ink)]"
@@ -319,9 +334,9 @@ export default function Jobs() {
             </button>
           </section>
         ) : filtered.length ? (
-          <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <section className={`mt-6 grid gap-4 ${layout === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : layout === "compact" ? "sm:grid-cols-2 xl:grid-cols-4" : "grid-cols-1"}`}>
             {filtered.map((job) => (
-              <JobCard key={job.id} job={job} onStatusChange={(selectedJob, status) => setStatusConfirmation({ job: selectedJob, status })} />
+              <JobCard key={job.id} job={job} layout={layout} />
             ))}
           </section>
         ) : (
@@ -357,7 +372,6 @@ export default function Jobs() {
             onSave={storeView}
           />
         )}
-        {statusConfirmation && <StatusConfirmDialog job={statusConfirmation.job} status={statusConfirmation.status} onClose={() => setStatusConfirmation(null)} />}
       </main>
     </Shell>
   );

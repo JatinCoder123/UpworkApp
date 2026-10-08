@@ -2,15 +2,24 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #151713;
-  --text: #151713;
-  --paper: #f1f0e9;
-  --surface: #faf9f4;
-  --raised: #ffffff;
-  --muted: #777a70;
-  --line: #d7d7cc;
-  --lime: #c8f55d;
-  --lime-dark: #a9d83d;
+  --ink: #243126;
+  --text: #263229;
+  --paper: #eef1e8;
+  --surface: #f8f8f2;
+  --raised: #fffef9;
+  --muted: #6e776d;
+  --line: #d3dacd;
+  --frame: #e2e8dc;
+  --lime: #c8e875;
+  --lime-dark: #91b43d;
+  --accent: #6e9431;
+  --accent-strong: #58782a;
+  --new-border: #a9cb63;
+  --new-shadow: rgb(92 119 48 / .12);
+  --price-bg: #e6efe0;
+  --price-line: #cbdcc0;
+  --price-text: #31563b;
+  --price-muted: #66806b;
   --orange: #f37a45;
   --lavender: #cbc6ef;
   --danger: #d75c4a;
@@ -23,9 +32,18 @@
   --raised: #21241e;
   --muted: #a4a89a;
   --line: #353930;
+  --frame: #272d25;
   --lime: #b9e653;
   --lime-dark: #9fc936;
   --lavender: #a9a3d3;
+  --accent: #a7ca58;
+  --accent-strong: #c0df78;
+  --new-border: #607b35;
+  --new-shadow: rgb(0 0 0 / .2);
+  --price-bg: #25372a;
+  --price-line: #38513d;
+  --price-text: #cbe6ce;
+  --price-muted: #91aa94;
 }
 
 * { box-sizing: border-box; }
@@ -66,6 +84,13 @@ button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
 .logo-loader-mark { position: relative; z-index: 1; animation: logo-loader-mark 1.8s cubic-bezier(.32,.72,0,1) infinite; }
 .skeleton-bone { position: relative; overflow: hidden; background: color-mix(in srgb, var(--muted) 12%, var(--surface)); }
 .skeleton-bone::after { content: ''; position: absolute; inset: 0; translate: -110% 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--raised) 72%, transparent), transparent); animation: skeleton-sweep 1.65s ease-in-out infinite; }
+.upwork-view-button { color: var(--text); background: var(--raised); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 14%, transparent); transition: transform 350ms cubic-bezier(.32,.72,0,1), box-shadow 350ms ease, background-color 350ms ease; }
+.upwork-view-button:hover { transform: translateY(-2px); background: var(--surface); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 24%, transparent), 0 10px 24px color-mix(in srgb, var(--ink) 10%, transparent); }
+.upwork-apply-button { position: relative; isolation: isolate; overflow: hidden; color: #151713 !important; background: var(--lime); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lime-dark) 45%, transparent); transition: transform 350ms cubic-bezier(.32,.72,0,1), box-shadow 350ms ease; }
+.upwork-apply-button::before { content: ''; position: absolute; inset: -80% auto -80% -45%; z-index: 0; width: 32%; rotate: 18deg; background: linear-gradient(90deg, transparent, rgb(255 255 255 / .75), transparent); translate: -180% 0; transition: translate 700ms cubic-bezier(.32,.72,0,1); }
+.upwork-apply-button:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lime-dark) 60%, transparent), 0 12px 30px color-mix(in srgb, var(--lime-dark) 32%, transparent); }
+.upwork-apply-button:hover::before { translate: 520% 0; }
+.upwork-apply-button:active, .upwork-view-button:active { transform: translateY(0) scale(.98); }
 @keyframes session-loader-orbit { to { rotate: 360deg; } }
 @keyframes session-loader-breathe { 0%, 100% { scale: .92; opacity: .45; } 50% { scale: 1; opacity: 1; } }
 @keyframes session-loader-progress { from { translate: -105% 0; } to { translate: 205% 0; } }
