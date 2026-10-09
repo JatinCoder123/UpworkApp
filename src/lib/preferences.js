@@ -27,9 +27,20 @@ const JOB_STATUS_KEY = 'pitchflow-job-status'
 
 export function loadJobStatus() {
   const status = localStorage.getItem(JOB_STATUS_KEY)
-  return ['New', 'Seen', 'Applied', 'Rejected'].includes(status) ? status : 'New'
+  return ['New', 'Most recent', 'Applied', 'Rejected'].includes(status) ? status : 'New'
 }
 
 export function saveJobStatus(status) {
   localStorage.setItem(JOB_STATUS_KEY, status)
+}
+
+const JOB_LAYOUT_KEY = 'pitchflow-job-layout'
+
+export function loadJobLayout() {
+  const layout = localStorage.getItem(JOB_LAYOUT_KEY)
+  return ['grid', 'list', 'compact'].includes(layout) ? layout : 'grid'
+}
+
+export function saveJobLayout(layout) {
+  localStorage.setItem(JOB_LAYOUT_KEY, layout)
 }
