@@ -1,20 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import gsap from 'gsap'
 import {
-  Alarm,
+  ArrowClockwise,
   ArrowUpRight,
-  Buildings,
   Funnel,
-  Globe,
   MagnifyingGlass,
   Newspaper,
-  PenNib,
+  Plus,
   X,
 } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import NewsFilterDialog from '../components/NewsFilterDialog'
+import CategoryFilterDialog from '../components/CategoryFilterDialog'
 import { iconButton } from '../components/ui'
 import { api } from '../services/api'
 import {
@@ -22,35 +21,33 @@ import {
   SCORE_TIER_THRESHOLDS,
 } from '../lib/newsClassification'
 
-const CATEGORY_LIST = [
-  'All',
-  'AI',
-  'Other Tech (Cloud)',
-  'Other Tech (Security)',
-  'Tech Product',
-  'Web Architecture',
-]
+// Show strictly 3 fixed categories on the main screen (All, Other Tech (Cloud), AI)
+// Notice AI is moved to third position so All and AI are not side-by-side
+const SCREEN_CATEGORIES = ['All', 'Other Tech (Cloud)', 'AI']
+
+// Source Type tabs matching Opportunity Desk pipeline
+const SOURCE_TYPE_TABS = ['All', 'FirstParty', 'ThirdParty', 'YouBlogging', 'HurryUp']
 
 function SourceTypeBadge({ type }) {
   if (type === 'FirstParty') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[10px] font-bold text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500/30 backdrop-blur-md">
-        <Buildings size={13} weight="bold" />
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
+        <span className="size-1.5 rounded-full bg-emerald-500" />
         <span>FirstParty</span>
       </span>
     )
   }
   if (type === 'YouBlogging') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/20 px-2.5 py-1 text-[10px] font-bold text-indigo-900 dark:text-indigo-200 ring-1 ring-indigo-500/30 backdrop-blur-md">
-        <PenNib size={13} weight="bold" />
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
+        <span className="size-1.5 rounded-full bg-purple-500" />
         <span>YouBlogging</span>
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-2.5 py-1 text-[10px] font-bold text-blue-900 dark:text-blue-200 ring-1 ring-blue-500/30 backdrop-blur-md">
-      <Globe size={13} weight="bold" />
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
+      <span className="size-1.5 rounded-full bg-blue-500" />
       <span>ThirdParty</span>
     </span>
   )
@@ -66,65 +63,228 @@ function ScoreBadge({ tier }) {
 }
 
 export default function TechNews() {
-  const { data: rawNews = [], isLoading } = useQuery({
-    queryKey: ['tech-news'],
-    queryFn: api.getTechNews,
+  const [selectedCategories, setSelectedCategories] = useState([])
+  const [selectedTiers, setSelectedTiers] = useState([])
+  const [selectedSourceTypes, setSelectedSourceTypes] = useState([])
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filterDialog, setFilterDialog] = useState(false)
+  const [categoryDialog, setCategoryDialog] = useState(false)
+  const root = useRef(null)
+  const loadMoreRef = useRef(null)
+
+  // 350ms debounce for Smart Gateway search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim())
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  // Single cached unified query from Smart Gateway
+  const {
+    data: newsData,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useQuery({
+    queryKey: ['tech-news-feed'],
+    queryFn: () => api.getAllTechNews(false),
+    staleTime: 5 * 60 * 1000,
   })
 
-  const [activeCategory, setActiveCategory] = useState('All')
-  const [activeTier, setActiveTier] = useState('All')
-  const [activeSourceType, setActiveSourceType] = useState('All')
-  const [search, setSearch] = useState('')
-  const [filterDialog, setFilterDialog] = useState(false)
-  const root = useRef(null)
+  const handleRefresh = async () => {
+    await api.getAllTechNews(true)
+    await refetch()
+  }
+
+  // All records gathered across all loaded pages — strictly deduplicated by unique ID (zero duplication, zero repetition)
+  const rawNews = useMemo(() => {
+    const seen = new Set()
+    const unique = []
+    for (const item of newsData?.records || []) {
+      if (item?.id && !seen.has(item.id)) {
+        seen.add(item.id)
+        unique.push(item)
+      }
+    }
+    return unique
+  }, [newsData])
+
+  // Dynamically extract only categories that actually exist in the Smart Gateway module AND have data
+  const categoryList = useMemo(() => {
+    // Find all distinct categories from records that actually have data
+    const presentCategories = new Set(
+      rawNews.map((item) => item.category?.trim()).filter(Boolean)
+    )
+
+    // Ensure 'Web Architecture' is completely excluded
+    presentCategories.delete('Web Architecture')
+
+    // Maintain preferred order for standard categories that have data
+    const priorityOrder = [
+      'Other Tech (Cloud)',
+      'AI',
+      'Other Tech (Security)',
+      'Tech Product',
+      'Other Tech (Hardware)',
+      'Other Tech (Dev Tools)',
+      'Other Tech (Business)',
+    ]
+
+    // Only include categories that actually have data inside them
+    const ordered = priorityOrder.filter((cat) => presentCategories.has(cat))
+    // Any other category in the CRM module with data is automatically discovered and added dynamically
+    const others = [...presentCategories].filter((cat) => !priorityOrder.includes(cat)).sort()
+
+    return ['All', ...ordered, ...others]
+  }, [rawNews])
 
   const digestStories = useMemo(() => {
     return prepareDailyTechDigest(rawNews)
   }, [rawNews])
 
-  // Latest 2 to 3 news stories for the "Up Next / Latest News" sidebar
-  const latestNewsStories = useMemo(() => {
-    return [...digestStories]
-      .sort((a, b) => new Date(b.postedAt || 0) - new Date(a.postedAt || 0))
-      .slice(0, 3)
-  }, [digestStories])
+  // All latest news stories sorted by recency for the Latest News sidebar
+  const allLatestNewsStories = useMemo(() => {
+    return [...rawNews].sort((a, b) => new Date(b.postedAt || 0) - new Date(a.postedAt || 0))
+  }, [rawNews])
 
   const filteredArticles = useMemo(() => {
     return digestStories.filter((item) => {
       const matchesCategory =
-        activeCategory === 'All' || item.category === activeCategory
+        selectedCategories.length === 0 ||
+        selectedCategories.includes(item.category)
 
       const matchesTier =
-        activeTier === 'All' ||
-        (activeTier === 'BLOCKBUSTER' && item.score >= SCORE_TIER_THRESHOLDS.BLOCKBUSTER.min) ||
-        (activeTier === 'HOT' &&
-          item.score >= SCORE_TIER_THRESHOLDS.HOT.min &&
-          item.score <= SCORE_TIER_THRESHOLDS.HOT.max) ||
-        (activeTier === 'NORMAL' && item.score <= SCORE_TIER_THRESHOLDS.NORMAL.max)
+        selectedTiers.length === 0 ||
+        selectedTiers.some((tier) => {
+          if (tier === 'BLOCKBUSTER') {
+            return item.score >= SCORE_TIER_THRESHOLDS.BLOCKBUSTER.min
+          }
+          if (tier === 'HOT') {
+            return (
+              item.score >= SCORE_TIER_THRESHOLDS.HOT.min &&
+              item.score <= SCORE_TIER_THRESHOLDS.HOT.max
+            )
+          }
+          if (tier === 'NORMAL') {
+            return item.score <= SCORE_TIER_THRESHOLDS.NORMAL.max
+          }
+          return false
+        })
 
       const matchesSource =
-        activeSourceType === 'All' ||
-        (activeSourceType === 'HurryUp' && item.hurryUp) ||
-        item.sourceType === activeSourceType
+        selectedSourceTypes.length === 0 ||
+        selectedSourceTypes.some((src) => {
+          if (src === 'HurryUp') {
+            return item.hurryUp === true
+          }
+          return item.sourceType === src
+        })
 
       const textToSearch = `${item.title} ${item.summary} ${item.source} ${item.sourceNote || ''} ${(item.tags || []).join(' ')}`.toLowerCase()
-      const matchesSearch = !search || textToSearch.includes(search.toLowerCase())
+      const matchesSearch = !debouncedSearch || textToSearch.includes(debouncedSearch.toLowerCase())
 
       return matchesCategory && matchesTier && matchesSource && matchesSearch
     })
-  }, [digestStories, activeCategory, activeTier, activeSourceType, search])
+  }, [digestStories, selectedCategories, selectedTiers, selectedSourceTypes, debouncedSearch])
 
   const categoryCounts = useMemo(() => {
-    const counts = { All: digestStories.length }
-    CATEGORY_LIST.forEach((cat) => {
+    const counts = { All: newsData?.total || rawNews.length }
+
+    categoryList.forEach((cat) => {
       if (cat !== 'All') {
-        counts[cat] = digestStories.filter((item) => item.category === cat).length
+        counts[cat] = rawNews.filter((item) => item.category === cat).length
       }
     })
-    return counts
-  }, [digestStories])
 
-  const hasActiveFilters = activeTier !== 'All' || activeSourceType !== 'All'
+    return counts
+  }, [newsData, rawNews, categoryList])
+
+  const sourceTypeCounts = useMemo(() => {
+    const counts = {
+      All: rawNews.length,
+      FirstParty: 0,
+      ThirdParty: 0,
+      YouBlogging: 0,
+      HurryUp: 0,
+    }
+
+    for (const item of rawNews) {
+      if (item.sourceType === 'FirstParty') counts.FirstParty++
+      else if (item.sourceType === 'ThirdParty') counts.ThirdParty++
+      else if (item.sourceType === 'YouBlogging') counts.YouBlogging++
+
+      if (item.hurryUp) counts.HurryUp++
+    }
+
+    return counts
+  }, [rawNews])
+
+  const totalActiveFilters =
+    selectedCategories.length + selectedTiers.length + selectedSourceTypes.length
+
+  const activeCategoryTitle = useMemo(() => {
+    if (selectedCategories.length === 0) return 'All Stories'
+    if (selectedCategories.length === 1) return selectedCategories[0]
+    return `${selectedCategories.length} Categories Selected`
+  }, [selectedCategories])
+
+  const removeCategory = (cat) => {
+    setSelectedCategories((prev) => prev.filter((item) => item !== cat))
+  }
+
+  const removeTier = (tier) => {
+    setSelectedTiers((prev) => prev.filter((item) => item !== tier))
+  }
+
+  const removeSourceType = (src) => {
+    setSelectedSourceTypes((prev) => prev.filter((item) => item !== src))
+  }
+
+  const clearAllFilters = () => {
+    setSelectedCategories([])
+    setSelectedTiers([])
+    setSelectedSourceTypes([])
+    setSearch('')
+  }
+
+  const filterKey = `${selectedCategories.join(',')}|${selectedTiers.join(',')}|${selectedSourceTypes.join(',')}|${debouncedSearch}`
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  const [visibleCount, setVisibleCount] = useState(16)
+
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey)
+    setVisibleCount(16)
+  }
+
+  const displayedArticles = useMemo(() => {
+    return filteredArticles.slice(0, visibleCount)
+  }, [filteredArticles, visibleCount])
+
+  const hasMore = visibleCount < filteredArticles.length
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((prev) => Math.min(prev + 12, filteredArticles.length))
+  }, [filteredArticles.length])
+
+  // Automatic Infinite Scroll observer (seamlessly reveals next chunk of stories on scroll)
+  useEffect(() => {
+    const sentinel = loadMoreRef.current
+    if (!sentinel || !hasMore) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          loadMore()
+        }
+      },
+      { threshold: 0.1, rootMargin: '250px' }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, loadMore])
 
   useEffect(() => {
     if (!isLoading && root.current) {
@@ -143,7 +303,7 @@ export default function TechNews() {
       }, root)
       return () => ctx.revert()
     }
-  }, [activeCategory, activeTier, activeSourceType, search, isLoading])
+  }, [selectedCategories, selectedTiers, selectedSourceTypes, search, isLoading])
 
   return (
     <Shell>
@@ -168,31 +328,40 @@ export default function TechNews() {
           </div>
         </section>
 
-        {/* Top Horizontal Category Navigation (X-Axis) & Search/Filter Toolbar */}
+        {/* Top Horizontal Navigation & Search/Filter Toolbar */}
         <section className="mt-10 rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
           <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-4 sm:p-5 space-y-4">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              {/* Category Pills along the horizontal X-axis */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)] mr-1">
-                  Category:
-                </span>
-                {CATEGORY_LIST.map((cat) => {
-                  const isSelected = activeCategory === cat
-                  const count = categoryCounts[cat] || 0
+            {/* Top Row: Source Types (Left) + Search & Filter (Right) */}
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              {/* Source Type Tabs in rounded-full pill container (matching Opportunity Desk pipeline) */}
+              <div className="flex gap-1 overflow-x-auto rounded-full bg-[var(--paper)] p-1 scrollbar-none">
+                {SOURCE_TYPE_TABS.map((item) => {
+                  const isSelected =
+                    item === 'All'
+                      ? selectedSourceTypes.length === 0
+                      : selectedSourceTypes.length === 1 && selectedSourceTypes[0] === item
+                  const count = sourceTypeCounts[item] || 0
 
                   return (
                     <button
-                      key={cat}
+                      key={item}
                       type="button"
-                      onClick={() => setActiveCategory(cat)}
-                      className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-300 ${
+                      onClick={() => {
+                        if (item === 'All') {
+                          setSelectedSourceTypes([])
+                        } else {
+                          setSelectedSourceTypes((prev) =>
+                            prev.length === 1 && prev[0] === item ? [] : [item]
+                          )
+                        }
+                      }}
+                      className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-300 ${
                         isSelected
                           ? 'bg-[var(--ink)] text-white shadow-xs'
-                          : 'bg-[var(--paper)] text-[var(--ink)] ring-1 ring-black/5 hover:bg-black/5 dark:hover:bg-white/5'
+                          : 'text-[var(--muted)] hover:text-[var(--ink)]'
                       }`}
                     >
-                      <span>{cat}</span>
+                      <span>{item}</span>
                       <span
                         className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
                           isSelected
@@ -235,56 +404,205 @@ export default function TechNews() {
                   type="button"
                   onClick={() => setFilterDialog(true)}
                   aria-label="Open filter dialog"
-                  title="Filter by Score Tier and Source Type"
-                  className={`${iconButton} ${
-                    hasActiveFilters
+                  title="Filter by Category, Score Tier, and Source Type"
+                  className={`relative ${iconButton} ${
+                    totalActiveFilters > 0
                       ? 'bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40 font-bold'
                       : ''
                   }`}
                 >
-                  <Funnel size={16} weight={hasActiveFilters ? 'fill' : 'regular'} />
+                  <Funnel size={16} weight={totalActiveFilters > 0 ? 'fill' : 'regular'} />
+                  {totalActiveFilters > 0 && (
+                    <span className="absolute -top-1 -right-1 grid size-4.5 place-items-center rounded-full bg-[var(--ink)] text-[9px] font-bold text-white shadow-xs">
+                      {totalActiveFilters}
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
 
+            {/* Bottom Row: Category Navigation with Universal Refresh Circle Button */}
+            <div className="flex flex-wrap items-center gap-2 border-t border-black/[.06] dark:border-white/[.08] pt-3 text-xs">
+              <span className="shrink-0 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)] mr-1">
+                Category:
+              </span>
+
+              {/* Universal Refresh Circle Button */}
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={isFetching}
+                title="Refresh news feed"
+                aria-label="Refresh news feed"
+                className={`grid size-8 shrink-0 place-items-center rounded-full bg-[var(--paper)] text-[var(--muted)] ring-1 ring-black/5 transition-all hover:bg-black/5 hover:text-[var(--ink)] dark:ring-white/10 dark:hover:bg-white/5 ${
+                  isFetching ? 'opacity-70 cursor-not-allowed' : 'active:scale-95'
+                }`}
+              >
+                <ArrowClockwise
+                  size={15}
+                  weight="bold"
+                  className={isFetching ? 'animate-spin text-[var(--lime-dark)]' : ''}
+                />
+              </button>
+
+              {/* Strictly 3 fixed categories: All, Other Tech (Cloud), AI */}
+              {SCREEN_CATEGORIES.map((cat) => {
+                const isSelected =
+                  cat === 'All'
+                    ? selectedCategories.length === 0
+                    : selectedCategories.length === 1 && selectedCategories[0] === cat
+                const count = categoryCounts[cat] || 0
+
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => {
+                      if (cat === 'All') {
+                        setSelectedCategories([])
+                      } else {
+                        setSelectedCategories((prev) =>
+                          prev.length === 1 && prev[0] === cat ? [] : [cat]
+                        )
+                      }
+                    }}
+                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-300 ${
+                      isSelected
+                        ? 'bg-[var(--ink)] text-white shadow-xs'
+                        : 'bg-[var(--paper)] text-[var(--muted)] hover:text-[var(--ink)] ring-1 ring-black/5 dark:ring-white/10 hover:bg-black/5 dark:hover:bg-white/5'
+                    }`}
+                  >
+                    <span>{cat}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                        isSelected
+                          ? 'bg-white/20 text-white'
+                          : 'bg-black/5 dark:bg-white/10 text-[var(--muted)]'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
+
+              {/* + More categories button (Opens modal with all categories) */}
+              {(() => {
+                const isExternalSelected =
+                  selectedCategories.length > 0 &&
+                  !(selectedCategories.length === 1 && SCREEN_CATEGORIES.includes(selectedCategories[0]))
+
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setCategoryDialog(true)}
+                    className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      isExternalSelected
+                        ? 'bg-[var(--ink)] text-white ring-1 ring-black/10 shadow-xs'
+                        : 'bg-transparent text-[var(--muted)] ring-1 ring-black/10 hover:text-[var(--ink)] hover:ring-black/20 dark:ring-white/10 dark:hover:ring-white/20'
+                    }`}
+                    title="View and select from all categories"
+                  >
+                    <Plus size={13} weight="bold" />
+                    <span>More categories</span>
+                    {isExternalSelected && (
+                      <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold text-white">
+                        {selectedCategories.length === 1
+                          ? selectedCategories[0]
+                          : `${selectedCategories.length} selected`}
+                      </span>
+                    )}
+                  </button>
+                )
+              })()}
+            </div>
+
             {/* Active Filters Display */}
-            {hasActiveFilters && (
+            {totalActiveFilters > 0 && (
               <div className="flex flex-wrap items-center gap-2 border-t border-black/[.06] dark:border-white/[.08] pt-3 text-xs">
                 <span className="text-[10px] font-bold uppercase tracking-[.14em] text-[var(--muted)] mr-1">
-                  Active Filters:
+                  Active Filters ({totalActiveFilters}):
                 </span>
-                {activeTier !== 'All' && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3 py-1 text-[11px] font-bold text-[var(--ink)] ring-1 ring-black/10">
-                    <span>Tier: {activeTier}</span>
+
+                {/* Category chips */}
+                {selectedCategories.map((cat) => (
+                  <span
+                    key={cat}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3 py-1 text-[11px] font-bold text-[var(--ink)] ring-1 ring-black/10 shadow-xs"
+                  >
+                    <span>Category: {cat}</span>
                     <button
                       type="button"
-                      onClick={() => setActiveTier('All')}
-                      aria-label="Remove tier filter"
+                      onClick={() => removeCategory(cat)}
+                      aria-label={`Remove ${cat} category filter`}
                       className="hover:opacity-75"
                     >
                       <X size={12} />
                     </button>
                   </span>
-                )}
-                {activeSourceType !== 'All' && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3 py-1 text-[11px] font-bold text-[var(--ink)] ring-1 ring-black/10">
-                    <span>Source: {activeSourceType}</span>
+                ))}
+
+                {/* Score Tier chips */}
+                {selectedTiers.map((tier) => (
+                  <span
+                    key={tier}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3 py-1 text-[11px] font-bold text-[var(--ink)] ring-1 ring-black/10 shadow-xs"
+                  >
+                    <span
+                      className={`size-2 rounded-xs ${
+                        tier === 'BLOCKBUSTER'
+                          ? 'bg-rose-500'
+                          : tier === 'HOT'
+                            ? 'bg-amber-500'
+                            : 'bg-purple-500'
+                      }`}
+                    />
+                    <span>
+                      Tier: {tier === 'BLOCKBUSTER' ? 'Blockbuster' : tier === 'HOT' ? 'Hot' : 'Normal'}
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setActiveSourceType('All')}
-                      aria-label="Remove source filter"
+                      onClick={() => removeTier(tier)}
+                      aria-label={`Remove ${tier} tier filter`}
                       className="hover:opacity-75"
                     >
                       <X size={12} />
                     </button>
                   </span>
-                )}
+                ))}
+
+                {/* Source Type chips */}
+                {selectedSourceTypes.map((src) => (
+                  <span
+                    key={src}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3 py-1 text-[11px] font-bold text-[var(--ink)] ring-1 ring-black/10 shadow-xs"
+                  >
+                    <span
+                      className={`size-2 rounded-full ${
+                        src === 'FirstParty'
+                          ? 'bg-emerald-500'
+                          : src === 'ThirdParty'
+                            ? 'bg-blue-500'
+                            : src === 'YouBlogging'
+                              ? 'bg-purple-500'
+                              : 'bg-amber-500'
+                      }`}
+                    />
+                    <span>Source: {src}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeSourceType(src)}
+                      aria-label={`Remove ${src} source filter`}
+                      className="hover:opacity-75"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+
                 <button
                   type="button"
-                  onClick={() => {
-                    setActiveTier('All')
-                    setActiveSourceType('All')
-                  }}
+                  onClick={clearAllFilters}
                   className="ml-auto text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)]"
                 >
                   Clear all
@@ -300,7 +618,7 @@ export default function TechNews() {
           <div className="space-y-6 min-w-0">
             <div className="flex items-center justify-between text-xs text-[var(--muted)]">
               <span className="font-bold uppercase tracking-wider text-[var(--ink)]">
-                {activeCategory === 'All' ? 'All Stories' : activeCategory} ({filteredArticles.length})
+                {activeCategoryTitle} ({filteredArticles.length})
               </span>
               <span className="text-[11px]">Click any story to open whole-page detail</span>
             </div>
@@ -320,12 +638,7 @@ export default function TechNews() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => {
-                      setActiveCategory('All')
-                      setActiveTier('All')
-                      setActiveSourceType('All')
-                      setSearch('')
-                    }}
+                    onClick={clearAllFilters}
                     className="mt-5 rounded-full bg-[var(--ink)] px-4 py-2 text-xs font-bold text-white"
                   >
                     Reset all filters
@@ -334,119 +647,135 @@ export default function TechNews() {
               </div>
             ) : (
               <div className="grid gap-6 sm:grid-cols-2">
-                {filteredArticles.map((story) => (
+                {displayedArticles.map((story) => (
                   <article
-                      key={story.id}
-                      data-card
-                      className="group flex flex-col overflow-hidden rounded-[1.8rem] bg-black/[.045] p-1.5 ring-1 ring-black/5 transition-all duration-700 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-1 hover:bg-black/[.07]"
-                    >
-                      <div className="relative flex flex-1 flex-col overflow-hidden rounded-[calc(1.8rem-.375rem)] bg-[var(--surface)] shadow-[inset_0_1px_1px_rgba(255,255,255,.9)]">
-                        {/* Topic-Matching Banner Image */}
-                        {story.image && (
-                          <Link
-                            to={`/tech-news/${story.id}`}
-                            className="relative block h-44 w-full overflow-hidden bg-[var(--ink)]"
-                          >
-                            <img
-                              src={story.image}
-                              alt={story.title}
-                              className="size-full object-cover opacity-85 transition-transform duration-700 ease-[cubic-bezier(.32,.72,0,1)] group-hover:scale-105"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    key={story.id}
+                    data-card
+                    className="group flex flex-col overflow-hidden rounded-[1.8rem] bg-black/[.045] p-1.5 ring-1 ring-black/5 transition-all duration-700 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-1 hover:bg-black/[.07]"
+                  >
+                    <div className="relative flex flex-1 flex-col overflow-hidden rounded-[calc(1.8rem-.375rem)] bg-[var(--surface)] shadow-[inset_0_1px_1px_rgba(255,255,255,.9)]">
+                      {/* Topic-Matching Banner Image */}
+                      {story.image && (
+                        <Link
+                          to={`/tech-news/${story.id}`}
+                          className="relative block h-44 w-full overflow-hidden bg-[var(--ink)]"
+                        >
+                          <img
+                            src={story.image}
+                            alt={story.title}
+                            className="size-full object-cover opacity-85 transition-transform duration-700 ease-[cubic-bezier(.32,.72,0,1)] group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-                            {/* Source Type Badge on Image */}
-                            <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                              <SourceTypeBadge type={story.sourceType} />
+                          {/* Source Type & HurryUp Badges on Image (High-contrast generic styling) */}
+                          <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+                            <SourceTypeBadge type={story.sourceType} />
 
-                              {story.hurryUp && (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-0.5 text-[9px] font-bold text-black shadow-xs">
-                                  <Alarm size={11} weight="fill" />
-                                  <span>HurryUp</span>
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Bottom row in image */}
-                            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs">
-                              <span className="rounded-full bg-black/50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[.1em] backdrop-blur-md">
-                                {story.category}
-                              </span>
-                              <span className="text-[10px] opacity-90">{story.readTime}</span>
-                            </div>
-                          </Link>
-                        )}
-
-                        {/* Card Body */}
-                        <div className="flex flex-1 flex-col p-5 sm:p-6">
-                          {/* Classification Row: Score Tier & Posted time */}
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/[.06] dark:border-white/[.08] pb-3 text-xs">
-                            <ScoreBadge tier={story.tier} />
-                            <span className="text-[10px] font-semibold text-[var(--muted)]">
-                              {story.posted}
-                            </span>
-                          </div>
-
-                          {/* Source Provenance */}
-                          <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--muted)]">
-                            <span className="font-bold uppercase tracking-[.1em] text-[var(--ink)]">
-                              {story.source}
-                            </span>
-                            {story.sourceNote && (
-                              <span className="truncate max-w-[170px] italic text-[10px]">
-                                {story.sourceNote}
+                            {story.hurryUp && (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
+                                <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                <span>HurryUp</span>
                               </span>
                             )}
                           </div>
 
-                          {/* Linked Headline (Clicking navigates to whole-page detail view) */}
+                          {/* Bottom row in image */}
+                          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs">
+                            <span className="rounded-full bg-black/60 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[.1em] backdrop-blur-md">
+                              {story.category}
+                            </span>
+                            <span className="text-[10px] opacity-90">{story.readTime}</span>
+                          </div>
+                        </Link>
+                      )}
+
+                      {/* Card Body */}
+                      <div className="flex flex-1 flex-col p-5 sm:p-6">
+                        {/* Classification Row: Score Tier & Posted time */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/[.06] dark:border-white/[.08] pb-3 text-xs">
+                          <ScoreBadge tier={story.tier} />
+                          <span className="text-[10px] font-semibold text-[var(--muted)]">
+                            {story.posted}
+                          </span>
+                        </div>
+
+                        {/* Source Provenance */}
+                        <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--muted)]">
+                          <span className="font-bold uppercase tracking-[.1em] text-[var(--ink)]">
+                            {story.source}
+                          </span>
+                          {story.sourceNote && (
+                            <span className="truncate max-w-[170px] italic text-[10px]">
+                              {story.sourceNote}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Linked Headline (Clicking navigates to whole-page detail view) */}
+                        <Link
+                          to={`/tech-news/${story.id}`}
+                          className="mt-3 block group/title"
+                        >
+                          <h2 className="text-lg font-semibold leading-[1.3] tracking-[-.035em] text-[var(--ink)] transition-colors duration-300 group-hover/title:text-[#668c16] sm:text-xl">
+                            {story.title}
+                          </h2>
+                        </Link>
+
+                        {/* Summary */}
+                        <p className="mt-2.5 flex-1 text-xs leading-5 text-[var(--muted)] line-clamp-3">
+                          {story.summary}
+                        </p>
+
+                        {/* Card Footer Actions */}
+                        <div className="mt-6 flex items-center justify-between border-t border-black/[.07] dark:border-white/[.08] pt-4">
                           <Link
                             to={`/tech-news/${story.id}`}
-                            className="mt-3 block group/title"
+                            className="inline-flex items-center gap-1 text-xs font-bold text-[var(--ink)] hover:text-[#668c16] transition-colors"
                           >
-                            <h2 className="text-lg font-semibold leading-[1.3] tracking-[-.035em] text-[var(--ink)] transition-colors duration-300 group-hover/title:text-[#668c16] sm:text-xl">
-                              {story.title}
-                            </h2>
+                            <span>Read full story</span>
+                            <ArrowUpRight size={13} />
                           </Link>
 
-                          {/* Summary */}
-                          <p className="mt-2.5 flex-1 text-xs leading-5 text-[var(--muted)] line-clamp-3">
-                            {story.summary}
-                          </p>
-
-                          {/* Card Footer Actions */}
-                          <div className="mt-6 flex items-center justify-between border-t border-black/[.07] dark:border-white/[.08] pt-4">
-                            <Link
-                              to={`/tech-news/${story.id}`}
-                              className="inline-flex items-center gap-1 text-xs font-bold text-[var(--ink)] hover:text-[#668c16] transition-colors"
-                            >
-                              <span>Read full story</span>
-                              <ArrowUpRight size={13} />
-                            </Link>
-
-                            <div className="flex items-center gap-2">
-                              {story.url && (
-                                <a
-                                  href={story.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  aria-label={`Open original source on ${story.source}`}
-                                  className="grid size-8 place-items-center rounded-full bg-[var(--paper)] text-[var(--ink)] ring-1 ring-black/5 transition-transform duration-500 hover:rotate-12"
-                                >
-                                  <ArrowUpRight size={13} weight="light" />
-                                </a>
-                              )}
-                            </div>
+                          <div className="flex items-center gap-2">
+                            {story.url && (
+                              <a
+                                href={story.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`Open original source on ${story.source}`}
+                                className="grid size-8 place-items-center rounded-full bg-[var(--paper)] text-[var(--ink)] ring-1 ring-black/5 transition-transform duration-500 hover:rotate-12"
+                              >
+                                <ArrowUpRight size={13} weight="light" />
+                              </a>
+                            )}
                           </div>
                         </div>
                       </div>
-                    </article>
+                    </div>
+                  </article>
                 ))}
               </div>
             )}
+
+            {/* Progressive Scroll Sentinel element */}
+            <div ref={loadMoreRef} className="py-6 flex flex-col items-center justify-center">
+              {hasMore ? (
+                <div className="flex items-center gap-2.5 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
+                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Showing {displayedArticles.length} of {filteredArticles.length} stories...</span>
+                </div>
+              ) : (
+                rawNews.length > 0 && (
+                  <p className="text-center text-xs text-[var(--muted)]">
+                    All {filteredArticles.length} stories loaded from live feed.
+                  </p>
+                )
+              )}
+            </div>
           </div>
 
-          {/* RIGHT: "Latest News" Sidebar (Referenced from Up Next & TechCrunch design) */}
-          <aside className="lg:sticky lg:top-28 space-y-6">
+          {/* RIGHT: "Latest News" Sidebar (Natural scroll + sticky on desktop) */}
+          <aside className="lg:sticky lg:top-24 space-y-6">
             <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
               <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 sm:p-6 space-y-4">
                 {/* Header: Latest News */}
@@ -461,13 +790,13 @@ export default function TechNews() {
                   </div>
                   <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-bold text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500/20">
                     <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Real-time</span>
+                    <span>Live Feed</span>
                   </span>
                 </div>
 
-                {/* 2 to 3 Latest News stories with topic thumbnails and badges */}
-                <div className="space-y-4 divide-y divide-black/[.06] dark:divide-white/[.08]">
-                  {latestNewsStories.map((item) => (
+                {/* Latest News Feed Container (Scrolls independently when cursor is over it) */}
+                <div className="max-h-[calc(100vh-14rem)] overflow-y-auto pr-1.5 space-y-4 divide-y divide-black/[.06] dark:divide-white/[.08] scroll-smooth overscroll-contain">
+                  {allLatestNewsStories.map((item) => (
                     <Link
                       key={item.id}
                       to={`/tech-news/${item.id}`}
@@ -515,9 +844,9 @@ export default function TechNews() {
                   ))}
                 </div>
 
-                {/* Footer note */}
+                {/* Footer note with item count */}
                 <div className="border-t border-black/[.06] dark:border-white/[.08] pt-3 text-[11px] text-[var(--muted)] flex items-center justify-between">
-                  <span>Click any item for full article</span>
+                  <span>{allLatestNewsStories.length} live stories in feed</span>
                   <ArrowUpRight size={13} className="text-[var(--muted)]" />
                 </div>
               </div>
@@ -525,16 +854,31 @@ export default function TechNews() {
           </aside>
         </section>
 
-        {/* Filter Dialog Modal */}
+        {/* Category Modal Dialog (Triggered by + More categories) */}
+        {categoryDialog && (
+          <CategoryFilterDialog
+            categories={categoryList}
+            categoryCounts={categoryCounts}
+            selectedCategories={selectedCategories}
+            onApply={(cats) => setSelectedCategories(cats)}
+            onClose={() => setCategoryDialog(false)}
+          />
+        )}
+
+        {/* Filter Dialog Modal (Multi-select across Categories, Tiers, and Source Types) */}
         {filterDialog && (
           <NewsFilterDialog
             value={{
-              tier: activeTier,
-              sourceType: activeSourceType,
+              tiers: selectedTiers,
+              sourceTypes: selectedSourceTypes,
+              categories: selectedCategories,
             }}
+            categoryOptions={categoryList.filter((c) => c !== 'All')}
+            categoryCounts={categoryCounts}
             onApply={(filters) => {
-              setActiveTier(filters.tier)
-              setActiveSourceType(filters.sourceType)
+              setSelectedTiers(filters.tiers)
+              setSelectedSourceTypes(filters.sourceTypes)
+              setSelectedCategories(filters.categories)
             }}
             onClose={() => setFilterDialog(false)}
           />
