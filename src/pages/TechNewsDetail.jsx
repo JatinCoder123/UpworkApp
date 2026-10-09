@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useParams, Link, Navigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft,
@@ -9,6 +9,8 @@ import {
   Tag,
 } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
+import JobDetailSkeleton from '../components/JobDetailSkeleton'
+import NotFound from './NotFound'
 import { primaryButton } from '../components/ui'
 import { api } from '../services/api'
 import {
@@ -29,40 +31,94 @@ export default function TechNewsDetail() {
   const { data: story, isLoading, isError } = useQuery({
     queryKey: ['tech-news-item', id],
     queryFn: () => api.getTechNewsItem(id),
+    retry: false,
   })
 
   const { data: newsResult } = useQuery({
-    queryKey: ['tech-news-sidebar'],
-    queryFn: () => api.getTechNews({ page: 1, perPage: 15 }),
+    queryKey: ['tech-news-feed'],
+    queryFn: () => api.getAllTechNews(),
+    staleTime: 5 * 60 * 1000,
   })
 
   const allNews = useMemo(() => newsResult?.records || [], [newsResult])
 
-  // All Up Next / Latest News items excluding the current story (strictly deduplicated)
+  // All Up Next / Related Latest News items for the current story (strictly deduplicated)
   const allUpNextStories = useMemo(() => {
+    if (!story) return []
+
+    const currentId = story.id || id
+    const currentCategory = String(story.category || '').trim().toLowerCase()
+    const currentTags = new Set(
+      (Array.isArray(story.tags) ? story.tags : [])
+        .map((t) => String(t).trim().toLowerCase())
+        .filter(Boolean)
+    )
+
     const seen = new Set()
-    const unique = []
+    const related = []
+    const others = []
+
     for (const item of allNews) {
-      if (item?.id && item.id !== id && !seen.has(item.id)) {
-        seen.add(item.id)
-        unique.push(item)
+      if (!item?.id || item.id === currentId || seen.has(item.id)) continue
+      seen.add(item.id)
+
+      const itemCategory = String(item.category || '').trim().toLowerCase()
+      const itemTags = (Array.isArray(item.tags) ? item.tags : []).map((t) =>
+        String(t).trim().toLowerCase()
+      )
+
+      const isSameCategory = Boolean(currentCategory && itemCategory === currentCategory)
+      const hasSharedTag = itemTags.some((t) => currentTags.has(t))
+      const isRelated = isSameCategory || hasSharedTag
+
+      if (isRelated) {
+        related.push(item)
+      } else {
+        others.push(item)
       }
     }
-    return unique.sort((a, b) => new Date(b.postedAt || 0) - new Date(a.postedAt || 0))
-  }, [allNews, id])
 
-  if (isLoading) {
-    return (
-      <Shell>
-        <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-10 sm:px-6 md:pt-14">
-          <p className="py-24 text-center text-sm text-[var(--muted)]">Loading story details...</p>
-        </main>
-      </Shell>
-    )
-  }
+    // Sort related stories: prioritize overlapping tags + same category, then newest postedAt date
+    related.sort((a, b) => {
+      const aCategoryMatch = String(a.category || '').trim().toLowerCase() === currentCategory
+      const bCategoryMatch = String(b.category || '').trim().toLowerCase() === currentCategory
+      const aTagOverlap = (Array.isArray(a.tags) ? a.tags : []).filter((t) =>
+        currentTags.has(String(t).trim().toLowerCase())
+      ).length
+      const bTagOverlap = (Array.isArray(b.tags) ? b.tags : []).filter((t) =>
+        currentTags.has(String(t).trim().toLowerCase())
+      ).length
+
+      const aScore = (aCategoryMatch ? 2 : 0) + aTagOverlap
+      const bScore = (bCategoryMatch ? 2 : 0) + bTagOverlap
+
+      if (bScore !== aScore) {
+        return bScore - aScore
+      }
+
+      return new Date(b.postedAt || 0) - new Date(a.postedAt || 0)
+    })
+
+    others.sort((a, b) => new Date(b.postedAt || 0) - new Date(a.postedAt || 0))
+
+    // If we have enough related stories (at least 3), show purely related stories
+    if (related.length >= 3) {
+      return related
+    }
+
+    // Otherwise, show related first, then fill with other latest stories
+    return [...related, ...others]
+  }, [allNews, story, id])
+
+  if (isLoading) return <Shell><JobDetailSkeleton /></Shell>
 
   if (isError || !story) {
-    return <Navigate to="/tech-news" replace />
+    return (
+      <NotFound
+        backTo="/tech-news"
+        backLabel="Back to Tech News"
+      />
+    )
   }
 
   const score = typeof story.score === 'number' ? story.score : 0
@@ -308,22 +364,22 @@ export default function TechNewsDetail() {
               </div>
             </div>
 
-            {/* Up Next / Latest News in Sidebar with Natural Scroll */}
+            {/* Up Next / Related Latest News in Sidebar with Natural Scroll */}
             {allUpNextStories.length > 0 && (
               <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
                 <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 space-y-4">
                   <div className="flex items-center justify-between border-b border-black/[.06] dark:border-white/[.08] pb-3">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)] block">
-                        Up Next
+                      <span className="text-[10px] font-bold uppercase tracking-[.2em] text-[#668c16] block">
+                        {story.category ? `More in ${story.category}` : 'Related Feed'}
                       </span>
                       <h3 className="text-base font-bold tracking-tight text-[var(--ink)]">
-                        Latest News
+                        Related Latest News
                       </h3>
                     </div>
-                    <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[9px] font-bold text-emerald-800 dark:text-emerald-300">
-                      <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>Live Feed</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 text-[10px] font-extrabold text-emerald-950 dark:text-emerald-200 ring-1 ring-emerald-600/30 dark:ring-emerald-500/40 shadow-xs">
+                      <span className="size-2 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse" />
+                      <span className="tracking-wide">Related</span>
                     </span>
                   </div>
 
@@ -370,7 +426,7 @@ export default function TechNewsDetail() {
                   </div>
 
                   <div className="border-t border-black/[.06] dark:border-white/[.08] pt-2 text-[10px] text-[var(--muted)] flex items-center justify-between">
-                    <span>{allUpNextStories.length} stories available</span>
+                    <span>{allUpNextStories.length} related stories available</span>
                     <ArrowUpRight size={12} />
                   </div>
                 </div>

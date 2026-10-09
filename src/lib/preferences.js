@@ -45,6 +45,17 @@ export function saveJobLayout(layout) {
   localStorage.setItem(JOB_LAYOUT_KEY, layout)
 }
 
+const TECH_NEWS_LAYOUT_KEY = 'pitchflow-tech-news-layout'
+
+export function loadTechNewsLayout() {
+  const layout = localStorage.getItem(TECH_NEWS_LAYOUT_KEY)
+  return ['grid', 'list', 'compact'].includes(layout) ? layout : 'grid'
+}
+
+export function saveTechNewsLayout(layout) {
+  localStorage.setItem(TECH_NEWS_LAYOUT_KEY, layout)
+}
+
 const DATE_FILTER_KEYS = {
   jobs: 'pitchflow-jobs-date-filter',
   techNews: 'pitchflow-tech-news-date-filter',
@@ -70,3 +81,36 @@ export function saveDateFilter(moduleName, value) {
   const key = DATE_FILTER_KEYS[moduleName]
   if (key) localStorage.setItem(key, JSON.stringify(value))
 }
+
+const TECH_NEWS_FILTERS_KEY = 'pitchflow-tech-news-filters'
+
+export const techNewsFilterDefaults = {
+  categories: [],
+  sourceTypes: [],
+  tiers: [],
+  search: '',
+}
+
+export function loadTechNewsFilters() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(TECH_NEWS_FILTERS_KEY) || 'null')
+    if (!saved || typeof saved !== 'object') return techNewsFilterDefaults
+    return {
+      categories: Array.isArray(saved.categories) ? saved.categories : [],
+      sourceTypes: Array.isArray(saved.sourceTypes) ? saved.sourceTypes : [],
+      tiers: Array.isArray(saved.tiers) ? saved.tiers : [],
+      search: typeof saved.search === 'string' ? saved.search : '',
+    }
+  } catch {
+    return techNewsFilterDefaults
+  }
+}
+
+export function saveTechNewsFilters(filters) {
+  try {
+    localStorage.setItem(TECH_NEWS_FILTERS_KEY, JSON.stringify(filters))
+  } catch {
+    // Ignore storage quota or privacy mode errors
+  }
+}
+

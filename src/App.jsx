@@ -8,6 +8,7 @@ import TechNews from './pages/TechNews'
 import TechNewsDetail from './pages/TechNewsDetail'
 import Profile from './pages/Profile'
 import Preferences from './pages/Preferences'
+import NotFound from './pages/NotFound'
 import SessionLoader from './components/SessionLoader'
 import LoginIntro from './components/LoginIntro'
 import ScrollToTop from './components/ScrollToTop'
@@ -45,7 +46,8 @@ export default function App() {
       <Route path="/news" element={<Navigate to="/tech-news" replace />} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/preferences" element={<ProtectedRoute><Preferences /></ProtectedRoute>} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/404" element={<NotFound />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   </>
 }

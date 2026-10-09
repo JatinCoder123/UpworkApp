@@ -15,6 +15,7 @@ import NewsFilterDialog from '../components/NewsFilterDialog'
 import CategoryFilterDialog from '../components/CategoryFilterDialog'
 import DateTimeRangeFilter from '../components/DateTimeRangeFilter'
 import { ActiveDateFilterChip, RefreshFilterButton } from '../components/FilterToolbarControls'
+import LogoLoader from '../components/LogoLoader'
 import { iconButton } from '../components/ui'
 import { api } from '../services/api'
 import {
@@ -22,63 +23,49 @@ import {
   SCORE_TIER_THRESHOLDS,
 } from '../lib/newsClassification'
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from '../lib/dateRange'
-import { loadDateFilter, saveDateFilter } from '../lib/preferences'
+import {
+  loadDateFilter,
+  loadTechNewsFilters,
+  loadTechNewsLayout,
+  saveDateFilter,
+  saveTechNewsFilters,
+  saveTechNewsLayout,
+} from '../lib/preferences'
+import LayoutToggle from '../components/LayoutToggle'
+import TechNewsCard from '../components/TechNewsCard'
 
-// Show strictly 3 fixed categories on the main screen (All, Other Tech (Cloud), AI)
-// Notice AI is moved to third position so All and AI are not side-by-side
-const SCREEN_CATEGORIES = ['All', 'Other Tech (Cloud)', 'AI']
+// Screen categories displayed on the main toolbar ("All" is inside the filter dialog)
+const SCREEN_CATEGORIES = ['Other Tech (Cloud)', 'AI']
 
-// Source Type tabs matching Opportunity Desk pipeline
-const SOURCE_TYPE_TABS = ['All', 'FirstParty', 'ThirdParty', 'YouBlogging', 'HurryUp']
-
-function SourceTypeBadge({ type }) {
-  if (type === 'FirstParty') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-        <span className="size-1.5 rounded-full bg-emerald-500" />
-        <span>FirstParty</span>
-      </span>
-    )
-  }
-  if (type === 'YouBlogging') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-        <span className="size-1.5 rounded-full bg-purple-500" />
-        <span>YouBlogging</span>
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-      <span className="size-1.5 rounded-full bg-blue-500" />
-      <span>ThirdParty</span>
-    </span>
-  )
-}
-
-function ScoreBadge({ tier }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-      <span className={`size-2 rounded-xs ${tier?.squareClass || 'bg-purple-500'}`} />
-      <span>{tier?.label || 'NORMAL'}</span>
-    </span>
-  )
-}
+// Source Type tabs displayed on the main toolbar ("All" is inside the filter dialog)
+const SOURCE_TYPE_TABS = ['FirstParty', 'ThirdParty', 'YouBlogging', 'HurryUp']
 
 export default function TechNews() {
-  const [selectedCategories, setSelectedCategories] = useState([])
-  const [selectedTiers, setSelectedTiers] = useState([])
-  const [selectedSourceTypes, setSelectedSourceTypes] = useState([])
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [layout, setLayout] = useState(loadTechNewsLayout)
+  const [selectedCategories, setSelectedCategories] = useState(() => loadTechNewsFilters().categories)
+  const [selectedTiers, setSelectedTiers] = useState(() => loadTechNewsFilters().tiers)
+  const [selectedSourceTypes, setSelectedSourceTypes] = useState(() => loadTechNewsFilters().sourceTypes)
+  const [search, setSearch] = useState(() => loadTechNewsFilters().search)
+  const [debouncedSearch, setDebouncedSearch] = useState(() => loadTechNewsFilters().search.trim())
   const [filterDialog, setFilterDialog] = useState(false)
   const [categoryDialog, setCategoryDialog] = useState(false)
   const [dateFilter, setDateFilter] = useState(() => loadDateFilter('techNews'))
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const root = useRef(null)
   const loadMoreRef = useRef(null)
   const gatewayDateFilter = useMemo(() => toGatewayDateFilter(dateFilter), [dateFilter])
 
   useEffect(() => saveDateFilter('techNews', dateFilter), [dateFilter])
+
+  // Save selected filters to localStorage so they persist across tabs and navigation
+  useEffect(() => {
+    saveTechNewsFilters({
+      categories: selectedCategories,
+      sourceTypes: selectedSourceTypes,
+      tiers: selectedTiers,
+      search,
+    })
+  }, [selectedCategories, selectedSourceTypes, selectedTiers, search])
 
   // 350ms debounce for Smart Gateway search query
   useEffect(() => {
@@ -101,8 +88,14 @@ export default function TechNews() {
   })
 
   const handleRefresh = async () => {
-    await api.getAllTechNews({ forceRefresh: true, dateFilter: gatewayDateFilter })
-    await refetch()
+    if (isRefreshing || isFetching) return
+    try {
+      setIsRefreshing(true)
+      await api.getAllTechNews({ forceRefresh: true, dateFilter: gatewayDateFilter })
+      await refetch()
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   // All records gathered across all loaded pages — strictly deduplicated by unique ID (zero duplication, zero repetition)
@@ -236,18 +229,6 @@ export default function TechNews() {
     return `${selectedCategories.length} Categories Selected`
   }, [selectedCategories])
 
-  const removeCategory = (cat) => {
-    setSelectedCategories((prev) => prev.filter((item) => item !== cat))
-  }
-
-  const removeTier = (tier) => {
-    setSelectedTiers((prev) => prev.filter((item) => item !== tier))
-  }
-
-  const removeSourceType = (src) => {
-    setSelectedSourceTypes((prev) => prev.filter((item) => item !== src))
-  }
-
   const clearAllFilters = () => {
     setSelectedCategories([])
     setSelectedTiers([])
@@ -294,7 +275,7 @@ export default function TechNews() {
   }, [hasMore, loadMore])
 
   useEffect(() => {
-    if (!isLoading && root.current) {
+    if (!isLoading && !isRefreshing && root.current) {
       const ctx = gsap.context(() => {
         gsap.fromTo(
           '[data-card]',
@@ -310,7 +291,7 @@ export default function TechNews() {
       }, root)
       return () => ctx.revert()
     }
-  }, [selectedCategories, selectedTiers, selectedSourceTypes, search, dateFilter, isLoading])
+  }, [selectedCategories, selectedTiers, selectedSourceTypes, search, dateFilter, isLoading, isRefreshing])
 
   return (
     <Shell>
@@ -336,31 +317,27 @@ export default function TechNews() {
         </section>
 
         {/* Top Horizontal Navigation & Search/Filter Toolbar */}
-        <section className="mt-10 rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
+        <section className="mt-10 rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
           <div className="space-y-4 rounded-[calc(2rem-.375rem)] bg-[var(--surface)] px-4 py-4 sm:px-6">
             {/* Top Row: Source Types (Left) + Search & Filter (Right) */}
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-              {/* Source Type Tabs in rounded-full pill container (matching Opportunity Desk pipeline) */}
+              {/* Source Type Tabs in rounded-full pill container (multi-select, "All" inside filter) */}
               <div className="flex gap-1 overflow-x-auto rounded-full bg-[var(--paper)] p-1 scrollbar-none">
                 {SOURCE_TYPE_TABS.map((item) => {
-                  const isSelected =
-                    item === 'All'
-                      ? selectedSourceTypes.length === 0
-                      : selectedSourceTypes.length === 1 && selectedSourceTypes[0] === item
+                  const isSelected = selectedSourceTypes.includes(item)
                   const count = sourceTypeCounts[item] || 0
 
                   return (
                     <button
                       key={item}
                       type="button"
+                      aria-pressed={isSelected}
                       onClick={() => {
-                        if (item === 'All') {
-                          setSelectedSourceTypes([])
-                        } else {
-                          setSelectedSourceTypes((prev) =>
-                            prev.length === 1 && prev[0] === item ? [] : [item]
-                          )
-                        }
+                        setSelectedSourceTypes((prev) =>
+                          prev.includes(item)
+                            ? prev.filter((t) => t !== item)
+                            : [...prev, item]
+                        )
                       }}
                       className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-300 ${
                         isSelected
@@ -383,9 +360,18 @@ export default function TechNews() {
                 })}
               </div>
 
-              {/* Search Bar + Filter Button (Like Opportunity Desk) */}
+              {/* Layout Toggle + Search Bar + Filter Button (Matching Opportunity Desk) */}
               <div className="flex items-center gap-2.5 shrink-0">
-                <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-3.5 py-2 ring-1 ring-black/5 transition-all focus-within:ring-[var(--lime-dark)] sm:w-64">
+                <LayoutToggle
+                  layout={layout}
+                  onChange={(next) => {
+                    setLayout(next)
+                    saveTechNewsLayout(next)
+                  }}
+                  ariaLabel="Tech news layout"
+                />
+
+                <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-3.5 py-2 ring-1 ring-black/5 dark:ring-white/10 transition-all focus-within:ring-[var(--lime-dark)] sm:w-64">
                   <MagnifyingGlass size={15} className="shrink-0 text-[var(--muted)]" />
                   <input
                     type="text"
@@ -440,28 +426,28 @@ export default function TechNews() {
                 Category:
               </span>
 
-              <RefreshFilterButton onClick={handleRefresh} loading={isFetching} label="Refresh news feed" />
+              <RefreshFilterButton
+                onClick={handleRefresh}
+                loading={isFetching || isRefreshing}
+                label="Refresh news feed"
+              />
 
-              {/* Strictly 3 fixed categories: All, Other Tech (Cloud), AI */}
+              {/* Fixed screen categories: Other Tech (Cloud), AI (multi-select) */}
               {SCREEN_CATEGORIES.map((cat) => {
-                const isSelected =
-                  cat === 'All'
-                    ? selectedCategories.length === 0
-                    : selectedCategories.length === 1 && selectedCategories[0] === cat
+                const isSelected = selectedCategories.includes(cat)
                 const count = categoryCounts[cat] || 0
 
                 return (
                   <button
                     key={cat}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => {
-                      if (cat === 'All') {
-                        setSelectedCategories([])
-                      } else {
-                        setSelectedCategories((prev) =>
-                          prev.length === 1 && prev[0] === cat ? [] : [cat]
-                        )
-                      }
+                      setSelectedCategories((prev) =>
+                        prev.includes(cat)
+                          ? prev.filter((c) => c !== cat)
+                          : [...prev, cat]
+                      )
                     }}
                     className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-300 ${
                       isSelected
@@ -485,16 +471,16 @@ export default function TechNews() {
 
               {/* + More categories button (Opens modal with all categories) */}
               {(() => {
-                const isExternalSelected =
-                  selectedCategories.length > 0 &&
-                  !(selectedCategories.length === 1 && SCREEN_CATEGORIES.includes(selectedCategories[0]))
+                const externalSelectedCount = selectedCategories.filter(
+                  (c) => !SCREEN_CATEGORIES.includes(c)
+                ).length
 
                 return (
                   <button
                     type="button"
                     onClick={() => setCategoryDialog(true)}
                     className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
-                      isExternalSelected
+                      externalSelectedCount > 0
                         ? 'bg-[var(--ink)] text-white ring-1 ring-black/10 shadow-xs'
                         : 'bg-transparent text-[var(--muted)] ring-1 ring-black/10 hover:text-[var(--ink)] hover:ring-black/20 dark:ring-white/10 dark:hover:ring-white/20'
                     }`}
@@ -502,11 +488,11 @@ export default function TechNews() {
                   >
                     <Plus size={13} weight="bold" />
                     <span>More categories</span>
-                    {isExternalSelected && (
+                    {externalSelectedCount > 0 && (
                       <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold text-white">
-                        {selectedCategories.length === 1
-                          ? selectedCategories[0]
-                          : `${selectedCategories.length} selected`}
+                        {externalSelectedCount === 1
+                          ? selectedCategories.find((c) => !SCREEN_CATEGORIES.includes(c))
+                          : `${externalSelectedCount} selected`}
                       </span>
                     )}
                   </button>
@@ -514,100 +500,16 @@ export default function TechNews() {
               })()}
 
               <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} className="ml-auto" />
-            </div>
-
-            {/* Active Filters Display */}
-            {refinementFilterCount > 0 && (
-              <div className="flex flex-wrap items-center gap-2 border-t border-black/[.06] dark:border-white/[.08] pt-3 text-xs">
-                <span className="text-[10px] font-bold uppercase tracking-[.14em] text-[var(--muted)] mr-1">
-                  Active Filters ({refinementFilterCount}):
-                </span>
-
-                {/* Category chips */}
-                {selectedCategories.map((cat) => (
-                  <span
-                    key={cat}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3 py-1 text-[11px] font-bold text-[var(--ink)] ring-1 ring-black/10 shadow-xs"
-                  >
-                    <span>Category: {cat}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeCategory(cat)}
-                      aria-label={`Remove ${cat} category filter`}
-                      className="hover:opacity-75"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-
-                {/* Score Tier chips */}
-                {selectedTiers.map((tier) => (
-                  <span
-                    key={tier}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3 py-1 text-[11px] font-bold text-[var(--ink)] ring-1 ring-black/10 shadow-xs"
-                  >
-                    <span
-                      className={`size-2 rounded-xs ${
-                        tier === 'BLOCKBUSTER'
-                          ? 'bg-rose-500'
-                          : tier === 'HOT'
-                            ? 'bg-amber-500'
-                            : 'bg-purple-500'
-                      }`}
-                    />
-                    <span>
-                      Tier: {tier === 'BLOCKBUSTER' ? 'Blockbuster' : tier === 'HOT' ? 'Hot' : 'Normal'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeTier(tier)}
-                      aria-label={`Remove ${tier} tier filter`}
-                      className="hover:opacity-75"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-
-                {/* Source Type chips */}
-                {selectedSourceTypes.map((src) => (
-                  <span
-                    key={src}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3 py-1 text-[11px] font-bold text-[var(--ink)] ring-1 ring-black/10 shadow-xs"
-                  >
-                    <span
-                      className={`size-2 rounded-full ${
-                        src === 'FirstParty'
-                          ? 'bg-emerald-500'
-                          : src === 'ThirdParty'
-                            ? 'bg-blue-500'
-                            : src === 'YouBlogging'
-                              ? 'bg-purple-500'
-                              : 'bg-amber-500'
-                      }`}
-                    />
-                    <span>Source: {src}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeSourceType(src)}
-                      aria-label={`Remove ${src} source filter`}
-                      className="hover:opacity-75"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-
+              {(refinementFilterCount > 0 || dateFilter.preset !== 'all' || search) && (
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="ml-auto text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)]"
+                  className="shrink-0 text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
                 >
                   Clear all
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </section>
 
@@ -623,8 +525,13 @@ export default function TechNews() {
             </div>
 
             {/* Articles Grid */}
-            {isLoading ? (
-              <p className="py-24 text-center text-sm text-[var(--muted)]">Loading tech news...</p>
+            {isLoading || isRefreshing ? (
+              <div className="py-12 flex flex-col items-center justify-center">
+                <LogoLoader
+                  className="min-h-[38dvh]"
+                  label={isRefreshing ? 'Refreshing tech news feed...' : 'Loading tech news feed...'}
+                />
+              </div>
             ) : filteredArticles.length === 0 ? (
               <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
                 <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] py-20 text-center">
@@ -645,113 +552,17 @@ export default function TechNews() {
                 </div>
               </div>
             ) : (
-              <div className="grid gap-6 sm:grid-cols-2">
+              <div
+                className={`grid gap-4 sm:gap-5 ${
+                  layout === 'grid'
+                    ? 'sm:grid-cols-2'
+                    : layout === 'compact'
+                    ? 'sm:grid-cols-2 xl:grid-cols-3'
+                    : 'grid-cols-1'
+                }`}
+              >
                 {displayedArticles.map((story) => (
-                  <article
-                    key={story.id}
-                    data-card
-                    className="group flex flex-col overflow-hidden rounded-[1.8rem] bg-black/[.045] p-1.5 ring-1 ring-black/5 transition-all duration-700 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-1 hover:bg-black/[.07]"
-                  >
-                    <div className="relative flex flex-1 flex-col overflow-hidden rounded-[calc(1.8rem-.375rem)] bg-[var(--surface)] shadow-[inset_0_1px_1px_rgba(255,255,255,.9)]">
-                      {/* Topic-Matching Banner Image */}
-                      {story.image && (
-                        <Link
-                          to={`/tech-news/${story.id}`}
-                          className="relative block h-44 w-full overflow-hidden bg-[var(--ink)]"
-                        >
-                          <img
-                            src={story.image}
-                            alt={story.title}
-                            className="size-full object-cover opacity-85 transition-transform duration-700 ease-[cubic-bezier(.32,.72,0,1)] group-hover:scale-105"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-
-                          {/* Source Type & HurryUp Badges on Image (High-contrast generic styling) */}
-                          <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                            <SourceTypeBadge type={story.sourceType} />
-
-                            {story.hurryUp && (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-                                <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                <span>HurryUp</span>
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Bottom row in image */}
-                          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs">
-                            <span className="rounded-full bg-black/60 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[.1em] backdrop-blur-md">
-                              {story.category}
-                            </span>
-                            <span className="text-[10px] opacity-90">{story.readTime}</span>
-                          </div>
-                        </Link>
-                      )}
-
-                      {/* Card Body */}
-                      <div className="flex flex-1 flex-col p-5 sm:p-6">
-                        {/* Classification Row: Score Tier & Posted time */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/[.06] dark:border-white/[.08] pb-3 text-xs">
-                          <ScoreBadge tier={story.tier} />
-                          <span className="text-[10px] font-semibold text-[var(--muted)]">
-                            {story.posted}
-                          </span>
-                        </div>
-
-                        {/* Source Provenance */}
-                        <div className="mt-3 flex items-center justify-between text-[11px] text-[var(--muted)]">
-                          <span className="font-bold uppercase tracking-[.1em] text-[var(--ink)]">
-                            {story.source}
-                          </span>
-                          {story.sourceNote && (
-                            <span className="truncate max-w-[170px] italic text-[10px]">
-                              {story.sourceNote}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Linked Headline (Clicking navigates to whole-page detail view) */}
-                        <Link
-                          to={`/tech-news/${story.id}`}
-                          className="mt-3 block group/title"
-                        >
-                          <h2 className="text-lg font-semibold leading-[1.3] tracking-[-.035em] text-[var(--ink)] transition-colors duration-300 group-hover/title:text-[#668c16] sm:text-xl">
-                            {story.title}
-                          </h2>
-                        </Link>
-
-                        {/* Summary */}
-                        <p className="mt-2.5 flex-1 text-xs leading-5 text-[var(--muted)] line-clamp-3">
-                          {story.summary}
-                        </p>
-
-                        {/* Card Footer Actions */}
-                        <div className="mt-6 flex items-center justify-between border-t border-black/[.07] dark:border-white/[.08] pt-4">
-                          <Link
-                            to={`/tech-news/${story.id}`}
-                            className="inline-flex items-center gap-1 text-xs font-bold text-[var(--ink)] hover:text-[#668c16] transition-colors"
-                          >
-                            <span>Read full story</span>
-                            <ArrowUpRight size={13} />
-                          </Link>
-
-                          <div className="flex items-center gap-2">
-                            {story.url && (
-                              <a
-                                href={story.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`Open original source on ${story.source}`}
-                                className="grid size-8 place-items-center rounded-full bg-[var(--paper)] text-[var(--ink)] ring-1 ring-black/5 transition-transform duration-500 hover:rotate-12"
-                              >
-                                <ArrowUpRight size={13} weight="light" />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
+                  <TechNewsCard key={story.id} story={story} layout={layout} />
                 ))}
               </div>
             )}
@@ -787,9 +598,9 @@ export default function TechNews() {
                       Latest News
                     </h2>
                   </div>
-                  <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-bold text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500/20">
-                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Live Feed</span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 text-[10px] font-extrabold text-emerald-950 dark:text-emerald-200 ring-1 ring-emerald-600/30 dark:ring-emerald-500/40 shadow-xs">
+                    <span className="size-2 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse" />
+                    <span className="tracking-wide">Live Feed</span>
                   </span>
                 </div>
 
