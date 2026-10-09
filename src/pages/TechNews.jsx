@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import gsap from 'gsap'
 import {
-  ArrowClockwise,
   ArrowUpRight,
   Funnel,
   MagnifyingGlass,
@@ -14,12 +13,16 @@ import {
 import Shell from '../components/Shell'
 import NewsFilterDialog from '../components/NewsFilterDialog'
 import CategoryFilterDialog from '../components/CategoryFilterDialog'
+import DateTimeRangeFilter from '../components/DateTimeRangeFilter'
+import { ActiveDateFilterChip, RefreshFilterButton } from '../components/FilterToolbarControls'
 import { iconButton } from '../components/ui'
 import { api } from '../services/api'
 import {
   prepareDailyTechDigest,
   SCORE_TIER_THRESHOLDS,
 } from '../lib/newsClassification'
+import { EMPTY_DATE_RANGE, toGatewayDateFilter } from '../lib/dateRange'
+import { loadDateFilter, saveDateFilter } from '../lib/preferences'
 
 // Show strictly 3 fixed categories on the main screen (All, Other Tech (Cloud), AI)
 // Notice AI is moved to third position so All and AI are not side-by-side
@@ -70,8 +73,12 @@ export default function TechNews() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterDialog, setFilterDialog] = useState(false)
   const [categoryDialog, setCategoryDialog] = useState(false)
+  const [dateFilter, setDateFilter] = useState(() => loadDateFilter('techNews'))
   const root = useRef(null)
   const loadMoreRef = useRef(null)
+  const gatewayDateFilter = useMemo(() => toGatewayDateFilter(dateFilter), [dateFilter])
+
+  useEffect(() => saveDateFilter('techNews', dateFilter), [dateFilter])
 
   // 350ms debounce for Smart Gateway search query
   useEffect(() => {
@@ -88,13 +95,13 @@ export default function TechNews() {
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: ['tech-news-feed'],
-    queryFn: () => api.getAllTechNews(false),
+    queryKey: ['tech-news-feed', gatewayDateFilter],
+    queryFn: () => api.getAllTechNews({ dateFilter: gatewayDateFilter }),
     staleTime: 5 * 60 * 1000,
   })
 
   const handleRefresh = async () => {
-    await api.getAllTechNews(true)
+    await api.getAllTechNews({ forceRefresh: true, dateFilter: gatewayDateFilter })
     await refetch()
   }
 
@@ -221,8 +228,7 @@ export default function TechNews() {
     return counts
   }, [rawNews])
 
-  const totalActiveFilters =
-    selectedCategories.length + selectedTiers.length + selectedSourceTypes.length
+  const refinementFilterCount = selectedCategories.length + selectedTiers.length + selectedSourceTypes.length
 
   const activeCategoryTitle = useMemo(() => {
     if (selectedCategories.length === 0) return 'All Stories'
@@ -247,9 +253,10 @@ export default function TechNews() {
     setSelectedTiers([])
     setSelectedSourceTypes([])
     setSearch('')
+    setDateFilter(EMPTY_DATE_RANGE)
   }
 
-  const filterKey = `${selectedCategories.join(',')}|${selectedTiers.join(',')}|${selectedSourceTypes.join(',')}|${debouncedSearch}`
+  const filterKey = `${selectedCategories.join(',')}|${selectedTiers.join(',')}|${selectedSourceTypes.join(',')}|${debouncedSearch}|${dateFilter.preset}|${dateFilter.from}|${dateFilter.to}`
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
   const [visibleCount, setVisibleCount] = useState(16)
 
@@ -303,7 +310,7 @@ export default function TechNews() {
       }, root)
       return () => ctx.revert()
     }
-  }, [selectedCategories, selectedTiers, selectedSourceTypes, search, isLoading])
+  }, [selectedCategories, selectedTiers, selectedSourceTypes, search, dateFilter, isLoading])
 
   return (
     <Shell>
@@ -329,8 +336,8 @@ export default function TechNews() {
         </section>
 
         {/* Top Horizontal Navigation & Search/Filter Toolbar */}
-        <section className="mt-10 rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
-          <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-4 sm:p-5 space-y-4">
+        <section className="mt-10 rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
+          <div className="space-y-4 rounded-[calc(2rem-.375rem)] bg-[var(--surface)] px-4 py-4 sm:px-6">
             {/* Top Row: Source Types (Left) + Search & Filter (Right) */}
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
               {/* Source Type Tabs in rounded-full pill container (matching Opportunity Desk pipeline) */}
@@ -399,6 +406,12 @@ export default function TechNews() {
                   )}
                 </label>
 
+                <DateTimeRangeFilter
+                  value={dateFilter}
+                  onApply={setDateFilter}
+                  label="News publishing time"
+                />
+
                 {/* Filter Button on right side of search bar */}
                 <button
                   type="button"
@@ -406,15 +419,15 @@ export default function TechNews() {
                   aria-label="Open filter dialog"
                   title="Filter by Category, Score Tier, and Source Type"
                   className={`relative ${iconButton} ${
-                    totalActiveFilters > 0
+                    refinementFilterCount > 0
                       ? 'bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40 font-bold'
                       : ''
                   }`}
                 >
-                  <Funnel size={16} weight={totalActiveFilters > 0 ? 'fill' : 'regular'} />
-                  {totalActiveFilters > 0 && (
+                  <Funnel size={16} weight={refinementFilterCount > 0 ? 'fill' : 'regular'} />
+                  {refinementFilterCount > 0 && (
                     <span className="absolute -top-1 -right-1 grid size-4.5 place-items-center rounded-full bg-[var(--ink)] text-[9px] font-bold text-white shadow-xs">
-                      {totalActiveFilters}
+                      {refinementFilterCount}
                     </span>
                   )}
                 </button>
@@ -427,23 +440,7 @@ export default function TechNews() {
                 Category:
               </span>
 
-              {/* Universal Refresh Circle Button */}
-              <button
-                type="button"
-                onClick={handleRefresh}
-                disabled={isFetching}
-                title="Refresh news feed"
-                aria-label="Refresh news feed"
-                className={`grid size-8 shrink-0 place-items-center rounded-full bg-[var(--paper)] text-[var(--muted)] ring-1 ring-black/5 transition-all hover:bg-black/5 hover:text-[var(--ink)] dark:ring-white/10 dark:hover:bg-white/5 ${
-                  isFetching ? 'opacity-70 cursor-not-allowed' : 'active:scale-95'
-                }`}
-              >
-                <ArrowClockwise
-                  size={15}
-                  weight="bold"
-                  className={isFetching ? 'animate-spin text-[var(--lime-dark)]' : ''}
-                />
-              </button>
+              <RefreshFilterButton onClick={handleRefresh} loading={isFetching} label="Refresh news feed" />
 
               {/* Strictly 3 fixed categories: All, Other Tech (Cloud), AI */}
               {SCREEN_CATEGORIES.map((cat) => {
@@ -515,13 +512,15 @@ export default function TechNews() {
                   </button>
                 )
               })()}
+
+              <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} className="ml-auto" />
             </div>
 
             {/* Active Filters Display */}
-            {totalActiveFilters > 0 && (
+            {refinementFilterCount > 0 && (
               <div className="flex flex-wrap items-center gap-2 border-t border-black/[.06] dark:border-white/[.08] pt-3 text-xs">
                 <span className="text-[10px] font-bold uppercase tracking-[.14em] text-[var(--muted)] mr-1">
-                  Active Filters ({totalActiveFilters}):
+                  Active Filters ({refinementFilterCount}):
                 </span>
 
                 {/* Category chips */}

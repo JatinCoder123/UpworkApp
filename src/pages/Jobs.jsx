@@ -17,12 +17,15 @@ import JobCard from "../components/JobCard";
 import LogoLoader from "../components/LogoLoader";
 import {
   AddJobDialog,
-  DateFilterDialog,
   SaveViewDialog,
 } from "../components/dialogs";
+import DateTimeRangeFilter from "../components/DateTimeRangeFilter";
+import OpportunityFilterDialog from "../components/OpportunityFilterDialog";
+import { ActiveDateFilterChip, RefreshFilterButton } from "../components/FilterToolbarControls";
 import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
-import { loadJobLayout, loadJobStatus, loadSavedViews, saveJobLayout, saveJobStatus, saveViews } from "../lib/preferences";
+import { loadDateFilter, loadJobLayout, loadJobStatus, loadSavedViews, saveDateFilter, saveJobLayout, saveJobStatus, saveViews } from "../lib/preferences";
+import { EMPTY_DATE_RANGE, toGatewayDateFilter } from "../lib/dateRange";
 
 const pipeline = ["New", "Most recent", "Applied", "Rejected"];
 const layouts = [
@@ -31,49 +34,12 @@ const layouts = [
   { id: "compact", label: "Compact", icon: Rows },
 ];
 
-const dateLabels = {
-  all: "Any time",
-  today: "Today",
-  yesterday: "Yesterday",
-  "7days": "Last 7 days",
-  "30days": "Last 30 days",
-  lastMonth: "Last month",
-  custom: "Custom time",
-};
-
-function isInsideDateFilter(postedAt, filter) {
-  if (filter.preset === "all") return true;
-  const posted = new Date(postedAt),
-    now = new Date();
-  let start,
-    end = now;
-  if (filter.preset === "today")
-    start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (filter.preset === "yesterday") {
-    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-    end = new Date(
-      new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - 1,
-    );
-  }
-  if (filter.preset === "7days")
-    start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  if (filter.preset === "30days")
-    start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  if (filter.preset === "lastMonth") {
-    start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    end = new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-  if (filter.preset === "custom") {
-    start = new Date(filter.from);
-    end = new Date(filter.to);
-  }
-  return posted >= start && posted <= end;
-}
-
 export default function Jobs() {
-  const { data: jobs = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["jobs"],
-    queryFn: api.getJobs,
+  const [dateFilter, setDateFilter] = useState(() => loadDateFilter("jobs"));
+  const gatewayDateFilter = useMemo(() => toGatewayDateFilter(dateFilter), [dateFilter]);
+  const { data: jobs = [], isLoading, isFetching, isError, error, refetch } = useQuery({
+    queryKey: ["jobs", gatewayDateFilter],
+    queryFn: () => api.getJobs({ dateFilter: gatewayDateFilter }),
   });
   const [tab, setTab] = useState(() => loadJobStatus() === "Seen" ? "New" : loadJobStatus()),
     [layout, setLayout] = useState(loadJobLayout),
@@ -81,10 +47,10 @@ export default function Jobs() {
     [adding, setAdding] = useState(false),
     [skills, setSkills] = useState([]),
     [dateDialog, setDateDialog] = useState(false),
-    [dateFilter, setDateFilter] = useState({ preset: "all", from: "", to: "" }),
     [savedViews, setSavedViews] = useState(loadSavedViews),
     [savingView, setSavingView] = useState(false);
   const root = useRef(null);
+  useEffect(() => saveDateFilter("jobs", dateFilter), [dateFilter]);
   const skillOptions = useMemo(
     () => [...new Set(jobs.flatMap((job) => job.tags))].sort(),
     [jobs],
@@ -102,10 +68,9 @@ export default function Jobs() {
             .toLowerCase()
             .includes(search.toLowerCase()) &&
           (!skills.length ||
-            skills.some((skill) => job.tags.includes(skill))) &&
-          isInsideDateFilter(job.postedAt, dateFilter),
+            skills.some((skill) => job.tags.includes(skill))),
       ).sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt)),
-    [jobs, tab, search, skills, dateFilter],
+    [jobs, tab, search, skills],
   );
   const toggleSkill = (skill) =>
     setSkills((current) =>
@@ -128,7 +93,7 @@ export default function Jobs() {
     saveJobStatus(nextTab);
     setSearch(saved.search);
     setSkills(saved.skills);
-    setDateFilter(saved.dateFilter);
+    setDateFilter(saved.dateFilter || EMPTY_DATE_RANGE);
   };
   const removeView = (id) => {
     const next = savedViews.filter((saved) => saved.id !== id);
@@ -228,7 +193,7 @@ export default function Jobs() {
                       setTab(item);
                       saveJobStatus(item);
                     }}
-                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${tab === item ? "bg-[var(--ink)] text-white" : "text-[var(--muted)]"}`}
+                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-300 ${tab === item ? "bg-[var(--ink)] text-white shadow-xs" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
                   >
                     {item}
                     <span
@@ -263,50 +228,50 @@ export default function Jobs() {
                     className="min-w-0 flex-1 bg-transparent text-xs outline-none"
                   />
                 </label>
+                <DateTimeRangeFilter
+                  value={dateFilter}
+                  onApply={setDateFilter}
+                  label="Opportunity posting time"
+                />
                 <button
                   onClick={() => setDateDialog(true)}
-                  aria-label="Open all filters"
-                  className={`${iconButton} ${dateFilter.preset !== "all" || skills.length ? "bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/25" : ""}`}
+                  aria-label="Open skill filters"
+                  className={`relative ${iconButton} ${skills.length ? "bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40 font-bold" : ""}`}
                 >
-                  <Funnel size={16} />
+                  <Funnel size={16} weight={skills.length ? "fill" : "regular"} />
+                  {skills.length > 0 && <span className="absolute -right-1 -top-1 grid size-4.5 place-items-center rounded-full bg-[var(--ink)] text-[9px] font-bold text-white shadow-xs">{skills.length}</span>}
                 </button>
               </div>
             </div>
-            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-black/[.06] pt-4">
-              <span className="shrink-0 text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">
-                Skills
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-black/[.06] pt-3 text-xs dark:border-white/[.08]">
+              <span className="mr-1 shrink-0 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">
+                Skills:
               </span>
+              <RefreshFilterButton onClick={() => refetch()} loading={isFetching} label="Refresh opportunities" />
               <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
                 {quickSkills.map((skill) => (
                   <button
                     key={skill}
                     onClick={() => toggleSkill(skill)}
                     aria-pressed={skills.includes(skill)}
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${skills.includes(skill) ? "bg-[var(--lime)] !text-[#26320b] ring-1 ring-[var(--lime-dark)]/30" : "bg-[var(--paper)] text-[var(--muted)] hover:text-[var(--ink)]"}`}
+                    className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold ring-1 transition-all duration-300 ${skills.includes(skill) ? "bg-[var(--ink)] text-white ring-black/10 shadow-xs" : "bg-[var(--paper)] text-[var(--muted)] ring-black/5 hover:bg-black/5 hover:text-[var(--ink)] dark:ring-white/10 dark:hover:bg-white/5"}`}
                   >
                     {skill}
                   </button>
                 ))}
                 <button
                   onClick={() => setDateDialog(true)}
-                  className="shrink-0 rounded-full bg-transparent px-3 py-1.5 text-[10px] font-bold text-[var(--muted)] ring-1 ring-black/10 hover:text-[var(--ink)]"
+                  className="shrink-0 rounded-full bg-transparent px-3.5 py-2 text-xs font-bold text-[var(--muted)] ring-1 ring-black/10 transition-all hover:text-[var(--ink)] hover:ring-black/20 dark:ring-white/10 dark:hover:ring-white/20"
                 >
                   + More skills
                 </button>
               </div>
-              {dateFilter.preset !== "all" && (
-                <button
-                  onClick={() => setDateDialog(true)}
-                  className="shrink-0 rounded-full bg-[#e1efbd] px-3 py-1.5 text-[10px] font-bold text-[#34420f]"
-                >
-                  {dateLabels[dateFilter.preset]}
-                </button>
-              )}
+              <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} className="ml-auto" />
               {(skills.length > 0 || dateFilter.preset !== "all") && (
                 <button
                   onClick={() => {
                     setSkills([]);
-                    setDateFilter({ preset: "all", from: "", to: "" });
+                    setDateFilter(EMPTY_DATE_RANGE);
                   }}
                   className="shrink-0 text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]"
                 >
@@ -354,13 +319,11 @@ export default function Jobs() {
         )}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {dateDialog && (
-          <DateFilterDialog
-            value={dateFilter}
+          <OpportunityFilterDialog
             skills={skills}
             skillOptions={skillOptions}
             onClose={() => setDateDialog(false)}
-            onApply={({ date, skills: nextSkills }) => {
-              setDateFilter(date);
+            onApply={(nextSkills) => {
               setSkills(nextSkills);
               setDateDialog(false);
             }}

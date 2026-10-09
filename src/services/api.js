@@ -42,6 +42,16 @@ function initials(value) {
   return String(value || "Upwork").split(/\s+/).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
 }
 
+function addGatewayDateFilter(payload, dateFilter) {
+  if (!dateFilter?.date_from || !dateFilter?.date_to) return payload;
+  return {
+    ...payload,
+    date_field: dateFilter.date_field || "date_entered",
+    date_from: dateFilter.date_from,
+    date_to: dateFilter.date_to,
+  };
+}
+
 function parseEnteredAt(record) {
   const match = String(record.date_entered || "").match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
   if (!match) return new Date().toISOString();
@@ -108,8 +118,9 @@ export function mapGatewayJob(record) {
   };
 }
 
-export async function fetchJobs({ page = 1, perPage = 20 } = {}) {
-  const data = await smartGateway({ action: "fetch", module: JOBS_MODULE, page, per_page: perPage });
+export async function fetchJobs({ page = 1, perPage = 20, dateFilter } = {}) {
+  const payload = addGatewayDateFilter({ action: "fetch", module: JOBS_MODULE, page, per_page: perPage }, dateFilter);
+  const data = await smartGateway(payload);
   return (data.records || []).map(mapGatewayJob);
 }
 
@@ -267,6 +278,7 @@ export async function fetchTechNews({
   category,
   search,
   filters = {},
+  dateFilter,
 } = {}) {
   const gatewayFilters = { ...filters };
   if (category && category !== "All") {
@@ -291,7 +303,7 @@ export async function fetchTechNews({
     queryPayload.search_fields = ["name", "summary", "description"];
   }
 
-  const data = await smartGateway(queryPayload);
+  const data = await smartGateway(addGatewayDateFilter(queryPayload, dateFilter));
   const records = (data.records || []).map(mapGatewayTechNews);
 
   return {
@@ -317,23 +329,24 @@ export async function fetchTechNewsById(id) {
   return mapGatewayTechNews(record);
 }
 
-let cachedTechNews = null;
-let cacheTimestamp = 0;
-let inFlightTechNewsPromise = null;
+const techNewsCache = new Map();
+const inFlightTechNewsRequests = new Map();
 
-export async function fetchAllTechNews(forceRefresh = false) {
+export async function fetchAllTechNews({ forceRefresh = false, dateFilter = null } = {}) {
   const now = Date.now();
-  if (!forceRefresh && cachedTechNews && now - cacheTimestamp < 120_000) {
-    return cachedTechNews;
+  const cacheKey = JSON.stringify(dateFilter || {});
+  const cached = techNewsCache.get(cacheKey);
+  if (!forceRefresh && cached && now - cached.timestamp < 120_000) {
+    return cached.data;
   }
 
-  if (!forceRefresh && inFlightTechNewsPromise) {
-    return inFlightTechNewsPromise;
+  if (!forceRefresh && inFlightTechNewsRequests.has(cacheKey)) {
+    return inFlightTechNewsRequests.get(cacheKey);
   }
 
-  inFlightTechNewsPromise = (async () => {
+  const request = (async () => {
     try {
-      const first = await fetchTechNews({ page: 1, perPage: 50 });
+      const first = await fetchTechNews({ page: 1, perPage: 50, dateFilter });
       const total = Number(first.total) || first.records.length;
       const computedTotalPages = Math.max(Number(first.totalPages) || 1, Math.ceil(total / 50));
       let allRecords = [...first.records];
@@ -341,7 +354,7 @@ export async function fetchAllTechNews(forceRefresh = false) {
       if (computedTotalPages > 1) {
         for (let p = 2; p <= computedTotalPages; p++) {
           try {
-            const nextPage = await fetchTechNews({ page: p, perPage: 50 });
+            const nextPage = await fetchTechNews({ page: p, perPage: 50, dateFilter });
             allRecords = allRecords.concat(nextPage.records || []);
           } catch (pageErr) {
             console.warn(`Failed to fetch tech news page ${p}:`, pageErr);
@@ -349,26 +362,27 @@ export async function fetchAllTechNews(forceRefresh = false) {
         }
       }
 
-      cachedTechNews = {
+      const result = {
         records: allRecords,
         total,
       };
-      cacheTimestamp = Date.now();
-      return cachedTechNews;
+      techNewsCache.set(cacheKey, { data: result, timestamp: Date.now() });
+      return result;
     } finally {
-      inFlightTechNewsPromise = null;
+      inFlightTechNewsRequests.delete(cacheKey);
     }
   })();
 
-  return inFlightTechNewsPromise;
+  inFlightTechNewsRequests.set(cacheKey, request);
+  return request;
 }
 
 export const api = {
-  getJobs: () => fetchJobs(),
+  getJobs: (params) => fetchJobs(params),
   getJob: fetchJobById,
   getTechNews: (params) => fetchTechNews(params),
   getTechNewsItem: (id) => fetchTechNewsById(id),
-  getAllTechNews: (forceRefresh) => fetchAllTechNews(forceRefresh),
+  getAllTechNews: (options) => fetchAllTechNews(options),
   async updateStatus({ id, status, reason, coverLetter }) {
     const current = await fetchJobById(id);
     await smartGateway({

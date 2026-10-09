@@ -44,3 +44,29 @@ export function loadJobLayout() {
 export function saveJobLayout(layout) {
   localStorage.setItem(JOB_LAYOUT_KEY, layout)
 }
+
+const DATE_FILTER_KEYS = {
+  jobs: 'pitchflow-jobs-date-filter',
+  techNews: 'pitchflow-tech-news-date-filter',
+}
+
+const DATE_PRESETS = new Set(['all', 'today', 'yesterday', '24hours', '7days', '30days', 'lastMonth', 'custom'])
+
+export function loadDateFilter(moduleName) {
+  const fallback = { preset: 'all', from: '', to: '' }
+  const key = DATE_FILTER_KEYS[moduleName]
+  if (!key) return fallback
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || 'null')
+    if (!saved || !DATE_PRESETS.has(saved.preset)) return fallback
+    if (saved.preset === 'custom' && (!saved.from || !saved.to)) return fallback
+    return { preset: saved.preset, from: saved.from || '', to: saved.to || '' }
+  } catch {
+    return fallback
+  }
+}
+
+export function saveDateFilter(moduleName, value) {
+  const key = DATE_FILTER_KEYS[moduleName]
+  if (key) localStorage.setItem(key, JSON.stringify(value))
+}
