@@ -2,13 +2,9 @@ import { useMemo } from 'react'
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Alarm,
   ArrowLeft,
   ArrowSquareOut,
   ArrowUpRight,
-  Buildings,
-  Globe,
-  PenNib,
   ShieldCheck,
   Tag,
 } from '@phosphor-icons/react'
@@ -22,9 +18,9 @@ import {
 } from '../lib/newsClassification'
 
 function SourceIcon({ type }) {
-  if (type === 'FirstParty') return <Buildings size={16} weight="bold" />
-  if (type === 'YouBlogging') return <PenNib size={16} weight="bold" />
-  return <Globe size={16} weight="bold" />
+  if (type === 'FirstParty') return <span className="size-1.5 rounded-full bg-emerald-500" />
+  if (type === 'YouBlogging') return <span className="size-1.5 rounded-full bg-purple-500" />
+  return <span className="size-1.5 rounded-full bg-blue-500" />
 }
 
 export default function TechNewsDetail() {
@@ -35,26 +31,24 @@ export default function TechNewsDetail() {
     queryFn: () => api.getTechNewsItem(id),
   })
 
-  const { data: allNews = [] } = useQuery({
-    queryKey: ['tech-news'],
-    queryFn: api.getTechNews,
+  const { data: newsResult } = useQuery({
+    queryKey: ['tech-news-sidebar'],
+    queryFn: () => api.getTechNews({ page: 1, perPage: 15 }),
   })
 
-  // 2-3 Up Next / Latest News items excluding the current story
-  const upNextStories = useMemo(() => {
-    return allNews
-      .filter((item) => item.id !== id)
-      .sort((a, b) => new Date(b.postedAt || 0) - new Date(a.postedAt || 0))
-      .slice(0, 3)
-      .map((item) => {
-        const sc = typeof item.score === 'number' ? item.score : 0
-        return {
-          ...item,
-          score: sc,
-          tier: classifyScoreTier(sc),
-          sourceType: classifySourceType(item),
-        }
-      })
+  const allNews = useMemo(() => newsResult?.records || [], [newsResult])
+
+  // All Up Next / Latest News items excluding the current story (strictly deduplicated)
+  const allUpNextStories = useMemo(() => {
+    const seen = new Set()
+    const unique = []
+    for (const item of allNews) {
+      if (item?.id && item.id !== id && !seen.has(item.id)) {
+        seen.add(item.id)
+        unique.push(item)
+      }
+    }
+    return unique.sort((a, b) => new Date(b.postedAt || 0) - new Date(a.postedAt || 0))
   }, [allNews, id])
 
   if (isLoading) {
@@ -109,10 +103,10 @@ export default function TechNewsDetail() {
         {/* Main Content Layout */}
         <section className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1.25fr)_minmax(19rem,.75fr)] xl:gap-16">
           <div>
-            {/* Header Classification Badges (Tier without percentage) */}
+            {/* Header Classification Badges (High-contrast generic styling) */}
             <div className="flex flex-wrap items-center gap-2.5">
               {/* Score Tier Badge */}
-              <span className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-3.5 py-1.5 text-xs font-bold ring-1 ring-black/10 dark:ring-white/10 shadow-xs">
+              <span className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-3.5 py-1.5 text-xs font-bold text-[var(--ink)] ring-1 ring-black/10 dark:ring-white/10 shadow-xs">
                 <span className={`size-2.5 rounded-xs ${tier.squareClass}`} />
                 <span>{tier.label}</span>
               </span>
@@ -125,8 +119,8 @@ export default function TechNewsDetail() {
 
               {/* HurryUp Badge */}
               {hurryUp && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3.5 py-1.5 text-xs font-bold text-amber-800 dark:text-amber-300 ring-1 ring-amber-500/30">
-                  <Alarm size={14} weight="fill" />
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-3.5 py-1.5 text-xs font-bold text-[var(--ink)] ring-1 ring-black/10 dark:ring-white/10 shadow-xs">
+                  <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
                   <span>HurryUp</span>
                 </span>
               )}
@@ -172,6 +166,17 @@ export default function TechNewsDetail() {
                     {story.summary}
                   </p>
                 </div>
+
+                {story.contentAngle && (
+                  <div className="rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-black/5 dark:ring-white/5">
+                    <p className="text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">
+                      Strategic Angle & Question
+                    </p>
+                    <p className="mt-1.5 text-sm font-medium italic text-[var(--ink)]">
+                      "{story.contentAngle}"
+                    </p>
+                  </div>
+                )}
 
                 {story.details && (
                   <div className="border-t border-black/[.06] dark:border-white/[.08] pt-5">
@@ -221,8 +226,8 @@ export default function TechNewsDetail() {
             )}
           </div>
 
-          {/* Sidebar / Aside */}
-          <aside className="lg:sticky lg:top-28 lg:self-start space-y-6">
+          {/* Sidebar / Aside (Sticky on desktop) */}
+          <aside className="lg:sticky lg:top-24 lg:self-start space-y-6">
             {/* Quick Metrics Card */}
             <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
               <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-6 space-y-5">
@@ -239,7 +244,7 @@ export default function TechNewsDetail() {
                       Score Tier
                     </span>
                     <span className="mt-1 inline-flex items-center gap-2 font-bold text-[var(--ink)] text-sm">
-                      <span className={`size-2.5 rounded-xs ${tier.squareClass}`} />
+                      <span className={`size-2 rounded-xs ${tier.squareClass}`} />
                       <span>{tier.label}</span>
                     </span>
                   </div>
@@ -303,8 +308,8 @@ export default function TechNewsDetail() {
               </div>
             </div>
 
-            {/* Up Next / Latest News in Sidebar */}
-            {upNextStories.length > 0 && (
+            {/* Up Next / Latest News in Sidebar with Natural Scroll */}
+            {allUpNextStories.length > 0 && (
               <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
                 <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 space-y-4">
                   <div className="flex items-center justify-between border-b border-black/[.06] dark:border-white/[.08] pb-3">
@@ -318,16 +323,16 @@ export default function TechNewsDetail() {
                     </div>
                     <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[9px] font-bold text-emerald-800 dark:text-emerald-300">
                       <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>Live</span>
+                      <span>Live Feed</span>
                     </span>
                   </div>
 
-                  <div className="space-y-3 divide-y divide-black/[.06] dark:divide-white/[.08]">
-                    {upNextStories.map((item) => (
+                  <div className="max-h-[calc(100vh-14rem)] overflow-y-auto pr-1.5 space-y-3.5 divide-y divide-black/[.06] dark:divide-white/[.08] scroll-smooth overscroll-contain">
+                    {allUpNextStories.map((item) => (
                       <Link
                         key={item.id}
                         to={`/tech-news/${item.id}`}
-                        className="group block pt-3 first:pt-0 transition-colors"
+                        className="group block pt-3.5 first:pt-0 transition-colors"
                       >
                         <div className="flex items-start gap-3">
                           <div className="min-w-0 flex-1 space-y-1">
@@ -365,7 +370,7 @@ export default function TechNewsDetail() {
                   </div>
 
                   <div className="border-t border-black/[.06] dark:border-white/[.08] pt-2 text-[10px] text-[var(--muted)] flex items-center justify-between">
-                    <span>Explore more stories</span>
+                    <span>{allUpNextStories.length} stories available</span>
                     <ArrowUpRight size={12} />
                   </div>
                 </div>
