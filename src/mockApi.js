@@ -1,4 +1,4 @@
-import { seedJobs } from './data'
+import { seedJobs, seedTechNews } from './data'
 
 let jobs = seedJobs.map((job) => ({ ...job }))
 const wait = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -21,6 +21,16 @@ export const api = {
     const job = jobs.find((item) => item.id === id)
     if (!job) throw new Error('Job not found')
     return { ...job }
+  },
+  async getTechNews() {
+    await wait(200)
+    return seedTechNews.map((item) => ({ ...item }))
+  },
+  async getTechNewsItem(id) {
+    await wait(150)
+    const story = seedTechNews.find((item) => item.id === id)
+    if (!story) throw new Error('Story not found')
+    return { ...story }
   },
   async updateStatus({ id, status, reason, coverLetter }) {
     await wait(420)

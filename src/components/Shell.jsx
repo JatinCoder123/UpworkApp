@@ -36,6 +36,7 @@ export default function Shell({ children }) {
         <nav className="hidden items-center gap-1 rounded-full bg-[var(--ink)]/[.045] p-1 md:flex">
           <Link to="/jobs" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/jobs') ? 'bg-white shadow-[0_4px_18px_rgba(0,0,0,.07)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Opportunities</Link>
           <Link to="/activity" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/activity') ? 'bg-white shadow-[0_4px_18px_rgba(0,0,0,.07)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Activity</Link>
+          <Link to="/tech-news" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/tech-news') ? 'bg-white shadow-[0_4px_18px_rgba(0,0,0,.07)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Tech News</Link>
         </nav>
         <div className="flex items-center gap-2">
           <ThemeToggle />

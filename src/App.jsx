@@ -4,6 +4,8 @@ import Login from './pages/Login'
 import Jobs from './pages/Jobs'
 import JobDetail from './pages/JobDetail'
 import Activity from './pages/Activity'
+import TechNews from './pages/TechNews'
+import TechNewsDetail from './pages/TechNewsDetail'
 import Profile from './pages/Profile'
 import Preferences from './pages/Preferences'
 import SessionLoader from './components/SessionLoader'
@@ -34,6 +36,10 @@ export default function App() {
     <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
     <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
     <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
+    <Route path="/tech-news" element={<ProtectedRoute><TechNews /></ProtectedRoute>} />
+    <Route path="/tech-news/:id" element={<ProtectedRoute><TechNewsDetail /></ProtectedRoute>} />
+    <Route path="/technews" element={<Navigate to="/tech-news" replace />} />
+    <Route path="/news" element={<Navigate to="/tech-news" replace />} />
     <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
     <Route path="/preferences" element={<ProtectedRoute><Preferences /></ProtectedRoute>} />
     <Route path="*" element={<Navigate to="/login" replace />} />

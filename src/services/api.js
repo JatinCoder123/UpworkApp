@@ -1,5 +1,6 @@
 import axios from "axios";
 import CryptoJS from "crypto-js";
+import { seedTechNews } from "../data";
 
 const SMART_GATEWAY_URL = import.meta.env.VITE_SMART_GATEWAY_URL || "https://upwork.outrightcrm.in/index.php?entryPoint=smart_gateway";
 const JOBS_MODULE = "outr_upwork_jobs";
@@ -111,9 +112,21 @@ export const cleanJobUrl = (value) => {
   return url.toString().replace(/\/$/, "");
 };
 
+export async function fetchTechNews() {
+  return seedTechNews.map((item) => ({ ...item }));
+}
+
+export async function fetchTechNewsById(id) {
+  const item = seedTechNews.find((story) => story.id === id);
+  if (!item) throw new Error("Story not found");
+  return { ...item };
+}
+
 export const api = {
   getJobs: () => fetchJobs(),
   getJob: fetchJobById,
+  getTechNews: () => fetchTechNews(),
+  getTechNewsItem: (id) => fetchTechNewsById(id),
   async updateStatus({ id, status, reason, coverLetter }) {
     const current = await fetchJobById(id);
     await smartGateway({
