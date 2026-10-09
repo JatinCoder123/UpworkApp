@@ -23,7 +23,7 @@ export default function JobCard({ job, layout = 'grid' }) {
           </div>
           {!list && <StatusPill status={job.status} />}
         </div>
-        <h3 className={`${compact ? 'mt-5 text-base' : list ? 'mt-4 text-lg' : 'mt-7 text-xl sm:text-2xl'} font-semibold leading-[1.2] tracking-[-.035em] transition-colors duration-300 group-hover:text-[var(--accent-strong)]`}>{job.title}</h3>
+        <h3 className={`${compact ? 'mt-5 text-sm sm:text-[.9375rem]' : list ? 'mt-4 text-base sm:text-[1.0625rem]' : 'mt-7 text-lg sm:text-xl'} font-semibold leading-[1.3] tracking-[-.025em] transition-colors duration-300 group-hover:text-[var(--accent-strong)]`}>{job.title}</h3>
         {!compact && <div className="mt-4 flex flex-wrap gap-2">{job.tags.slice(0, list ? 4 : undefined).map((tag) => <span key={tag} className="rounded-full bg-[var(--paper)] px-3 py-1.5 text-[10px] font-medium text-[var(--muted)]">{tag}</span>)}</div>}
       </div>
       <div className={`${list ? '' : compact ? 'mt-5' : 'mt-8 border-t border-[var(--line)]/70 pt-5'} flex items-end justify-between gap-4`}>

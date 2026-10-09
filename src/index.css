@@ -91,6 +91,7 @@ button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
 .upwork-apply-button:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lime-dark) 60%, transparent), 0 12px 30px color-mix(in srgb, var(--lime-dark) 32%, transparent); }
 .upwork-apply-button:hover::before { translate: 520% 0; }
 .upwork-apply-button:active, .upwork-view-button:active { transform: translateY(0) scale(.98); }
+h1[data-detail] { max-width: 56rem; font-size: clamp(2rem, 3.6vw, 3.75rem); line-height: 1.02; letter-spacing: -.045em; }
 @keyframes session-loader-orbit { to { rotate: 360deg; } }
 @keyframes session-loader-breathe { 0%, 100% { scale: .92; opacity: .45; } 50% { scale: 1; opacity: 1; } }
 @keyframes session-loader-progress { from { translate: -105% 0; } to { translate: 205% 0; } }

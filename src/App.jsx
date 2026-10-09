@@ -10,6 +10,7 @@ import Profile from './pages/Profile'
 import Preferences from './pages/Preferences'
 import SessionLoader from './components/SessionLoader'
 import LoginIntro from './components/LoginIntro'
+import ScrollToTop from './components/ScrollToTop'
 import { useAuth } from './contexts/AuthContext'
 
 function ProtectedRoute({ children }) {
@@ -30,18 +31,21 @@ export default function App() {
   if (showWelcomeIntro) return <LoginIntro onComplete={completeWelcomeIntro} />
   if (status === 'authenticated' && showLoginIntro) return <LoginIntro onComplete={completeLoginIntro} />
 
-  return <Routes>
-    <Route path="/" element={<Navigate to="/login" replace />} />
-    <Route path="/login" element={<Login />} />
-    <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
-    <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
-    <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
-    <Route path="/tech-news" element={<ProtectedRoute><TechNews /></ProtectedRoute>} />
-    <Route path="/tech-news/:id" element={<ProtectedRoute><TechNewsDetail /></ProtectedRoute>} />
-    <Route path="/technews" element={<Navigate to="/tech-news" replace />} />
-    <Route path="/news" element={<Navigate to="/tech-news" replace />} />
-    <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-    <Route path="/preferences" element={<ProtectedRoute><Preferences /></ProtectedRoute>} />
-    <Route path="*" element={<Navigate to="/login" replace />} />
-  </Routes>
+  return <>
+    <ScrollToTop />
+    <Routes>
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
+      <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
+      <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
+      <Route path="/tech-news" element={<ProtectedRoute><TechNews /></ProtectedRoute>} />
+      <Route path="/tech-news/:id" element={<ProtectedRoute><TechNewsDetail /></ProtectedRoute>} />
+      <Route path="/technews" element={<Navigate to="/tech-news" replace />} />
+      <Route path="/news" element={<Navigate to="/tech-news" replace />} />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/preferences" element={<ProtectedRoute><Preferences /></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  </>
 }

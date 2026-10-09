@@ -34,9 +34,9 @@ export default function Shell({ children }) {
       <div className="mx-auto flex max-w-[1500px] items-center justify-between rounded-full bg-[var(--surface)]/90 px-3 py-2 ring-1 ring-black/5 shadow-[0_18px_60px_rgba(30,32,25,.08)] backdrop-blur-xl">
         <Link to="/jobs" className="flex items-center gap-2.5 rounded-full pr-3 text-sm font-bold tracking-[-.02em]"><Mark />UpWorkApp</Link>
         <nav className="hidden items-center gap-1 rounded-full bg-[var(--ink)]/[.045] p-1 md:flex">
-          <Link to="/jobs" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/jobs') ? 'bg-white shadow-[0_4px_18px_rgba(0,0,0,.07)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Opportunities</Link>
-          <Link to="/activity" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/activity') ? 'bg-white shadow-[0_4px_18px_rgba(0,0,0,.07)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Activity</Link>
-          <Link to="/tech-news" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/tech-news') ? 'bg-white shadow-[0_4px_18px_rgba(0,0,0,.07)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Tech News</Link>
+          <Link to="/jobs" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/jobs') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Opportunities</Link>
+          <Link to="/activity" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/activity') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Activity</Link>
+          <Link to="/tech-news" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/tech-news') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Tech News</Link>
         </nav>
         <div className="flex items-center gap-2">
           <ThemeToggle />
