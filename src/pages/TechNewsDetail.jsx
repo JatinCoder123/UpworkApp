@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft,
   ArrowSquareOut,
   ArrowUpRight,
+  FilePlus,
   ShieldCheck,
   Tag,
   YoutubeLogo,
@@ -13,6 +14,7 @@ import Shell from '../components/Shell'
 import JobDetailSkeleton from '../components/JobDetailSkeleton'
 import NotFound from './NotFound'
 import { primaryButton } from '../components/ui'
+import GenerateNewsDialog from '../components/GenerateNewsDialog'
 import { api } from '../services/api'
 import {
   classifyScoreTier,
@@ -28,6 +30,7 @@ function SourceIcon({ type }) {
 
 export default function TechNewsDetail() {
   const { id } = useParams()
+  const [documentDialog, setDocumentDialog] = useState(false)
 
   const { data: story, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['tech-news-item', id],
@@ -145,7 +148,16 @@ export default function TechNewsDetail() {
             <span>All AI news</span>
           </Link>
 
-          {story.url && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setDocumentDialog(true)}
+              className="group inline-flex items-center justify-center gap-2 rounded-full bg-[var(--lime)] px-4 py-3 text-xs font-bold text-[#26320b] transition-all duration-300 hover:-translate-y-0.5 active:scale-[.98]"
+            >
+              <FilePlus size={17} weight="bold" />
+              <span>Generate Doc</span>
+            </button>
+            {story.url && (
             <a
               href={story.url}
               target="_blank"
@@ -157,7 +169,8 @@ export default function TechNewsDetail() {
                 <ArrowSquareOut size={14} />
               </span>
             </a>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Main Content Layout */}
@@ -438,6 +451,12 @@ export default function TechNewsDetail() {
             )}
           </aside>
         </section>
+        {documentDialog && (
+          <GenerateNewsDialog
+            storyTitle={story.title}
+            onClose={() => setDocumentDialog(false)}
+          />
+        )}
       </main>
     </Shell>
   )
