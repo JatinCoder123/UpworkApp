@@ -269,7 +269,7 @@ export default function NotFound({
             className="inline-flex items-center gap-2.5 text-base font-bold tracking-tight text-[var(--ink)]"
           >
             <Mark />
-            <span>UpWorkApp</span>
+            <span>OutrightFeedPortal</span>
           </Link>
 
           <div>
@@ -358,7 +358,7 @@ export default function NotFound({
             className="flex items-center gap-2.5 pr-3 text-sm font-bold tracking-[-.02em] text-[var(--ink)]"
           >
             <Mark />
-            <span>UpWorkApp</span>
+            <span>OutrightFeedPortal</span>
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />

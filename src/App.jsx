@@ -23,10 +23,10 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   const { status, showLoginIntro, completeLoginIntro } = useAuth()
-  const [showWelcomeIntro, setShowWelcomeIntro] = useState(() => sessionStorage.getItem('upworkapp-welcome-intro') !== 'seen')
+  const [showWelcomeIntro, setShowWelcomeIntro] = useState(() => sessionStorage.getItem('outrightfeedportal-welcome-intro') !== 'seen')
 
   const completeWelcomeIntro = () => {
-    sessionStorage.setItem('upworkapp-welcome-intro', 'seen')
+    sessionStorage.setItem('outrightfeedportal-welcome-intro', 'seen')
     setShowWelcomeIntro(false)
   }
 

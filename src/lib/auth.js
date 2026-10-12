@@ -1,5 +1,5 @@
 const AUTH_ORIGIN = "https://upworkapp.backend.outrightcrm.in".replace(/\/$/, "");
-const LOGIN_INTRO_KEY = "upworkapp-login-intro";
+const LOGIN_INTRO_KEY = "outrightfeedportal-login-intro";
 
 export function startMicrosoftLogin() {
   sessionStorage.setItem(LOGIN_INTRO_KEY, "pending");

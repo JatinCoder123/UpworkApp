@@ -1,4 +1,4 @@
-# UpWorkApp frontend
+# OutrightFeedPortal frontend
 
 ## Microsoft authentication
 

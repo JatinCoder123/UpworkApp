@@ -41,7 +41,7 @@ export default function LoginIntro({ onComplete }) {
         </div>
 
         <div className="mt-10 overflow-hidden pb-1">
-          <h1 data-intro-word className="text-[clamp(2.8rem,8vw,6.5rem)] font-semibold leading-none tracking-[-.075em]">UpWorkApp</h1>
+          <h1 data-intro-word className="text-[clamp(2.8rem,8vw,6.5rem)] font-semibold leading-none tracking-[-.075em]">OutrightFeedPortal</h1>
         </div>
         <div data-intro-rule aria-hidden="true" className="mt-5 h-px w-24 origin-center bg-[var(--lime)]" />
         <p data-intro-word className="mt-5 text-[10px] font-semibold uppercase tracking-[.34em] text-white/45 sm:text-xs">Opportunity, in motion</p>
