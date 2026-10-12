@@ -24,7 +24,7 @@ import OpportunityFilterDialog from "../components/OpportunityFilterDialog";
 import { ActiveDateFilterChip, RefreshFilterButton } from "../components/FilterToolbarControls";
 import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
-import { loadDateFilter, loadJobLayout, loadJobStatus, loadSavedViews, saveDateFilter, saveJobLayout, saveJobStatus, saveViews } from "../lib/preferences";
+import { loadCustomJobSkills, loadDateFilter, loadJobLayout, loadJobStatus, loadSavedViews, saveDateFilter, saveJobLayout, saveJobStatus, saveViews } from "../lib/preferences";
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from "../lib/dateRange";
 
 const pipeline = ["New", "Most recent", "Applied", "Rejected"];
@@ -46,14 +46,15 @@ export default function Jobs() {
     [search, setSearch] = useState(""),
     [adding, setAdding] = useState(false),
     [skills, setSkills] = useState([]),
+    [customSkills, setCustomSkills] = useState(loadCustomJobSkills),
     [dateDialog, setDateDialog] = useState(false),
     [savedViews, setSavedViews] = useState(loadSavedViews),
     [savingView, setSavingView] = useState(false);
   const root = useRef(null);
   useEffect(() => saveDateFilter("jobs", dateFilter), [dateFilter]);
   const skillOptions = useMemo(
-    () => [...new Set(jobs.flatMap((job) => job.tags))].sort(),
-    [jobs],
+    () => [...new Set([...jobs.flatMap((job) => job.tags), ...customSkills])].sort(),
+    [jobs, customSkills],
   );
   const quickSkills = useMemo(
     () => [...new Set(jobs.flatMap((job) => job.tags))].slice(0, 3),
@@ -68,7 +69,13 @@ export default function Jobs() {
             .toLowerCase()
             .includes(search.toLowerCase()) &&
           (!skills.length ||
-            skills.some((skill) => job.tags.includes(skill))),
+            skills.some(
+              (skill) =>
+                job.tags.includes(skill) ||
+                `${job.title} ${job.company} ${job.description || ""} ${job.tags.join(" ")}`
+                  .toLowerCase()
+                  .includes(skill.toLowerCase()),
+            )),
       ).sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt)),
     [jobs, tab, search, skills],
   );
@@ -220,13 +227,26 @@ export default function Jobs() {
                   <BookmarkSimple size={16} />
                 </button>
                 <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-4 py-2.5 md:w-64">
-                  <MagnifyingGlass size={15} className="text-[var(--muted)]" />
+                  <MagnifyingGlass size={15} className="shrink-0 text-[var(--muted)]" />
                   <input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search opportunities"
                     className="min-w-0 flex-1 bg-transparent text-xs outline-none"
                   />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setSearch("");
+                      }}
+                      aria-label="Clear search"
+                      className="grid size-5 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] transition-colors hover:bg-black/15 hover:text-[var(--ink)] dark:bg-white/10 dark:hover:bg-white/20"
+                    >
+                      <X size={11} weight="bold" />
+                    </button>
+                  )}
                 </label>
                 <DateTimeRangeFilter
                   value={dateFilter}
@@ -322,6 +342,7 @@ export default function Jobs() {
           <OpportunityFilterDialog
             skills={skills}
             skillOptions={skillOptions}
+            onAddCustomSkill={setCustomSkills}
             onClose={() => setDateDialog(false)}
             onApply={(nextSkills) => {
               setSkills(nextSkills);

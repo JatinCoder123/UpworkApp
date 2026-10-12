@@ -114,3 +114,42 @@ export function saveTechNewsFilters(filters) {
   }
 }
 
+const CUSTOM_JOB_SKILLS_KEY = 'pitchflow-custom-job-skills'
+
+export function loadCustomJobSkills() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CUSTOM_JOB_SKILLS_KEY) || '[]')
+    return Array.isArray(saved) ? saved.map((s) => String(s).trim()).filter(Boolean) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveCustomJobSkills(skills) {
+  try {
+    const clean = [...new Set((Array.isArray(skills) ? skills : []).map((s) => String(s).trim()).filter(Boolean))]
+    localStorage.setItem(CUSTOM_JOB_SKILLS_KEY, JSON.stringify(clean))
+  } catch {
+    // Ignore storage quota or privacy mode errors
+  }
+}
+
+const CUSTOM_TECH_NEWS_CATEGORIES_KEY = 'pitchflow-custom-tech-news-categories'
+
+export function loadCustomTechNewsCategories() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CUSTOM_TECH_NEWS_CATEGORIES_KEY) || '[]')
+    return Array.isArray(saved) ? saved.map((c) => String(c).trim()).filter(Boolean) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveCustomTechNewsCategories(categories) {
+  try {
+    const clean = [...new Set((Array.isArray(categories) ? categories : []).map((c) => String(c).trim()).filter(Boolean))]
+    localStorage.setItem(CUSTOM_TECH_NEWS_CATEGORIES_KEY, JSON.stringify(clean))
+  } catch {
+    // Ignore storage quota or privacy mode errors
+  }
+}

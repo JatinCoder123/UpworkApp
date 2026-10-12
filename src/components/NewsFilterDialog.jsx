@@ -5,9 +5,12 @@ import {
   Buildings,
   CheckCircle,
   Globe,
+  Plus,
+  X,
   YoutubeLogo,
 } from '@phosphor-icons/react'
 import { DialogHeader, Modal, primaryButton } from './ui'
+import { loadCustomTechNewsCategories, saveCustomTechNewsCategories } from '../lib/preferences'
 
 const tierOptions = [
   { id: 'BLOCKBUSTER', label: 'Blockbuster', note: 'Critical high-impact developments', dot: 'bg-rose-500' },
@@ -25,7 +28,7 @@ const sourceOptions = [
 export default function NewsFilterDialog({
   value = {},
   categoryOptions = [],
-  categoryCounts = {},
+  onAddCustomCategory,
   onApply,
   onClose,
 }) {
@@ -51,6 +54,11 @@ export default function NewsFilterDialog({
   const [selectedTiers, setSelectedTiers] = useState(initialTiers)
   const [selectedSources, setSelectedSources] = useState(initialSources)
   const [selectedCategories, setSelectedCategories] = useState(initialCategories)
+  const [customCategories, setCustomCategories] = useState(loadCustomTechNewsCategories)
+  const [isAddingCategory, setIsAddingCategory] = useState(false)
+  const [newCategory, setNewCategory] = useState('')
+
+  const allCategoryOptions = [...new Set([...categoryOptions, ...customCategories])]
 
   const toggleTier = (tierId) => {
     setSelectedTiers((current) =>
@@ -74,6 +82,27 @@ export default function NewsFilterDialog({
         ? current.filter((c) => c !== cat)
         : [...current, cat]
     )
+  }
+
+  const handleAddCategory = () => {
+    const trimmed = newCategory.trim()
+    if (!trimmed) return
+    const existing = allCategoryOptions.find((c) => c.toLowerCase() === trimmed.toLowerCase())
+    const categoryToUse = existing || trimmed
+
+    if (!existing) {
+      const updatedCustom = [...customCategories, categoryToUse]
+      setCustomCategories(updatedCustom)
+      saveCustomTechNewsCategories(updatedCustom)
+      if (onAddCustomCategory) onAddCustomCategory(updatedCustom)
+    }
+
+    if (!selectedCategories.includes(categoryToUse)) {
+      setSelectedCategories((current) => [...current, categoryToUse])
+    }
+
+    setNewCategory('')
+    setIsAddingCategory(false)
   }
 
   const totalActiveCount =
@@ -112,19 +141,21 @@ export default function NewsFilterDialog({
       </p>
 
       {/* Section 1: Categories (Multi-select) */}
-      {categoryOptions.length > 0 && (
-        <div className="mt-6 rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-black/5 dark:ring-white/5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[.17em] text-[var(--muted)]">
-                Categories
-              </span>
-              {selectedCategories.length > 0 && (
-                <span className="rounded-full bg-[var(--lime)]/30 px-2 py-0.5 text-[9px] font-bold text-[#34420f]">
-                  {selectedCategories.length} selected
-                </span>
-              )}
-            </div>
+      <div className="mt-6 rounded-2xl bg-[var(--paper)] p-4">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-[.17em] text-[var(--muted)]">
+            All categories
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsAddingCategory((prev) => !prev)}
+              aria-label="Add custom category"
+              className="inline-flex items-center gap-1 rounded-full bg-[var(--raised)] px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-all duration-300 hover:ring-[var(--lime-dark)]"
+            >
+              <Plus size={11} weight="bold" />
+              <span>Add category</span>
+            </button>
             {selectedCategories.length > 0 && (
               <button
                 type="button"
@@ -135,41 +166,75 @@ export default function NewsFilterDialog({
               </button>
             )}
           </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {categoryOptions.map((cat) => {
-              const isSelected = selectedCategories.includes(cat)
-              const count = categoryCounts[cat] || 0
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => toggleCategory(cat)}
-                  className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition-all duration-300 ${
-                    isSelected
-                      ? 'bg-[var(--lime)] !text-[#26320b] ring-1 ring-[var(--lime-dark)]/40 font-bold shadow-xs'
-                      : 'bg-[var(--surface)] text-[var(--ink)] ring-1 ring-black/5 hover:ring-black/15'
-                  }`}
-                >
-                  <span>{cat}</span>
-                  <span
-                    className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
-                      isSelected
-                        ? 'bg-black/10 text-[#26320b]'
-                        : 'bg-black/5 dark:bg-white/10 text-[var(--muted)]'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                  {isSelected && (
-                    <CheckCircle size={14} weight="fill" className="text-[#26320b]" />
-                  )}
-                </button>
-              )
-            })}
-          </div>
         </div>
-      )}
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {allCategoryOptions.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => toggleCategory(cat)}
+              className={`rounded-full px-3 py-2 text-[10px] font-semibold transition-all duration-300 ${
+                selectedCategories.includes(cat)
+                  ? 'bg-[var(--lime)] !text-[#26320b] ring-1 ring-[var(--lime-dark)]/30'
+                  : 'bg-[var(--surface)] text-[var(--muted)] ring-1 ring-black/5 hover:text-[var(--ink)]'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+          {isAddingCategory ? (
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--raised)] py-1 pl-3 pr-1.5 ring-1 ring-[var(--lime-dark)]">
+              <input
+                autoFocus
+                type="text"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleAddCategory()
+                  } else if (e.key === 'Escape') {
+                    setIsAddingCategory(false)
+                    setNewCategory('')
+                  }
+                }}
+                placeholder="New category..."
+                className="w-28 bg-transparent text-[10px] font-semibold text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
+              />
+              <button
+                type="button"
+                onClick={handleAddCategory}
+                aria-label="Save category"
+                className="grid size-5 place-items-center rounded-full bg-[var(--lime)] text-[#26320b] transition-colors hover:brightness-95"
+              >
+                <Plus size={11} weight="bold" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingCategory(false)
+                  setNewCategory('')
+                }}
+                aria-label="Cancel"
+                className="grid size-5 place-items-center rounded-full bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)] hover:text-[var(--ink)]"
+              >
+                <X size={10} weight="bold" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsAddingCategory(true)}
+              aria-label="Add custom category"
+              title="Add custom category"
+              className="grid size-7 place-items-center rounded-full bg-[var(--raised)] text-[var(--ink)] ring-1 ring-[var(--line)] transition-all duration-300 hover:ring-[var(--lime-dark)]"
+            >
+              <Plus size={12} weight="bold" />
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Section 2: Score Tier (Multi-select) */}
       <div className="mt-6">

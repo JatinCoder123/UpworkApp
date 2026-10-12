@@ -84,17 +84,11 @@ export function classifySourceType(story) {
   return SOURCE_TYPES.THIRD_PARTY
 }
 
-export function isHurryUp(story, thresholdHours = HURRY_UP_THRESHOLD_HOURS) {
+export function isHurryUp(story) {
   if (!story) return false
-  if (story.isHurryUp === true) return true
-  if (story.isHurryUp === false) return false
-
-  if (!story.postedAt) return false
-  const time = new Date(story.postedAt).getTime()
-  if (Number.isNaN(time)) return false
-
-  const ageHours = (Date.now() - time) / 36e5
-  return ageHours >= 0 && ageHours <= thresholdHours
+  if (typeof story.hurryUp === 'boolean') return story.hurryUp
+  if (typeof story.isHurryUp === 'boolean') return story.isHurryUp
+  return /HurryUp/i.test(String(story.raw?.tag || story.tag || ''))
 }
 
 export function formatDigestISTTimestamp(date = new Date()) {

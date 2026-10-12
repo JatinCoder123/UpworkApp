@@ -7,7 +7,6 @@ import {
   Funnel,
   MagnifyingGlass,
   Newspaper,
-  Plus,
   X,
   YoutubeLogo,
 } from '@phosphor-icons/react'
@@ -25,6 +24,7 @@ import {
 } from '../lib/newsClassification'
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from '../lib/dateRange'
 import {
+  loadCustomTechNewsCategories,
   loadDateFilter,
   loadTechNewsFilters,
   loadTechNewsLayout,
@@ -44,6 +44,7 @@ const SOURCE_TYPE_TABS = ['FirstParty', 'ThirdParty', 'YouBlogging', 'HurryUp']
 export default function TechNews() {
   const [layout, setLayout] = useState(loadTechNewsLayout)
   const [selectedCategories, setSelectedCategories] = useState(() => loadTechNewsFilters().categories)
+  const [customCategories, setCustomCategories] = useState(loadCustomTechNewsCategories)
   const [selectedTiers, setSelectedTiers] = useState(() => loadTechNewsFilters().tiers)
   const [selectedSourceTypes, setSelectedSourceTypes] = useState(() => loadTechNewsFilters().sourceTypes)
   const [search, setSearch] = useState(() => loadTechNewsFilters().search)
@@ -112,17 +113,14 @@ export default function TechNews() {
     return unique
   }, [newsData])
 
-  // Dynamically extract only categories that actually exist in the Smart Gateway module AND have data
+  // Dynamically extract categories from Smart Gateway module and user's saved custom categories
   const categoryList = useMemo(() => {
-    // Find all distinct categories from records that actually have data
     const presentCategories = new Set(
       rawNews.map((item) => item.category?.trim()).filter(Boolean)
     )
 
-    // Ensure 'Web Architecture' is completely excluded
     presentCategories.delete('Web Architecture')
 
-    // Maintain preferred order for standard categories that have data
     const priorityOrder = [
       'Other Tech (Cloud)',
       'AI',
@@ -133,13 +131,13 @@ export default function TechNews() {
       'Other Tech (Business)',
     ]
 
-    // Only include categories that actually have data inside them
     const ordered = priorityOrder.filter((cat) => presentCategories.has(cat))
-    // Any other category in the CRM module with data is automatically discovered and added dynamically
-    const others = [...presentCategories].filter((cat) => !priorityOrder.includes(cat)).sort()
+    const others = [...new Set([...presentCategories, ...customCategories])]
+      .filter((cat) => !priorityOrder.includes(cat))
+      .sort()
 
     return ['All', ...ordered, ...others]
-  }, [rawNews])
+  }, [rawNews, customCategories])
 
   const digestStories = useMemo(() => {
     return prepareDailyTechDigest(rawNews)
@@ -154,7 +152,13 @@ export default function TechNews() {
     return digestStories.filter((item) => {
       const matchesCategory =
         selectedCategories.length === 0 ||
-        selectedCategories.includes(item.category)
+        selectedCategories.some(
+          (cat) =>
+            item.category === cat ||
+            `${item.category || ''} ${item.title || ''} ${item.summary || ''} ${(item.tags || []).join(' ')}`
+              .toLowerCase()
+              .includes(cat.toLowerCase())
+        )
 
       const matchesTier =
         selectedTiers.length === 0 ||
@@ -385,11 +389,15 @@ export default function TechNews() {
                   {search && (
                     <button
                       type="button"
-                      onClick={() => setSearch('')}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setSearch('')
+                        setDebouncedSearch('')
+                      }}
                       aria-label="Clear search"
-                      className="text-[var(--muted)] hover:text-[var(--ink)]"
+                      className="grid size-5 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] transition-colors hover:bg-black/15 hover:text-[var(--ink)] dark:bg-white/10 dark:hover:bg-white/20"
                     >
-                      <X size={13} />
+                      <X size={11} weight="bold" />
                     </button>
                   )}
                 </label>
@@ -423,8 +431,8 @@ export default function TechNews() {
             </div>
 
             {/* Bottom Row: Category Navigation with Universal Refresh Circle Button */}
-            <div className="flex flex-wrap items-center gap-2 border-t border-black/[.06] dark:border-white/[.08] pt-3 text-xs">
-              <span className="shrink-0 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)] mr-1">
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-black/[.06] pt-3 text-xs dark:border-white/[.08]">
+              <span className="mr-1 shrink-0 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">
                 Category:
               </span>
 
@@ -434,72 +442,41 @@ export default function TechNews() {
                 label="Refresh news feed"
               />
 
-              {/* Fixed screen categories: Other Tech (Cloud), AI (multi-select) */}
-              {SCREEN_CATEGORIES.map((cat) => {
-                const isSelected = selectedCategories.includes(cat)
-                const count = categoryCounts[cat] || 0
+              <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
+                {SCREEN_CATEGORIES.map((cat) => {
+                  const isSelected = selectedCategories.includes(cat)
 
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => {
-                      setSelectedCategories((prev) =>
-                        prev.includes(cat)
-                          ? prev.filter((c) => c !== cat)
-                          : [...prev, cat]
-                      )
-                    }}
-                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-300 ${
-                      isSelected
-                        ? 'bg-[var(--ink)] text-white shadow-xs'
-                        : 'bg-[var(--paper)] text-[var(--muted)] hover:text-[var(--ink)] ring-1 ring-black/5 dark:ring-white/10 hover:bg-black/5 dark:hover:bg-white/5'
-                    }`}
-                  >
-                    <span>{cat}</span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => {
+                        setSelectedCategories((prev) =>
+                          prev.includes(cat)
+                            ? prev.filter((c) => c !== cat)
+                            : [...prev, cat]
+                        )
+                      }}
+                      className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold ring-1 transition-all duration-300 ${
                         isSelected
-                          ? 'bg-white/20 text-white'
-                          : 'bg-black/5 dark:bg-white/10 text-[var(--muted)]'
+                          ? 'bg-[var(--ink)] text-white ring-black/10 shadow-xs'
+                          : 'bg-[var(--paper)] text-[var(--muted)] ring-black/5 hover:bg-black/5 hover:text-[var(--ink)] dark:ring-white/10 dark:hover:bg-white/5'
                       }`}
                     >
-                      {count}
-                    </span>
-                  </button>
-                )
-              })}
+                      {cat}
+                    </button>
+                  )
+                })}
 
-              {/* + More categories button (Opens modal with all categories) */}
-              {(() => {
-                const externalSelectedCount = selectedCategories.filter(
-                  (c) => !SCREEN_CATEGORIES.includes(c)
-                ).length
-
-                return (
-                  <button
-                    type="button"
-                    onClick={() => setCategoryDialog(true)}
-                    className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
-                      externalSelectedCount > 0
-                        ? 'bg-[var(--ink)] text-white ring-1 ring-black/10 shadow-xs'
-                        : 'bg-transparent text-[var(--muted)] ring-1 ring-black/10 hover:text-[var(--ink)] hover:ring-black/20 dark:ring-white/10 dark:hover:ring-white/20'
-                    }`}
-                    title="View and select from all categories"
-                  >
-                    <Plus size={13} weight="bold" />
-                    <span>More categories</span>
-                    {externalSelectedCount > 0 && (
-                      <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold text-white">
-                        {externalSelectedCount === 1
-                          ? selectedCategories.find((c) => !SCREEN_CATEGORIES.includes(c))
-                          : `${externalSelectedCount} selected`}
-                      </span>
-                    )}
-                  </button>
-                )
-              })()}
+                <button
+                  type="button"
+                  onClick={() => setCategoryDialog(true)}
+                  className="shrink-0 rounded-full bg-transparent px-3.5 py-2 text-xs font-bold text-[var(--muted)] ring-1 ring-black/10 transition-all hover:text-[var(--ink)] hover:ring-black/20 dark:ring-white/10 dark:hover:ring-white/20"
+                >
+                  + More categories
+                </button>
+              </div>
 
               <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} className="ml-auto" />
               {(refinementFilterCount > 0 || dateFilter.preset !== 'all' || search) && (
@@ -670,8 +647,8 @@ export default function TechNews() {
         {categoryDialog && (
           <CategoryFilterDialog
             categories={categoryList}
-            categoryCounts={categoryCounts}
             selectedCategories={selectedCategories}
+            onAddCustomCategory={setCustomCategories}
             onApply={(cats) => setSelectedCategories(cats)}
             onClose={() => setCategoryDialog(false)}
           />
@@ -687,6 +664,7 @@ export default function TechNews() {
             }}
             categoryOptions={categoryList.filter((c) => c !== 'All')}
             categoryCounts={categoryCounts}
+            onAddCustomCategory={setCustomCategories}
             onApply={(filters) => {
               setSelectedTiers(filters.tiers)
               setSelectedSourceTypes(filters.sourceTypes)
