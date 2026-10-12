@@ -5,7 +5,7 @@ import Shell from '../components/Shell'
 import { api } from '../services/api'
 
 const eventIcon = (text) => text.includes('Applied') || text.includes('application') ? PaperPlaneTilt : text.includes('Rejected') || text.includes('Reason') ? Prohibit : text.includes('Duplicate') ? ShieldCheck : PlusCircle
-const cleanEventText = (text) => String(text).replace(/Imported from Smart Gateway as/i, 'Opportunity imported as').replace(/Smart Gateway/gi, 'workspace')
+const cleanEventText = (text) => String(text).replace(/Imported from Smart Gateway as/i, 'Job imported as').replace(/Smart Gateway/gi, 'workspace')
 
 export default function Activity() {
   const { data: jobs = [], isLoading } = useQuery({ queryKey: ['jobs'], queryFn: api.getJobs })

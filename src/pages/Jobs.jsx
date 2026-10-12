@@ -24,10 +24,12 @@ import OpportunityFilterDialog from "../components/OpportunityFilterDialog";
 import { ActiveDateFilterChip, RefreshFilterButton } from "../components/FilterToolbarControls";
 import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
-import { loadCustomJobSkills, loadDateFilter, loadJobLayout, loadJobStatus, loadSavedViews, saveDateFilter, saveJobLayout, saveJobStatus, saveViews } from "../lib/preferences";
+import { loadCustomJobSkills, loadDateFilter, loadJobLayout, loadJobScope, loadJobStatus, loadSavedViews, saveDateFilter, saveJobLayout, saveJobScope, saveJobStatus, saveViews } from "../lib/preferences";
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from "../lib/dateRange";
+import { useAuth } from "../contexts/AuthContext";
 
-const pipeline = ["New", "Most recent", "Applied", "Rejected"];
+const scopes = ["My Jobs", "All Jobs"];
+const pipeline = ["All", "New", "Applied", "Rejected"];
 const layouts = [
   { id: "grid", label: "Grid", icon: SquaresFour },
   { id: "list", label: "List", icon: ListBullets },
@@ -35,13 +37,11 @@ const layouts = [
 ];
 
 export default function Jobs() {
+  const { user } = useAuth();
   const [dateFilter, setDateFilter] = useState(() => loadDateFilter("jobs"));
   const gatewayDateFilter = useMemo(() => toGatewayDateFilter(dateFilter), [dateFilter]);
-  const { data: jobs = [], isLoading, isFetching, isError, error, refetch } = useQuery({
-    queryKey: ["jobs", gatewayDateFilter],
-    queryFn: () => api.getJobs({ dateFilter: gatewayDateFilter }),
-  });
-  const [tab, setTab] = useState(() => loadJobStatus() === "Seen" ? "New" : loadJobStatus()),
+  const [scope, setScope] = useState(loadJobScope),
+    [tab, setTab] = useState(() => loadJobStatus() === "Seen" ? "New" : loadJobStatus()),
     [layout, setLayout] = useState(loadJobLayout),
     [search, setSearch] = useState(""),
     [adding, setAdding] = useState(false),
@@ -50,6 +50,12 @@ export default function Jobs() {
     [dateDialog, setDateDialog] = useState(false),
     [savedViews, setSavedViews] = useState(loadSavedViews),
     [savingView, setSavingView] = useState(false);
+  const showAllJobs = scope === "All Jobs";
+  const { data: jobs = [], isLoading, isFetching, isError, error, refetch } = useQuery({
+    queryKey: ["jobs", showAllJobs ? "all" : user?.email, gatewayDateFilter],
+    queryFn: () => api.getJobs({ dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs }),
+    enabled: Boolean(user?.email),
+  });
   const root = useRef(null);
   useEffect(() => saveDateFilter("jobs", dateFilter), [dateFilter]);
   const skillOptions = useMemo(
@@ -64,7 +70,7 @@ export default function Jobs() {
     () =>
       jobs.filter(
         (job) =>
-          (tab === "New" ? ["New", "Seen"].includes(job.status) : tab === "Most recent" ? true : job.status === tab) &&
+          (tab === "New" ? ["New", "Seen"].includes(job.status) : tab === "All" ? true : job.status === tab) &&
           `${job.title} ${job.company} ${job.tags.join(" ")}`
             .toLowerCase()
             .includes(search.toLowerCase()) &&
@@ -88,14 +94,17 @@ export default function Jobs() {
   const storeView = (name) => {
     const next = [
       ...savedViews,
-      { id: crypto.randomUUID(), name, tab, search, skills, dateFilter },
+      { id: crypto.randomUUID(), name, scope, tab, search, skills, dateFilter },
     ];
     setSavedViews(next);
     saveViews(next);
     setSavingView(false);
   };
   const applyView = (saved) => {
-    const nextTab = saved.tab === "Seen" ? "New" : saved.tab;
+    const nextScope = saved.scope || (saved.tab === "All Jobs" ? "All Jobs" : "My Jobs");
+    const nextTab = ["My Jobs", "All Jobs", "Most recent"].includes(saved.tab) ? "All" : saved.tab === "Seen" ? "New" : saved.tab;
+    setScope(nextScope);
+    saveJobScope(nextScope);
     setTab(nextTab);
     saveJobStatus(nextTab);
     setSearch(saved.search);
@@ -126,42 +135,14 @@ export default function Jobs() {
       );
       return () => ctx.revert();
     }
-  }, [tab, search, skills, dateFilter, layout, isLoading]);
+  }, [scope, tab, search, skills, dateFilter, layout, isLoading]);
   return (
     <Shell>
       <main
         ref={root}
-        className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-14 sm:px-6 md:pt-20"
+        className="mx-auto w-full max-w-[1500px] px-4 pb-0 pt-8 sm:px-6 md:pt-10"
       >
-        <section className="grid items-end gap-8 lg:grid-cols-[1fr_auto]">
-          <div>
-            <div className="mb-5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">
-              <span className="h-px w-7 bg-[var(--ink)]/25" />
-              Opportunity desk
-            </div>
-            <h1 className="max-w-4xl text-[clamp(2.75rem,5vw,5.5rem)] font-semibold leading-[.9] tracking-[-.065em]">
-              The right work,
-              <br />
-              <span className="font-serif font-medium italic">in focus.</span>
-            </h1>
-          </div>
-          <div className="lg:pb-2">
-            <p className="max-w-xs text-sm leading-6 text-[var(--muted)]">
-              A quiet place to qualify the signal, write with care, and move at
-              the right moment.
-            </p>
-            <button
-              onClick={() => setAdding(true)}
-              className={`${primaryButton} mt-5`}
-            >
-              <span>Add opportunity</span>
-              <span className="grid size-8 place-items-center rounded-full bg-white/10">
-                <Plus size={15} />
-              </span>
-            </button>
-          </div>
-        </section>
-        <section className="mt-12 rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
+        <section className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
           <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] px-4 py-4 sm:px-6">
             {savedViews.length > 0 && (
               <div className="mb-4 flex items-center gap-2 overflow-x-auto border-b border-black/[.06] pb-4">
@@ -191,6 +172,42 @@ export default function Jobs() {
                 ))}
               </div>
             )}
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-black/[.06] pb-4 dark:border-white/[.08]">
+              <div className="flex items-center gap-3">
+                <span className="shrink-0 text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Job scope</span>
+                <div className="flex items-center gap-1 rounded-full bg-[var(--paper)] p-1" aria-label="Job scope">
+                  {scopes.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      aria-pressed={scope === item}
+                      onClick={() => {
+                        setScope(item);
+                        saveJobScope(item);
+                      }}
+                      className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-300 ${scope === item ? "bg-[var(--lime)] !text-[#26320b] shadow-[0_4px_18px_rgba(105,130,32,.14)] ring-1 ring-[var(--lime-dark)]/25" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <DateTimeRangeFilter
+                  value={dateFilter}
+                  onApply={setDateFilter}
+                  label="Job posting time"
+                />
+                <button
+                  onClick={() => setDateDialog(true)}
+                  aria-label="Open skill filters"
+                  className={`relative ${iconButton} ${skills.length ? "bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40 font-bold" : ""}`}
+                >
+                  <Funnel size={16} weight={skills.length ? "fill" : "regular"} />
+                  {skills.length > 0 && <span className="absolute -right-1 -top-1 grid size-4.5 place-items-center rounded-full bg-[var(--ink)] text-[9px] font-bold text-white shadow-xs">{skills.length}</span>}
+                </button>
+              </div>
+            </div>
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
               <div className="flex gap-1 overflow-x-auto rounded-full bg-[var(--paper)] p-1">
                 {pipeline.map((item) => (
@@ -206,7 +223,7 @@ export default function Jobs() {
                     <span
                       className={`rounded-full px-2 py-0.5 text-[9px] ${tab === item ? "bg-white/12" : "bg-black/5"}`}
                     >
-                      {item === "New" ? jobs.filter((job) => ["New", "Seen"].includes(job.status)).length : item === "Most recent" ? jobs.length : jobs.filter((job) => job.status === item).length}
+                      {item === "New" ? jobs.filter((job) => ["New", "Seen"].includes(job.status)).length : item === "All" ? jobs.length : jobs.filter((job) => job.status === item).length}
                     </span>
                   </button>
                 ))}
@@ -231,7 +248,7 @@ export default function Jobs() {
                   <input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search opportunities"
+                    placeholder="Search jobs"
                     className="min-w-0 flex-1 bg-transparent text-xs outline-none"
                   />
                   {search && (
@@ -248,26 +265,13 @@ export default function Jobs() {
                     </button>
                   )}
                 </label>
-                <DateTimeRangeFilter
-                  value={dateFilter}
-                  onApply={setDateFilter}
-                  label="Opportunity posting time"
-                />
-                <button
-                  onClick={() => setDateDialog(true)}
-                  aria-label="Open skill filters"
-                  className={`relative ${iconButton} ${skills.length ? "bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40 font-bold" : ""}`}
-                >
-                  <Funnel size={16} weight={skills.length ? "fill" : "regular"} />
-                  {skills.length > 0 && <span className="absolute -right-1 -top-1 grid size-4.5 place-items-center rounded-full bg-[var(--ink)] text-[9px] font-bold text-white shadow-xs">{skills.length}</span>}
-                </button>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-black/[.06] pt-3 text-xs dark:border-white/[.08]">
               <span className="mr-1 shrink-0 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">
                 Skills:
               </span>
-              <RefreshFilterButton onClick={() => refetch()} loading={isFetching} label="Refresh opportunities" />
+              <RefreshFilterButton onClick={() => refetch()} loading={isFetching} label="Refresh jobs" />
               <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
                 {quickSkills.map((skill) => (
                   <button
@@ -286,7 +290,7 @@ export default function Jobs() {
                   + More skills
                 </button>
               </div>
-              <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} className="ml-auto" />
+              <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} />
               {(skills.length > 0 || dateFilter.preset !== "all") && (
                 <button
                   onClick={() => {
@@ -298,17 +302,24 @@ export default function Jobs() {
                   Clear all
                 </button>
               )}
+              <button onClick={() => setAdding(true)} className={`${primaryButton} ml-auto shrink-0 !py-1.5 !pl-4`}>
+                <span>Add job</span>
+                <span className="grid size-7 place-items-center rounded-full bg-white/10">
+                  <Plus size={14} />
+                </span>
+              </button>
             </div>
           </div>
         </section>
+        <div className="jobs-results-surface -mx-4 px-4 pb-20 pt-9 sm:-mx-6 sm:px-6">
         {isLoading ? (
-          <LogoLoader className="min-h-[38dvh]" label="Loading opportunities" />
+          <LogoLoader className="min-h-[38dvh]" label="Loading jobs" />
         ) : isError ? (
           <section className="py-24 text-center">
             <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--danger)]/10">
               <Briefcase size={22} />
             </div>
-            <h3 className="mt-5 text-xl font-semibold">Could not load opportunities</h3>
+            <h3 className="mt-5 text-xl font-semibold">Could not load jobs</h3>
             <p className="mx-auto mt-2 max-w-lg text-sm text-[var(--muted)]">
               {error?.response?.status === 401
                 ? "The service rejected the request. Please sign in again or contact your administrator."
@@ -321,7 +332,7 @@ export default function Jobs() {
         ) : filtered.length ? (
           <section className={`mt-6 grid gap-4 ${layout === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : layout === "compact" ? "sm:grid-cols-2 xl:grid-cols-4" : "grid-cols-1"}`}>
             {filtered.map((job) => (
-              <JobCard key={job.id} job={job} layout={layout} />
+              <JobCard key={job.id} job={job} layout={layout} allJobs={showAllJobs} />
             ))}
           </section>
         ) : (
@@ -330,13 +341,14 @@ export default function Jobs() {
               <Briefcase size={22} />
             </div>
             <h3 className="mt-5 text-xl font-semibold">
-              No matching opportunities
+              No matching jobs
             </h3>
             <p className="mt-2 text-sm text-[var(--muted)]">
               Try another skill, time window, or search term.
             </p>
           </section>
         )}
+        </div>
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {dateDialog && (
           <OpportunityFilterDialog

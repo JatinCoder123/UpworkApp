@@ -3,7 +3,7 @@ import { ArrowUpRight } from '@phosphor-icons/react'
 import { StatusPill } from './ui'
 import { scoreJob } from '../lib/scoring'
 
-export default function JobCard({ job, layout = 'grid' }) {
+export default function JobCard({ job, layout = 'grid', allJobs = false }) {
   const fit = scoreJob(job)
   const isNew = job.status === 'New'
   const compact = layout === 'compact'
@@ -11,7 +11,7 @@ export default function JobCard({ job, layout = 'grid' }) {
 
   return <article data-card className={`group relative overflow-hidden rounded-[1.6rem] p-1 transition-all duration-500 hover:-translate-y-0.5 ${isNew ? 'bg-[var(--new-border)] shadow-[0_14px_42px_var(--new-shadow)]' : 'bg-[var(--frame)] ring-1 ring-[var(--line)]/60'}`}>
     {isNew && <span className="absolute left-0 top-8 z-10 h-10 w-1 rounded-r-full bg-[var(--accent)]" />}
-    <Link to={`/jobs/${job.id}`} className={`relative block h-full rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] ${list ? 'p-4 sm:grid sm:grid-cols-[minmax(0,1.65fr)_minmax(13rem,.7fr)_auto] sm:items-center sm:gap-7 sm:p-5' : compact ? 'p-4' : 'p-5 sm:p-6'}`}>
+    <Link to={`/jobs/${job.id}${allJobs ? '?scope=all' : ''}`} className={`relative block h-full rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] ${list ? 'p-4 sm:grid sm:grid-cols-[minmax(0,1.65fr)_minmax(13rem,.7fr)_auto] sm:items-center sm:gap-7 sm:p-5' : compact ? 'p-4' : 'p-5 sm:p-6'}`}>
       <div className={list ? 'min-w-0' : ''}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">

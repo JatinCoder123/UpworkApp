@@ -24,10 +24,22 @@ export function saveViews(views) {
 }
 
 const JOB_STATUS_KEY = 'pitchflow-job-status'
+const JOB_SCOPE_KEY = 'pitchflow-job-scope'
+
+export function loadJobScope() {
+  const scope = localStorage.getItem(JOB_SCOPE_KEY)
+  if (['My Jobs', 'All Jobs'].includes(scope)) return scope
+  return localStorage.getItem(JOB_STATUS_KEY) === 'All Jobs' ? 'All Jobs' : 'My Jobs'
+}
+
+export function saveJobScope(scope) {
+  localStorage.setItem(JOB_SCOPE_KEY, scope)
+}
 
 export function loadJobStatus() {
   const status = localStorage.getItem(JOB_STATUS_KEY)
-  return ['New', 'Most recent', 'Applied', 'Rejected'].includes(status) ? status : 'New'
+  if (['My Jobs', 'All Jobs', 'Most recent'].includes(status)) return 'All'
+  return ['All', 'New', 'Applied', 'Rejected'].includes(status) ? status : 'All'
 }
 
 export function saveJobStatus(status) {

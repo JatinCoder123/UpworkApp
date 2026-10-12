@@ -41,7 +41,7 @@ export default function OpportunityFilterDialog({ skills, skillOptions, onApply,
 
   return (
     <Modal onClose={onClose} wide>
-      <DialogHeader eyebrow="Refine opportunities" title="Filter your job list" onClose={onClose} />
+      <DialogHeader eyebrow="Refine jobs" title="Filter your job list" onClose={onClose} />
       <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
         Choose one or more skills. Use the shared date control in the toolbar for posting time.
       </p>

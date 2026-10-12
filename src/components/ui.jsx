@@ -5,8 +5,8 @@ import { X } from '@phosphor-icons/react'
 export const iconButton = 'grid size-10 shrink-0 place-items-center rounded-full bg-[var(--ink)]/5 text-[var(--ink)] transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] hover:scale-105 hover:bg-[var(--ink)] hover:text-white active:scale-95'
 export const primaryButton = 'group inline-flex items-center justify-center gap-3 rounded-full bg-[var(--ink)] py-2 pl-5 pr-2 text-sm font-semibold text-white transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-0.5 active:scale-[.98] disabled:pointer-events-none disabled:opacity-50'
 
-export function Mark({ dark = false }) {
-  return <div className={`grid size-9 place-items-center rounded-xl ${dark ? 'bg-[var(--lime)] text-[var(--ink)]' : 'bg-[var(--ink)] text-[var(--lime)]'}`}><svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none"><path d="M5 5.5v7a6.5 6.5 0 0 0 13 0V6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" /><path d="m14 9 4-4 4 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
+export function Mark() {
+  return <img src="https://www.outrightcrm.com/wp-content/uploads/2021/09/cropped-cropped-cropped-OutRightcrm-web-192x192.png" alt="" aria-hidden="true" className="size-9 shrink-0 object-contain" />
 }
 
 export function StatusPill({ status }) {

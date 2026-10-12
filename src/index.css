@@ -108,4 +108,33 @@ h1[data-detail] { max-width: 56rem; font-size: clamp(2rem, 3.6vw, 3.75rem); line
 }
 .intro-orbit::after { content: ''; position: absolute; inset: 1rem; border: 1px dashed rgb(255 255 255 / .08); border-radius: 999px; }
 
+.login-feature-check {
+  opacity: 0;
+  transform: scale(.45) rotate(-18deg);
+  animation: login-check-in .42s cubic-bezier(.2,.85,.3,1.35) var(--feature-delay) forwards;
+}
+.login-feature-copy {
+  display: inline-block;
+  clip-path: inset(0 100% 0 0);
+  animation: login-type-in .65s steps(18, end) calc(var(--feature-delay) + .12s) forwards;
+}
+.jobs-results-surface {
+  background: linear-gradient(
+    180deg,
+    var(--paper) 0,
+    color-mix(in srgb, var(--lime) 8%, var(--frame)) 5rem,
+    color-mix(in srgb, var(--lime) 18%, var(--frame)) 11rem,
+    color-mix(in srgb, var(--lime) 20%, var(--frame)) 100%
+  );
+  transition: background 700ms cubic-bezier(.32,.72,0,1);
+}
+@keyframes login-check-in {
+  70% { opacity: 1; transform: scale(1.12) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes login-type-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { CaretDown, Clock, SignOut, SlidersHorizontal, User, UserCircle } from '@phosphor-icons/react'
+import { CaretDown, ChartLineUp, Clock, SignOut, SlidersHorizontal, User, UserCircle } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Mark, iconButton } from './ui'
 import ThemeToggle from './ThemeToggle'
@@ -32,7 +32,7 @@ export default function Shell({ children }) {
   return <div className="min-h-[100dvh] bg-[var(--paper)]">
     <header className="sticky top-0 z-30 px-3 pt-3 md:px-6 md:pt-5">
       <div className="mx-auto flex max-w-[1500px] items-center justify-between rounded-full bg-[var(--surface)]/90 px-3 py-2 ring-1 ring-black/5 shadow-[0_18px_60px_rgba(30,32,25,.08)] backdrop-blur-xl">
-        <Link to="/jobs" className="flex items-center gap-2.5 rounded-full pr-3 text-sm font-bold tracking-[-.02em]"><Mark />OutrightFeedPortal</Link>
+        <Link to="/jobs" className="flex items-center gap-2.5 rounded-full pr-3 text-sm font-bold tracking-[-.02em]"><Mark />Outright Feed Portal</Link>
         <nav className="hidden items-center gap-1 rounded-full bg-[var(--ink)]/[.045] p-1 md:flex">
           <Link to="/jobs" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/jobs') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Jobs</Link>
           <Link to="/tech-news" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/tech-news') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>AI News</Link>
@@ -40,6 +40,14 @@ export default function Shell({ children }) {
           <Link to="/domain" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/domain') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Domain</Link>
         </nav>
         <div className="flex items-center gap-2">
+          <div className="group relative" tabIndex={0} aria-label="Current CRM: Sales">
+            <span className="grid size-9 place-items-center rounded-full bg-[var(--lime)]/25 text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/30 transition-all duration-300 group-hover:bg-[var(--lime)]/45 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-[var(--accent)]">
+              <ChartLineUp size={17} weight="duotone" />
+            </span>
+            <span role="tooltip" className="pointer-events-none absolute right-1/2 top-12 z-40 translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg bg-[var(--ink)] px-3 py-1.5 text-[10px] font-bold text-white opacity-0 shadow-[0_10px_30px_rgba(30,32,25,.18)] transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus:translate-y-0 group-focus:opacity-100">
+              Sales
+            </span>
+          </div>
           <ThemeToggle />
           <div ref={menuRef} className="relative">
             <button aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)} className={`${iconButton} size-9`} aria-label="Open profile menu"><User size={17} weight="light" /></button>

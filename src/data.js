@@ -88,7 +88,7 @@ export const seedJobs = [
   },
 ]
 
-export const coverLetterTemplate = `Hi there,\n\nYour vision for {company} immediately stood out—especially the opportunity to bring clarity and craft to a complex product. I’ve led similar engagements where thoughtful systems and a polished execution materially improved both customer confidence and team velocity.\n\nI’d begin with a focused discovery session, map the critical journey, and move quickly into a tangible direction your team can react to. You’ll get clear communication, senior-level thinking, and production-minded work throughout.\n\nI’d love to share a few relevant examples and hear more about what success looks like for you.\n\nBest,\nWaseem`
+export const coverLetterTemplate = `Hi there,\n\nYour vision for {company} immediately stood out—especially the chance to bring clarity and craft to a complex product. I’ve led similar engagements where thoughtful systems and a polished execution materially improved both customer confidence and team velocity.\n\nI’d begin with a focused discovery session, map the critical journey, and move quickly into a tangible direction your team can react to. You’ll get clear communication, senior-level thinking, and production-minded work throughout.\n\nI’d love to share a few relevant examples and hear more about what success looks like for you.\n\nBest,\nWaseem`
 
 export const seedTechNews = [
   {

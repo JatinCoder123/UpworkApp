@@ -4,7 +4,7 @@ function Bone({ className = '' }) {
 
 export default function JobDetailSkeleton() {
   return <main role="status" aria-live="polite" className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-10 sm:px-6 md:pt-14">
-    <span className="sr-only">Loading opportunity details</span>
+    <span className="sr-only">Loading job details</span>
     <div className="flex items-center gap-3"><Bone className="size-9" /><Bone className="h-3 w-28" /></div>
     <section className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1.25fr)_minmax(19rem,.75fr)] xl:gap-16">
       <div>

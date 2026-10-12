@@ -3,6 +3,7 @@ import CryptoJS from "crypto-js";
 
 export const SMART_GATEWAY_URL = import.meta.env?.VITE_SMART_GATEWAY_URL || "https://upwork.outrightcrm.in/index.php?entryPoint=smart_gateway";
 export const JOBS_MODULE = "outr_upwork_jobs";
+export const USERS_MODULE = "Users";
 export const TECH_NEWS_MODULE = import.meta.env?.VITE_TECH_NEWS_MODULE || "daily_tech_news";
 export const DEFAULT_TECH_NEWS_PER_PAGE = 10;
 
@@ -13,6 +14,7 @@ const apiClient = axios.create({
 });
 
 const localChanges = new Map();
+const gatewayUserIdCache = new Map();
 
 function generateToken() {
   const SECRET = "MY_SUPER_SECRET_123";
@@ -123,7 +125,7 @@ export function mapGatewayJob(record) {
   return {
     id: record.id,
     jobId: record.job_id || record.name,
-    title: record.job_title || record.name || "Untitled opportunity",
+    title: record.job_title || record.name || "Untitled job",
     company: owner || record.category || "Upwork client",
     client: initials(owner || record.category),
     location: clientStats.location,
@@ -143,21 +145,56 @@ export function mapGatewayJob(record) {
     pitch: record.pitch || "",
     coverLetter: record.cover_letter || "",
     clientStats,
-    activity: changes.activity || [`Opportunity imported as ${record.job_id || record.name}`, `Last updated ${record.date_modified_time_ago || "recently"}`],
+    activity: changes.activity || [`Job imported as ${record.job_id || record.name}`, `Last updated ${record.date_modified_time_ago || "recently"}`],
     raw: record,
     ...changes,
   };
 }
 
-export async function fetchJobs({ page = 1, perPage = 20, dateFilter } = {}) {
-  const payload = addGatewayDateFilter({ action: "fetch", module: JOBS_MODULE, page, per_page: perPage }, dateFilter);
+export async function findGatewayUserIdByEmail(email) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) throw createAppError("CRM_USER_EMAIL_MISSING", "Your signed-in account does not include an email address.");
+  if (gatewayUserIdCache.has(normalizedEmail)) return gatewayUserIdCache.get(normalizedEmail);
+
+  const request = (async () => {
+    const perPage = 100;
+    const firstPage = await smartGateway({ action: "fetch", module: USERS_MODULE, page: 1, per_page: perPage });
+    let users = [...(firstPage.records || [])];
+    const totalPages = Math.max(Number(firstPage.total_pages) || 1, Math.ceil((Number(firstPage.total) || users.length) / perPage));
+
+    for (let page = 2; page <= totalPages; page += 1) {
+      const nextPage = await smartGateway({ action: "fetch", module: USERS_MODULE, page, per_page: perPage });
+      users = users.concat(nextPage.records || []);
+    }
+
+    const matchedUser = users.find((record) => String(record.email1 || "").trim().toLowerCase() === normalizedEmail);
+    if (!matchedUser?.id) throw createAppError("CRM_USER_NOT_FOUND", `No CRM user was found for ${email}.`);
+    return matchedUser.id;
+  })();
+
+  gatewayUserIdCache.set(normalizedEmail, request);
+  try {
+    return await request;
+  } catch (error) {
+    gatewayUserIdCache.delete(normalizedEmail);
+    throw error;
+  }
+}
+
+export async function fetchJobs({ page = 1, perPage = 20, dateFilter, userEmail, allJobs = false } = {}) {
+  const assignedUserId = allJobs ? null : await findGatewayUserIdByEmail(userEmail);
+  const query = { action: "fetch", module: JOBS_MODULE, page, per_page: perPage };
+  if (assignedUserId) query.filters = { assigned_user_id: assignedUserId };
+  const payload = addGatewayDateFilter(query, dateFilter);
   const data = await smartGateway(payload);
   return (data.records || []).map(mapGatewayJob);
 }
 
-export async function fetchJobById(id) {
+export async function fetchJobById(id, { userEmail, allJobs = false } = {}) {
   if (!id || !String(id).trim()) throw createAppError("JOB_NOT_FOUND", "Job not found");
-  const data = await smartGateway({ action: "fetch", module: JOBS_MODULE, filters: { id }, page: 1, per_page: 1 });
+  const assignedUserId = allJobs ? null : await findGatewayUserIdByEmail(userEmail);
+  const filters = assignedUserId ? { id, assigned_user_id: assignedUserId } : { id };
+  const data = await smartGateway({ action: "fetch", module: JOBS_MODULE, filters, page: 1, per_page: 1 });
   const record = data.records?.find((item) => item.id === id);
   if (!record) throw createAppError("JOB_NOT_FOUND", "Job not found");
   return mapGatewayJob(record);
@@ -412,12 +449,12 @@ export async function fetchAllTechNews({ forceRefresh = false, dateFilter = null
 
 export const api = {
   getJobs: (params) => fetchJobs(params),
-  getJob: fetchJobById,
+  getJob: (id, options) => fetchJobById(id, options),
   getTechNews: (params) => fetchTechNews(params),
   getTechNewsItem: (id) => fetchTechNewsById(id),
   getAllTechNews: (options) => fetchAllTechNews(options),
-  async updateStatus({ id, status, reason, coverLetter }) {
-    const current = await fetchJobById(id);
+  async updateStatus({ id, status, reason, coverLetter, userEmail, allJobs = false }) {
+    const current = await fetchJobById(id, { userEmail, allJobs });
     await smartGateway({
       action: "update",
       module: JOBS_MODULE,
@@ -428,9 +465,9 @@ export const api = {
     localChanges.set(id, changes);
     return { ...current, ...changes };
   },
-  async checkDuplicate(value) {
+  async checkDuplicate(value, userEmail) {
     const cleaned = cleanJobUrl(value);
-    const jobs = await fetchJobs();
+    const jobs = await fetchJobs({ userEmail });
     return { exists: jobs.some((job) => job.url && cleanJobUrl(job.url) === cleaned), cleaned };
   },
 };

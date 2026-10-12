@@ -134,10 +134,10 @@ function getErrorPreset(errorType, currentPath) {
     case 'job-not-found':
       return {
         code: '404.',
-        heading: 'Opportunity does not exist.',
+        heading: 'Job does not exist.',
         description: (
           <>
-            We couldn’t find an opportunity matching {urlCode}. It may have been removed or the link is incorrect.{' '}
+            We couldn’t find a job matching {urlCode}. It may have been removed or the link is incorrect.{' '}
             <span className="font-semibold text-[var(--ink)]">That’s all we know.</span>
           </>
         ),
@@ -269,7 +269,7 @@ export default function NotFound({
             className="inline-flex items-center gap-2.5 text-base font-bold tracking-tight text-[var(--ink)]"
           >
             <Mark />
-            <span>OutrightFeedPortal</span>
+            <span>Outright Feed Portal</span>
           </Link>
 
           <div>
@@ -358,7 +358,7 @@ export default function NotFound({
             className="flex items-center gap-2.5 pr-3 text-sm font-bold tracking-[-.02em] text-[var(--ink)]"
           >
             <Mark />
-            <span>OutrightFeedPortal</span>
+            <span>Outright Feed Portal</span>
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />

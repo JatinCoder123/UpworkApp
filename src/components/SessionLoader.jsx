@@ -11,7 +11,7 @@ export default function SessionLoader() {
           <Mark />
         </span>
       </div>
-      <p className="mt-8 text-[10px] font-bold uppercase tracking-[.24em] text-[var(--muted)]">OutrightFeedPortal</p>
+      <p className="mt-8 text-[10px] font-bold uppercase tracking-[.24em] text-[var(--muted)]">Outright Feed Portal</p>
       <h1 className="mt-3 text-2xl font-semibold tracking-[-.045em] text-[var(--text)]">Opening your workspace</h1>
       <div className="mt-5 h-1 w-36 overflow-hidden rounded-full bg-[var(--line)]/70" aria-hidden="true">
         <span className="session-loader-progress block h-full w-1/2 rounded-full bg-[var(--lime-dark)]" />
