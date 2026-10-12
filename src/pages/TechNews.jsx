@@ -579,63 +579,93 @@ export default function TechNews() {
                   </div>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 text-[10px] font-extrabold text-emerald-950 dark:text-emerald-200 ring-1 ring-emerald-600/30 dark:ring-emerald-500/40 shadow-xs">
                     <span className="size-2 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse" />
-                    <span className="tracking-wide">Live Feed</span>
+                    <span className="tracking-wide">{isLoading || isRefreshing ? 'Loading...' : 'Live Feed'}</span>
                   </span>
                 </div>
 
                 {/* Latest News Feed Container (Scrolls independently when cursor is over it) */}
-                <div className="max-h-[calc(100vh-14rem)] overflow-y-auto pr-1.5 space-y-4 divide-y divide-black/[.06] dark:divide-white/[.08] scroll-smooth overscroll-contain">
-                  {allLatestNewsStories.map((item) => (
-                    <Link
-                      key={item.id}
-                      to={`/tech-news/${item.id}`}
-                      className="group block pt-4 first:pt-0 transition-all"
-                    >
-                      <div className="flex items-start gap-3">
-                        {/* Text Information */}
-                        <div className="min-w-0 flex-1 space-y-1.5">
+                {isLoading || isRefreshing ? (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="space-y-4 divide-y divide-black/[.06] dark:divide-white/[.08]"
+                  >
+                    {[0, 1, 2, 3, 4].map((index) => (
+                      <div key={index} className="flex items-start gap-3 pt-4 first:pt-0">
+                        <div className="min-w-0 flex-1 space-y-2">
                           <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-[#668c16]">
-                              {item.category}
-                            </span>
-                            <span className="text-[9px] text-[var(--muted)]">·</span>
-                            <span className="text-[9px] text-[var(--muted)]">{item.posted}</span>
+                            <span className="skeleton-bone h-2.5 w-16 rounded-full" />
+                            <span className="skeleton-bone h-2.5 w-10 rounded-full" />
                           </div>
-
-                          <h3 className="text-xs sm:text-sm font-semibold leading-snug text-[var(--ink)] line-clamp-2 transition-colors duration-300 group-hover:text-[#668c16]">
-                            {item.title}
-                          </h3>
-
-                          <div className="flex items-center gap-2 pt-0.5">
-                            <span className="text-[10px] text-[var(--muted)] truncate max-w-[120px]">
-                              {item.source}
-                            </span>
-                            <span className={`inline-block size-1.5 rounded-full ${item.tier?.squareClass || 'bg-purple-500'}`} />
-                            <span className="text-[9px] font-bold text-[var(--ink)]">
-                              {item.tier?.label}
-                            </span>
+                          <span className="skeleton-bone block h-3.5 w-full rounded-lg" />
+                          <span className="skeleton-bone block h-3.5 w-4/5 rounded-lg" />
+                          <div className="flex items-center gap-2 pt-1">
+                            <span className="skeleton-bone h-2.5 w-20 rounded-full" />
+                            <span className="skeleton-bone h-2.5 w-12 rounded-full" />
                           </div>
                         </div>
-
-                        {/* Topic Image Thumbnail */}
-                        {item.image && (
-                          <div className="relative size-20 sm:size-22 shrink-0 overflow-hidden rounded-xl bg-[var(--ink)] ring-1 ring-black/5">
-                            <img
-                              src={item.image}
-                              alt={item.title}
-                              className="size-full object-cover transition-transform duration-500 group-hover:scale-108"
-                            />
-                            <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
-                          </div>
-                        )}
+                        <span className="skeleton-bone size-20 sm:size-22 shrink-0 rounded-xl" />
                       </div>
-                    </Link>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="max-h-[calc(100vh-14rem)] overflow-y-auto pr-1.5 space-y-4 divide-y divide-black/[.06] dark:divide-white/[.08] scroll-smooth overscroll-contain">
+                    {allLatestNewsStories.map((item) => (
+                      <Link
+                        key={item.id}
+                        to={`/tech-news/${item.id}`}
+                        className="group block pt-4 first:pt-0 transition-all"
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Text Information */}
+                          <div className="min-w-0 flex-1 space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-[#668c16]">
+                                {item.category}
+                              </span>
+                              <span className="text-[9px] text-[var(--muted)]">·</span>
+                              <span className="text-[9px] text-[var(--muted)]">{item.posted}</span>
+                            </div>
+
+                            <h3 className="text-xs sm:text-sm font-semibold leading-snug text-[var(--ink)] line-clamp-2 transition-colors duration-300 group-hover:text-[#668c16]">
+                              {item.title}
+                            </h3>
+
+                            <div className="flex items-center gap-2 pt-0.5">
+                              <span className="text-[10px] text-[var(--muted)] truncate max-w-[120px]">
+                                {item.source}
+                              </span>
+                              <span className={`inline-block size-1.5 rounded-full ${item.tier?.squareClass || 'bg-purple-500'}`} />
+                              <span className="text-[9px] font-bold text-[var(--ink)]">
+                                {item.tier?.label}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Topic Image Thumbnail */}
+                          {item.image && (
+                            <div className="relative size-20 sm:size-22 shrink-0 overflow-hidden rounded-xl bg-[var(--ink)] ring-1 ring-black/5">
+                              <img
+                                src={item.image}
+                                alt={item.title}
+                                className="size-full object-cover transition-transform duration-500 group-hover:scale-108"
+                              />
+                              <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                            </div>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
 
                 {/* Footer note with item count */}
                 <div className="border-t border-black/[.06] dark:border-white/[.08] pt-3 text-[11px] text-[var(--muted)] flex items-center justify-between">
-                  <span>{allLatestNewsStories.length} live stories in feed</span>
+                  <span>
+                    {isLoading || isRefreshing
+                      ? 'Loading latest stories...'
+                      : `${allLatestNewsStories.length} live stories in feed`}
+                  </span>
                   <ArrowUpRight size={13} className="text-[var(--muted)]" />
                 </div>
               </div>

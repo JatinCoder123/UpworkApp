@@ -38,7 +38,11 @@ export default function TechNewsDetail() {
     retry: false,
   })
 
-  const { data: newsResult } = useQuery({
+  const {
+    data: newsResult,
+    isLoading: isRelatedLoading,
+    isFetching: isRelatedFetching,
+  } = useQuery({
     queryKey: ['tech-news-feed'],
     queryFn: () => api.getAllTechNews(),
     staleTime: 5 * 60 * 1000,
@@ -382,7 +386,7 @@ export default function TechNewsDetail() {
             </div>
 
             {/* Up Next / Related Latest News in Sidebar with Natural Scroll */}
-            {allUpNextStories.length > 0 && (
+            {(isRelatedLoading || isRelatedFetching || allUpNextStories.length > 0) && (
               <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
                 <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 space-y-4">
                   <div className="flex items-center justify-between border-b border-black/[.06] dark:border-white/[.08] pb-3">
@@ -396,54 +400,86 @@ export default function TechNewsDetail() {
                     </div>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 text-[10px] font-extrabold text-emerald-950 dark:text-emerald-200 ring-1 ring-emerald-600/30 dark:ring-emerald-500/40 shadow-xs">
                       <span className="size-2 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse" />
-                      <span className="tracking-wide">Related</span>
+                      <span className="tracking-wide">
+                        {isRelatedLoading && allUpNextStories.length === 0 ? 'Loading...' : 'Related'}
+                      </span>
                     </span>
                   </div>
 
-                  <div className="max-h-[calc(100vh-14rem)] overflow-y-auto pr-1.5 space-y-3.5 divide-y divide-black/[.06] dark:divide-white/[.08] scroll-smooth overscroll-contain">
-                    {allUpNextStories.map((item) => (
-                      <Link
-                        key={item.id}
-                        to={`/tech-news/${item.id}`}
-                        className="group block pt-3.5 first:pt-0 transition-colors"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="min-w-0 flex-1 space-y-1">
+                  {isRelatedLoading && allUpNextStories.length === 0 ? (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="space-y-3.5 divide-y divide-black/[.06] dark:divide-white/[.08]"
+                    >
+                      {[0, 1, 2, 3].map((index) => (
+                        <div key={index} className="flex items-start gap-3 pt-3.5 first:pt-0">
+                          <div className="min-w-0 flex-1 space-y-2">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-bold uppercase tracking-wider text-[#668c16]">
-                                {item.category}
-                              </span>
-                              <span className="text-[9px] text-[var(--muted)]">·</span>
-                              <span className="text-[9px] text-[var(--muted)]">{item.posted}</span>
+                              <span className="skeleton-bone h-2.5 w-14 rounded-full" />
+                              <span className="skeleton-bone h-2.5 w-10 rounded-full" />
                             </div>
-                            <h4 className="text-xs font-semibold leading-snug text-[var(--ink)] line-clamp-2 transition-colors duration-300 group-hover:text-[#668c16]">
-                              {item.title}
-                            </h4>
+                            <span className="skeleton-bone block h-3 w-full rounded-lg" />
+                            <span className="skeleton-bone block h-3 w-3/4 rounded-lg" />
                             <div className="flex items-center gap-2 pt-0.5">
-                              <span className="text-[10px] text-[var(--muted)] truncate max-w-[110px]">
-                                {item.source}
-                              </span>
-                              <span className={`inline-block size-1.5 rounded-full ${item.tier?.squareClass || 'bg-purple-500'}`} />
-                              <span className="text-[9px] font-bold text-[var(--ink)]">{item.tier?.label}</span>
+                              <span className="skeleton-bone h-2.5 w-16 rounded-full" />
+                              <span className="skeleton-bone h-2.5 w-10 rounded-full" />
                             </div>
                           </div>
-
-                          {item.image && (
-                            <div className="relative size-16 shrink-0 overflow-hidden rounded-xl bg-[var(--ink)] ring-1 ring-black/5">
-                              <img
-                                src={item.image}
-                                alt={item.title}
-                                className="size-full object-cover transition-transform duration-500 group-hover:scale-108"
-                              />
-                            </div>
-                          )}
+                          <span className="skeleton-bone size-16 shrink-0 rounded-xl" />
                         </div>
-                      </Link>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="max-h-[calc(100vh-14rem)] overflow-y-auto pr-1.5 space-y-3.5 divide-y divide-black/[.06] dark:divide-white/[.08] scroll-smooth overscroll-contain">
+                      {allUpNextStories.map((item) => (
+                        <Link
+                          key={item.id}
+                          to={`/tech-news/${item.id}`}
+                          className="group block pt-3.5 first:pt-0 transition-colors"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-[#668c16]">
+                                  {item.category}
+                                </span>
+                                <span className="text-[9px] text-[var(--muted)]">·</span>
+                                <span className="text-[9px] text-[var(--muted)]">{item.posted}</span>
+                              </div>
+                              <h4 className="text-xs font-semibold leading-snug text-[var(--ink)] line-clamp-2 transition-colors duration-300 group-hover:text-[#668c16]">
+                                {item.title}
+                              </h4>
+                              <div className="flex items-center gap-2 pt-0.5">
+                                <span className="text-[10px] text-[var(--muted)] truncate max-w-[110px]">
+                                  {item.source}
+                                </span>
+                                <span className={`inline-block size-1.5 rounded-full ${item.tier?.squareClass || 'bg-purple-500'}`} />
+                                <span className="text-[9px] font-bold text-[var(--ink)]">{item.tier?.label}</span>
+                              </div>
+                            </div>
+
+                            {item.image && (
+                              <div className="relative size-16 shrink-0 overflow-hidden rounded-xl bg-[var(--ink)] ring-1 ring-black/5">
+                                <img
+                                  src={item.image}
+                                  alt={item.title}
+                                  className="size-full object-cover transition-transform duration-500 group-hover:scale-108"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="border-t border-black/[.06] dark:border-white/[.08] pt-2 text-[10px] text-[var(--muted)] flex items-center justify-between">
-                    <span>{allUpNextStories.length} related stories available</span>
+                    <span>
+                      {isRelatedLoading && allUpNextStories.length === 0
+                        ? 'Loading related stories...'
+                        : `${allUpNextStories.length} related stories available`}
+                    </span>
                     <ArrowUpRight size={12} />
                   </div>
                 </div>
