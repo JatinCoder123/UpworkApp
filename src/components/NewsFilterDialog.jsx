@@ -5,7 +5,7 @@ import {
   Buildings,
   CheckCircle,
   Globe,
-  PenNib,
+  YoutubeLogo,
 } from '@phosphor-icons/react'
 import { DialogHeader, Modal, primaryButton } from './ui'
 
@@ -18,7 +18,7 @@ const tierOptions = [
 const sourceOptions = [
   { id: 'FirstParty', label: 'FirstParty', note: 'Direct from official source or press page', icon: Buildings },
   { id: 'ThirdParty', label: 'ThirdParty', note: 'Reported by external media and news sites', icon: Globe },
-  { id: 'YouBlogging', label: 'YouBlogging', note: 'Story well-suited for blog and video content', icon: PenNib },
+  { id: 'YouBlogging', label: 'YouBlogging', note: 'Story well-suited for blog and video content', icon: YoutubeLogo },
   { id: 'HurryUp', label: 'HurryUp', note: 'Time-sensitive news posted recently', icon: Alarm },
 ]
 
@@ -345,7 +345,11 @@ export default function NewsFilterDialog({
                     isSelected ? 'bg-black/10' : 'bg-white'
                   }`}
                 >
-                  <Icon size={16} weight="bold" />
+                  <Icon
+                    size={16}
+                    weight={opt.id === 'YouBlogging' ? 'fill' : 'bold'}
+                    className={opt.id === 'YouBlogging' ? 'text-red-500' : ''}
+                  />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-bold">{opt.label}</span>

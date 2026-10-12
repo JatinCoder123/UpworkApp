@@ -9,6 +9,7 @@ import {
   Newspaper,
   Plus,
   X,
+  YoutubeLogo,
 } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import NewsFilterDialog from '../components/NewsFilterDialog'
@@ -301,10 +302,10 @@ export default function TechNews() {
           <div>
             <div className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">
               <span className="h-px w-7 bg-[var(--ink)]/25" />
-              Daily Tech Digest
+              Daily AI Digest
             </div>
             <h1 className="max-w-4xl text-[clamp(2.8rem,5.5vw,5.5rem)] font-semibold leading-[.88] tracking-[-.075em] text-[var(--ink)]">
-              Tech News,
+              AI News,
               <br />
               <span className="font-serif font-medium italic">classified & curated.</span>
             </h1>
@@ -345,6 +346,7 @@ export default function TechNews() {
                           : 'text-[var(--muted)] hover:text-[var(--ink)]'
                       }`}
                     >
+                      {item === 'YouBlogging' && <YoutubeLogo size={14} weight="fill" className="text-red-500" />}
                       <span>{item}</span>
                       <span
                         className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
@@ -368,7 +370,7 @@ export default function TechNews() {
                     setLayout(next)
                     saveTechNewsLayout(next)
                   }}
-                  ariaLabel="Tech news layout"
+                  ariaLabel="AI news layout"
                 />
 
                 <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-3.5 py-2 ring-1 ring-black/5 dark:ring-white/10 transition-all focus-within:ring-[var(--lime-dark)] sm:w-64">
@@ -529,7 +531,7 @@ export default function TechNews() {
               <div className="py-12 flex flex-col items-center justify-center">
                 <LogoLoader
                   className="min-h-[38dvh]"
-                  label={isRefreshing ? 'Refreshing tech news feed...' : 'Loading tech news feed...'}
+                  label={isRefreshing ? 'Refreshing AI news feed...' : 'Loading AI news feed...'}
                 />
               </div>
             ) : filteredArticles.length === 0 ? (

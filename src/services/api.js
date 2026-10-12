@@ -25,12 +25,43 @@ function generateToken() {
   return btoa(`${json}||${signature}`);
 }
 
+export function createAppError(code, message, meta = {}) {
+  const error = new Error(message);
+  error.code = code;
+  Object.assign(error, meta);
+  return error;
+}
+
 export async function smartGateway(payload) {
   const token = generateToken();
-  const response = await apiClient.post("", payload, {
-    headers: { "X-Api-Token": token },
-  });
-  if (!response.data?.success) throw new Error(response.data?.message || "The request could not be completed");
+  let response;
+  try {
+    response = await apiClient.post("", payload, {
+      headers: { "X-Api-Token": token },
+    });
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status === 401 || status === 403) {
+      throw createAppError("UNAUTHORIZED", "Your session has expired or you do not have permission to access this resource.", { status });
+    }
+    if (err?.code === "ECONNABORTED" || /timeout/i.test(err?.message || "")) {
+      throw createAppError("TIMEOUT", "The request timed out while waiting for the server.", { status });
+    }
+    if (!err?.response) {
+      throw createAppError("NETWORK_ERROR", "Unable to reach the server. Please check your internet connection.", { status });
+    }
+    if (status >= 500) {
+      throw createAppError("SERVER_ERROR", "The server encountered an internal error. Please try again shortly.", { status });
+    }
+    throw createAppError("SERVER_ERROR", err?.response?.data?.message || err?.message || "The request could not be completed", { status });
+  }
+  if (!response.data?.success) {
+    const message = response.data?.message || "The request could not be completed";
+    if (/unauthorized|forbidden|invalid token|expired session/i.test(message)) {
+      throw createAppError("UNAUTHORIZED", message);
+    }
+    throw createAppError("SERVER_ERROR", message);
+  }
   return response.data;
 }
 
@@ -125,9 +156,10 @@ export async function fetchJobs({ page = 1, perPage = 20, dateFilter } = {}) {
 }
 
 export async function fetchJobById(id) {
+  if (!id || !String(id).trim()) throw createAppError("JOB_NOT_FOUND", "Job not found");
   const data = await smartGateway({ action: "fetch", module: JOBS_MODULE, filters: { id }, page: 1, per_page: 1 });
   const record = data.records?.find((item) => item.id === id);
-  if (!record) throw new Error("Job not found");
+  if (!record) throw createAppError("JOB_NOT_FOUND", "Job not found");
   return mapGatewayJob(record);
 }
 
@@ -316,6 +348,7 @@ export async function fetchTechNews({
 }
 
 export async function fetchTechNewsById(id) {
+  if (!id || !String(id).trim()) throw createAppError("STORY_NOT_FOUND", "Story not found");
   const data = await smartGateway({
     action: "fetch",
     module: TECH_NEWS_MODULE,
@@ -324,8 +357,8 @@ export async function fetchTechNewsById(id) {
     per_page: 1,
   });
 
-  const record = data.records?.find((item) => item.id === id) || data.records?.[0];
-  if (!record) throw new Error("Story not found");
+  const record = data.records?.find((item) => item.id === id);
+  if (!record) throw createAppError("STORY_NOT_FOUND", "Story not found");
   return mapGatewayTechNews(record);
 }
 

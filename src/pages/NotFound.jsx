@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Briefcase } from '@phosphor-icons/react'
+import { ArrowClockwise, ArrowLeft, ArrowRight, Briefcase } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import ThemeToggle from '../components/ThemeToggle'
 import { Mark, primaryButton } from '../components/ui'
@@ -91,20 +91,173 @@ function RobotIllustration({ className = 'size-72' }) {
   )
 }
 
+function normalizeErrorType({ type, stateType, error }) {
+  const raw = String(type || stateType || error?.code || '')
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, '-')
+
+  if (['job-not-found'].includes(raw)) {
+    return 'job-not-found'
+  }
+  if (['story-not-found', 'news-not-found'].includes(raw)) {
+    return 'news-not-found'
+  }
+  if (['timeout', 'request-timeout'].includes(raw)) {
+    return 'timeout'
+  }
+  if (['network-error', 'offline', 'connection-error'].includes(raw)) {
+    return 'network-error'
+  }
+  if (['server-error', '500', 'gateway-error'].includes(raw)) {
+    return 'server-error'
+  }
+  if (['unauthorized', '401', '403', 'session-expired', 'forbidden'].includes(raw)) {
+    return 'unauthorized'
+  }
+
+  const msg = String(error?.message || '').toLowerCase()
+  if (/timed out|timeout/.test(msg)) return 'timeout'
+  if (/internet connection|unable to reach|network/.test(msg)) return 'network-error'
+
+  return '404'
+}
+
+function getErrorPreset(errorType, currentPath) {
+  const urlCode = (
+    <code className="break-all rounded-md bg-black/[.06] dark:bg-white/10 px-2 py-0.5 font-mono text-xs font-bold text-[var(--ink)]">
+      {currentPath}
+    </code>
+  )
+
+  switch (errorType) {
+    case 'job-not-found':
+      return {
+        code: '404.',
+        heading: 'Opportunity does not exist.',
+        description: (
+          <>
+            We couldn’t find an opportunity matching {urlCode}. It may have been removed or the link is incorrect.{' '}
+            <span className="font-semibold text-[var(--ink)]">That’s all we know.</span>
+          </>
+        ),
+        backTo: '/jobs',
+        backLabel: 'Back to Jobs',
+        canRetry: false,
+      }
+    case 'news-not-found':
+      return {
+        code: '404.',
+        heading: 'Story does not exist.',
+        description: (
+          <>
+            We couldn’t find an AI news story matching {urlCode}. It may have been moved or the link is incorrect.{' '}
+            <span className="font-semibold text-[var(--ink)]">That’s all we know.</span>
+          </>
+        ),
+        backTo: '/tech-news',
+        backLabel: 'Back to AI News',
+        canRetry: false,
+      }
+    case 'timeout':
+      return {
+        code: '408.',
+        heading: 'Request timed out.',
+        description: (
+          <>
+            The server took too long to respond while loading {urlCode}.{' '}
+            <span className="font-semibold text-[var(--ink)]">Please check your connection and try again.</span>
+          </>
+        ),
+        backTo: '/tech-news',
+        backLabel: 'Back to AI News',
+        canRetry: true,
+      }
+    case 'network-error':
+      return {
+        code: 'Offline.',
+        heading: 'Connection lost.',
+        description: (
+          <>
+            We couldn’t reach the server to load {urlCode}.{' '}
+            <span className="font-semibold text-[var(--ink)]">Please check your network connection and try again.</span>
+          </>
+        ),
+        backTo: '/tech-news',
+        backLabel: 'Back to AI News',
+        canRetry: true,
+      }
+    case 'server-error':
+      return {
+        code: '500.',
+        heading: 'Service unavailable.',
+        description: (
+          <>
+            Something went wrong while loading {urlCode} from the gateway.{' '}
+            <span className="font-semibold text-[var(--ink)]">Please try again in a moment.</span>
+          </>
+        ),
+        backTo: '/tech-news',
+        backLabel: 'Back to AI News',
+        canRetry: true,
+      }
+    case 'unauthorized':
+      return {
+        code: '401.',
+        heading: 'Session expired.',
+        description: (
+          <>
+            Your session has expired or you don’t have permission to view {urlCode}.{' '}
+            <span className="font-semibold text-[var(--ink)]">Please sign in again to continue.</span>
+          </>
+        ),
+        backTo: '/login',
+        backLabel: 'Return to sign in',
+        canRetry: false,
+      }
+    default:
+      return {
+        code: '404.',
+        heading: 'Page not found.',
+        description: (
+          <>
+            The requested URL {urlCode} was not found on this server.{' '}
+            <span className="font-semibold text-[var(--ink)]">That’s all we know.</span>
+          </>
+        ),
+        backTo: '/tech-news',
+        backLabel: 'Back to AI News',
+        canRetry: false,
+      }
+  }
+}
+
 export default function NotFound({
-  title = '404. Page not found.',
+  type,
+  error,
+  onRetry,
+  title,
   message,
-  backTo = '/tech-news',
-  backLabel = 'Back to Tech News',
+  backTo,
+  backLabel,
 }) {
   const { status } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const isAuthenticated = status === 'authenticated'
 
-  const currentPath = location.pathname + (location.search || '')
-  const targetBackTo = isAuthenticated ? backTo : '/login'
-  const targetBackLabel = isAuthenticated ? backLabel : 'Return to sign in'
+  const currentPath = location.state?.fromPath || (location.pathname + (location.search || ''))
+  const resolvedType = normalizeErrorType({
+    type,
+    stateType: location.state?.type,
+    error: error || location.state?.error,
+  })
+  const preset = getErrorPreset(resolvedType, currentPath)
+
+  const resolvedBackTo = backTo || preset.backTo
+  const resolvedBackLabel = backLabel || preset.backLabel
+  const targetBackTo = isAuthenticated && resolvedType !== 'unauthorized' ? resolvedBackTo : '/login'
+  const targetBackLabel = isAuthenticated && resolvedType !== 'unauthorized' ? resolvedBackLabel : 'Return to sign in'
 
   const content = (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-16 sm:px-6 md:py-24">
@@ -121,24 +274,16 @@ export default function NotFound({
 
           <div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--ink)]">
-              {title === '404. Page not found.' ? (
-                <>
-                  <span className="font-extrabold text-[var(--ink)]">404.</span> Page not found.
-                </>
-              ) : (
+              {title ? (
                 title
+              ) : (
+                <>
+                  <span className="font-extrabold text-[var(--ink)]">{preset.code}</span> {preset.heading}
+                </>
               )}
             </h1>
             <p className="mt-4 text-sm sm:text-base leading-7 text-[var(--muted)]">
-              {message || (
-                <>
-                  The requested URL{' '}
-                  <code className="break-all rounded-md bg-black/[.06] dark:bg-white/10 px-2 py-0.5 font-mono text-xs font-bold text-[var(--ink)]">
-                    {currentPath}
-                  </code>{' '}
-                  was not found on this server. <span className="font-semibold text-[var(--ink)]">That’s all we know.</span>
-                </>
-              )}
+              {message || location.state?.message || preset.description}
             </p>
           </div>
 
@@ -150,6 +295,17 @@ export default function NotFound({
                 <ArrowRight size={13} />
               </span>
             </Link>
+
+            {typeof onRetry === 'function' && preset.canRetry && (
+              <button
+                type="button"
+                onClick={() => onRetry()}
+                className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink)] ring-1 ring-black/10 dark:ring-white/10 transition-all hover:bg-black/5 dark:hover:bg-white/5 shadow-2xs"
+              >
+                <ArrowClockwise size={13} />
+                <span>Try again</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -166,7 +322,7 @@ export default function NotFound({
                 className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink)] ring-1 ring-black/10 dark:ring-white/10 transition-all hover:bg-black/5 dark:hover:bg-white/5 shadow-2xs"
               >
                 <Briefcase size={13} />
-                <span>Opportunities</span>
+                <span>Jobs</span>
               </Link>
             )}
 
@@ -175,7 +331,7 @@ export default function NotFound({
                 to="/tech-news"
                 className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink)] ring-1 ring-black/10 dark:ring-white/10 transition-all hover:bg-black/5 dark:hover:bg-white/5 shadow-2xs"
               >
-                <span>Tech News</span>
+                <span>AI News</span>
               </Link>
             )}
           </div>

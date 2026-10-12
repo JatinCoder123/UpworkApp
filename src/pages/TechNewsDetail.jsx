@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   ShieldCheck,
   Tag,
+  YoutubeLogo,
 } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import JobDetailSkeleton from '../components/JobDetailSkeleton'
@@ -21,14 +22,14 @@ import {
 
 function SourceIcon({ type }) {
   if (type === 'FirstParty') return <span className="size-1.5 rounded-full bg-emerald-500" />
-  if (type === 'YouBlogging') return <span className="size-1.5 rounded-full bg-purple-500" />
+  if (type === 'YouBlogging') return <YoutubeLogo size={14} weight="fill" className="text-red-500" />
   return <span className="size-1.5 rounded-full bg-blue-500" />
 }
 
 export default function TechNewsDetail() {
   const { id } = useParams()
 
-  const { data: story, isLoading, isError } = useQuery({
+  const { data: story, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['tech-news-item', id],
     queryFn: () => api.getTechNewsItem(id),
     retry: false,
@@ -115,8 +116,11 @@ export default function TechNewsDetail() {
   if (isError || !story) {
     return (
       <NotFound
+        type={error?.code ? undefined : 'news-not-found'}
+        error={error}
+        onRetry={refetch}
         backTo="/tech-news"
-        backLabel="Back to Tech News"
+        backLabel="Back to AI News"
       />
     )
   }
@@ -138,7 +142,7 @@ export default function TechNewsDetail() {
             <span className="grid size-9 place-items-center rounded-full bg-black/5 dark:bg-white/5">
               <ArrowLeft size={15} />
             </span>
-            <span>All tech news</span>
+            <span>All AI news</span>
           </Link>
 
           {story.url && (

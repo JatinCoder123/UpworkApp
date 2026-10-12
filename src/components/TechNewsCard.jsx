@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowUpRight } from '@phosphor-icons/react'
+import { ArrowUpRight, YoutubeLogo } from '@phosphor-icons/react'
 
 export function SourceTypeBadge({ type }) {
   if (type === 'FirstParty') {
@@ -13,7 +13,7 @@ export function SourceTypeBadge({ type }) {
   if (type === 'YouBlogging') {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-        <span className="size-1.5 rounded-full bg-purple-500" />
+        <YoutubeLogo size={13} weight="fill" className="text-red-500" />
         <span>YouBlogging</span>
       </span>
     )
