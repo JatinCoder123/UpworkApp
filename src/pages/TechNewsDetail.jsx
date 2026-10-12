@@ -204,7 +204,7 @@ export default function TechNewsDetail() {
             </div>
 
             {/* Headline */}
-            <h1 className="mt-6 max-w-5xl text-[clamp(2.2rem,4.5vw,4.5rem)] font-semibold leading-[1.02] tracking-[-.06em] text-[var(--ink)]">
+            <h1 className="mt-6 max-w-5xl text-[clamp(2rem,3.8vw,3.75rem)] font-semibold leading-[1.05] tracking-[-.055em] text-[var(--ink)]">
               {story.title}
             </h1>
 
