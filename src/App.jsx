@@ -11,6 +11,7 @@ import Preferences from './pages/Preferences'
 import ComingSoon from './pages/ComingSoon'
 import Video from './pages/Video'
 import Seo from './pages/Seo'
+import Domain from './pages/Domain'
 import NotFound from './pages/NotFound'
 import SessionLoader from './components/SessionLoader'
 import LoginIntro from './components/LoginIntro'
@@ -46,7 +47,7 @@ export default function App() {
       <Route path="/tech-news" element={<ProtectedRoute><TechNews /></ProtectedRoute>} />
       <Route path="/tech-news/:id" element={<ProtectedRoute><TechNewsDetail /></ProtectedRoute>} />
       <Route path="/daily-news" element={<ProtectedRoute><ComingSoon eyebrow="Daily Digest" title="Daily News" subtitle="curated & incoming." description="Your daily general news and market intelligence feed is being prepared and will launch here soon." type="daily-news" /></ProtectedRoute>} />
-      <Route path="/domain" element={<ProtectedRoute><ComingSoon eyebrow="Domain Intelligence" title="Domain" subtitle="tracked & analyzed." description="Domain tracking, insights, and portfolio tools are currently being prepared and will be available soon." type="domain" /></ProtectedRoute>} />
+      <Route path="/domain" element={<ProtectedRoute><Domain /></ProtectedRoute>} />
       <Route path="/video" element={<ProtectedRoute><Video /></ProtectedRoute>} />
       <Route path="/seo" element={<ProtectedRoute><Seo /></ProtectedRoute>} />
       <Route path="/technews" element={<Navigate to="/tech-news" replace />} />

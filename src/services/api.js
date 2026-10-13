@@ -207,6 +207,33 @@ export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEm
   };
 }
 
+export async function fetchJobStats({ dateFilter, userEmail } = {}) {
+  const assignedUserId = await findGatewayUserIdByEmail(userEmail);
+  const statuses = ["New", "Seen", "Applied", "Rejected"];
+  const queries = [
+    { key: "my_total", module: JOBS_MODULE, filters: { assigned_user_id: assignedUserId } },
+    { key: "all_total", module: JOBS_MODULE, filters: {} },
+    ...statuses.flatMap((status) => {
+      const statusKey = status.toLowerCase();
+      return [
+        { key: `my_${statusKey}`, module: JOBS_MODULE, filters: { assigned_user_id: assignedUserId, status } },
+        { key: `all_${statusKey}`, module: JOBS_MODULE, filters: { status } },
+      ];
+    }),
+  ];
+  const data = await smartGateway({
+    action: "get_stats",
+    date_range: "",
+    date_field: dateFilter?.date_field || "",
+    date_from: dateFilter?.date_from || "",
+    date_to: dateFilter?.date_to || "",
+    queries,
+  });
+  return Object.fromEntries(
+    Object.entries(data.stats || {}).map(([key, value]) => [key, Number(value?.count) || 0]),
+  );
+}
+
 export async function fetchJobs(options = {}) {
   const page = await fetchJobsPage(options);
   return page.records;
@@ -501,6 +528,7 @@ export async function fetchAllTechNews({ forceRefresh = false, dateFilter = null
 export const api = {
   getJobs: (params) => fetchJobs(params),
   getJobsPage: (params) => fetchJobsPage(params),
+  getJobStats: (params) => fetchJobStats(params),
   getJob: (id, options) => fetchJobById(id, options),
   getSkills: (params) => fetchSkills(params),
   createSkill,

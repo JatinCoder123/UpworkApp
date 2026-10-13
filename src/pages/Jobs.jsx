@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import gsap from "gsap";
 import {
   BookmarkSimple,
@@ -71,6 +71,25 @@ export default function Jobs() {
     () => (jobPages?.pages || []).flatMap((page) => page.records).filter((job, index, records) => records.findIndex((item) => item.id === job.id) === index),
     [jobPages],
   );
+  const {
+    data: jobStats = {},
+    isFetching: isFetchingStats,
+    refetch: refetchStats,
+  } = useQuery({
+    queryKey: ["job-stats", user?.email, gatewayDateFilter],
+    queryFn: () => api.getJobStats({ dateFilter: gatewayDateFilter, userEmail: user.email }),
+    enabled: Boolean(user?.email),
+  });
+  const scopePrefix = showAllJobs ? "all" : "my";
+  const scopeCounts = {
+    "My Jobs": jobStats.my_total,
+    "All Jobs": jobStats.all_total,
+  };
+  const pipelineCounts = {
+    New: (jobStats[`${scopePrefix}_new`] || 0) + (jobStats[`${scopePrefix}_seen`] || 0),
+    Applied: jobStats[`${scopePrefix}_applied`],
+    Rejected: jobStats[`${scopePrefix}_rejected`],
+  };
   const {
     data: skillPages,
     isLoading: skillsLoading,
@@ -229,7 +248,10 @@ export default function Jobs() {
                       }}
                       className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-300 ${scope === item ? "bg-[var(--lime)] !text-[#26320b] shadow-[0_4px_18px_rgba(105,130,32,.14)] ring-1 ring-[var(--lime-dark)]/25" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
                     >
-                      {item}
+                      <span>{item}</span>
+                      <span className={`ml-1 rounded-full px-2 py-0.5 text-[9px] tabular-nums ${scope === item ? "bg-black/10" : "bg-black/5 dark:bg-white/10"}`}>
+                        {isFetchingStats && scopeCounts[item] == null ? "…" : scopeCounts[item] ?? 0}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -266,7 +288,7 @@ export default function Jobs() {
                     <span
                       className={`rounded-full px-2 py-0.5 text-[9px] ${tab === item ? "bg-white/12" : "bg-black/5"}`}
                     >
-                      {item === "New" ? jobs.filter((job) => ["New", "Seen"].includes(job.status)).length : item === "All" ? jobs.length : jobs.filter((job) => job.status === item).length}
+                      {isFetchingStats && pipelineCounts[item] == null ? "…" : pipelineCounts[item] ?? 0}
                     </span>
                   </button>
                 ))}
@@ -314,7 +336,7 @@ export default function Jobs() {
               <span className="mr-1 shrink-0 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">
                 Skills:
               </span>
-              <RefreshFilterButton onClick={() => refetch()} loading={isFetching} label="Refresh jobs" />
+              <RefreshFilterButton onClick={() => { refetch(); refetchStats(); }} loading={isFetching || isFetchingStats} label="Refresh jobs" />
               <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
                 {quickSkills.map((skill) => (
                   <button
