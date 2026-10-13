@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import gsap from "gsap";
 import {
   BookmarkSimple,
@@ -24,12 +24,12 @@ import OpportunityFilterDialog from "../components/OpportunityFilterDialog";
 import { ActiveDateFilterChip, RefreshFilterButton } from "../components/FilterToolbarControls";
 import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
-import { loadCustomJobSkills, loadDateFilter, loadJobLayout, loadJobScope, loadJobStatus, loadSavedViews, saveDateFilter, saveJobLayout, saveJobScope, saveJobStatus, saveViews } from "../lib/preferences";
+import { loadDateFilter, loadJobLayout, loadJobScope, loadJobStatus, loadSavedViews, saveDateFilter, saveJobLayout, saveJobScope, saveJobStatus, saveViews } from "../lib/preferences";
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from "../lib/dateRange";
 import { useAuth } from "../contexts/AuthContext";
 
 const scopes = ["My Jobs", "All Jobs"];
-const pipeline = ["All", "New", "Applied", "Rejected"];
+const pipeline = ["New", "Applied", "Rejected"];
 const layouts = [
   { id: "grid", label: "Grid", icon: SquaresFour },
   { id: "list", label: "List", icon: ListBullets },
@@ -46,7 +46,6 @@ export default function Jobs() {
     [search, setSearch] = useState(""),
     [adding, setAdding] = useState(false),
     [skills, setSkills] = useState([]),
-    [customSkills, setCustomSkills] = useState(loadCustomJobSkills),
     [dateDialog, setDateDialog] = useState(false),
     [savedViews, setSavedViews] = useState(loadSavedViews),
     [savingView, setSavingView] = useState(false);
@@ -56,16 +55,30 @@ export default function Jobs() {
     queryFn: () => api.getJobs({ dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs }),
     enabled: Boolean(user?.email),
   });
+  const {
+    data: skillPages,
+    isLoading: skillsLoading,
+    isError: skillsError,
+    error: skillsQueryError,
+    hasNextPage: hasMoreSkills,
+    isFetchingNextPage: isFetchingMoreSkills,
+    fetchNextPage: fetchMoreSkills,
+  } = useInfiniteQuery({
+    queryKey: ["skills"],
+    queryFn: ({ pageParam }) => api.getSkills({ page: pageParam, perPage: 20 }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
+  });
   const root = useRef(null);
   useEffect(() => saveDateFilter("jobs", dateFilter), [dateFilter]);
-  const skillOptions = useMemo(
-    () => [...new Set([...jobs.flatMap((job) => job.tags), ...customSkills])].sort(),
-    [jobs, customSkills],
+  useEffect(() => {
+    if (hasMoreSkills && !isFetchingMoreSkills) fetchMoreSkills();
+  }, [fetchMoreSkills, hasMoreSkills, isFetchingMoreSkills]);
+  const skillRecords = useMemo(
+    () => (skillPages?.pages || []).flatMap((page) => page.records).filter((record, index, records) => records.findIndex((item) => item.id === record.id) === index).sort((a, b) => a.name.localeCompare(b.name)),
+    [skillPages],
   );
-  const quickSkills = useMemo(
-    () => [...new Set(jobs.flatMap((job) => job.tags))].slice(0, 3),
-    [jobs],
-  );
+  const quickSkills = useMemo(() => skillRecords.slice(0, 3).map((record) => record.name), [skillRecords]);
   const filtered = useMemo(
     () =>
       jobs.filter(
@@ -214,8 +227,9 @@ export default function Jobs() {
                   <button
                     key={item}
                     onClick={() => {
-                      setTab(item);
-                      saveJobStatus(item);
+                      const nextStatus = tab === item ? "All" : item;
+                      setTab(nextStatus);
+                      saveJobStatus(nextStatus);
                     }}
                     className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-300 ${tab === item ? "bg-[var(--ink)] text-white shadow-xs" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
                   >
@@ -353,8 +367,9 @@ export default function Jobs() {
         {dateDialog && (
           <OpportunityFilterDialog
             skills={skills}
-            skillOptions={skillOptions}
-            onAddCustomSkill={setCustomSkills}
+            skillRecords={skillRecords}
+            isLoading={skillsLoading || isFetchingMoreSkills}
+            error={skillsError ? skillsQueryError : null}
             onClose={() => setDateDialog(false)}
             onApply={(nextSkills) => {
               setSkills(nextSkills);

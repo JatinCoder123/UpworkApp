@@ -4,6 +4,7 @@ import CryptoJS from "crypto-js";
 export const SMART_GATEWAY_URL = import.meta.env?.VITE_SMART_GATEWAY_URL || "https://upwork.outrightcrm.in/index.php?entryPoint=smart_gateway";
 export const JOBS_MODULE = "outr_upwork_jobs";
 export const USERS_MODULE = "Users";
+export const SKILLS_MODULE = "outr_skills";
 export const TECH_NEWS_MODULE = import.meta.env?.VITE_TECH_NEWS_MODULE || "daily_tech_news";
 export const DEFAULT_TECH_NEWS_PER_PAGE = 10;
 
@@ -198,6 +199,35 @@ export async function fetchJobById(id, { userEmail, allJobs = false } = {}) {
   const record = data.records?.find((item) => item.id === id);
   if (!record) throw createAppError("JOB_NOT_FOUND", "Job not found");
   return mapGatewayJob(record);
+}
+
+export async function fetchSkills({ page = 1, perPage = 20 } = {}) {
+  const data = await smartGateway({ action: "fetch", module: SKILLS_MODULE, page, per_page: perPage });
+  return {
+    records: (data.records || []).filter((record) => record.deleted !== "1"),
+    page: Number(data.page) || page,
+    perPage: Number(data.per_page) || perPage,
+    total: Number(data.total) || 0,
+    totalPages: Number(data.total_pages) || 1,
+  };
+}
+
+export async function createSkill(name) {
+  const trimmedName = String(name || "").trim();
+  if (!trimmedName) throw createAppError("SKILL_NAME_REQUIRED", "Enter a skill name.");
+  return smartGateway({ action: "create", module: SKILLS_MODULE, data: { name: trimmedName } });
+}
+
+export async function updateSkill(id, name) {
+  const trimmedName = String(name || "").trim();
+  if (!id) throw createAppError("SKILL_ID_REQUIRED", "Skill ID is required.");
+  if (!trimmedName) throw createAppError("SKILL_NAME_REQUIRED", "Enter a skill name.");
+  return smartGateway({ action: "update", module: SKILLS_MODULE, id, data: { name: trimmedName } });
+}
+
+export async function deleteSkill(id) {
+  if (!id) throw createAppError("SKILL_ID_REQUIRED", "Skill ID is required.");
+  return smartGateway({ action: "delete", module: SKILLS_MODULE, id });
 }
 
 export const cleanJobUrl = (value) => {
@@ -450,6 +480,10 @@ export async function fetchAllTechNews({ forceRefresh = false, dateFilter = null
 export const api = {
   getJobs: (params) => fetchJobs(params),
   getJob: (id, options) => fetchJobById(id, options),
+  getSkills: (params) => fetchSkills(params),
+  createSkill,
+  updateSkill,
+  deleteSkill,
   getTechNews: (params) => fetchTechNews(params),
   getTechNewsItem: (id) => fetchTechNewsById(id),
   getAllTechNews: (options) => fetchAllTechNews(options),
