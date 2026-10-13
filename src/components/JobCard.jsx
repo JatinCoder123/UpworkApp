@@ -5,11 +5,14 @@ import { scoreJob } from '../lib/scoring'
 
 export default function JobCard({ job, layout = 'grid', allJobs = false }) {
   const fit = scoreJob(job)
+  const skills = job.skills?.length ? job.skills : job.tags
+  const visibleSkills = skills.slice(0, 2)
+  const remainingSkills = Math.max(0, skills.length - visibleSkills.length)
   const isNew = job.status === 'New'
   const compact = layout === 'compact'
   const list = layout === 'list'
 
-  return <article data-card className={`group relative overflow-hidden rounded-[1.6rem] p-1 transition-all duration-500 hover:-translate-y-0.5 ${isNew ? 'bg-[var(--new-border)] shadow-[0_14px_42px_var(--new-shadow)]' : 'bg-[var(--frame)] ring-1 ring-[var(--line)]/60'}`}>
+  return <article data-card className={`group relative rounded-[1.6rem] p-1 transition-all duration-500 hover:z-30 hover:-translate-y-0.5 ${isNew ? 'bg-[var(--new-border)] shadow-[0_14px_42px_var(--new-shadow)]' : 'bg-[var(--frame)] ring-1 ring-[var(--line)]/60'}`}>
     {isNew && <span className="absolute left-0 top-8 z-10 h-10 w-1 rounded-r-full bg-[var(--accent)]" />}
     <Link to={`/jobs/${job.id}${allJobs ? '?scope=all' : ''}`} className={`relative block h-full rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] ${list ? 'p-4 sm:grid sm:grid-cols-[minmax(0,1.65fr)_minmax(13rem,.7fr)_auto] sm:items-center sm:gap-7 sm:p-5' : compact ? 'p-4' : 'p-5 sm:p-6'}`}>
       <div className={list ? 'min-w-0' : ''}>
@@ -24,7 +27,19 @@ export default function JobCard({ job, layout = 'grid', allJobs = false }) {
           {!list && <StatusPill status={job.status} />}
         </div>
         <h3 className={`${compact ? 'mt-5 text-sm sm:text-[.9375rem]' : list ? 'mt-4 text-base sm:text-[1.0625rem]' : 'mt-7 text-lg sm:text-xl'} font-semibold leading-[1.3] tracking-[-.025em] transition-colors duration-300 group-hover:text-[var(--accent-strong)]`}>{job.title}</h3>
-        {!compact && <div className="mt-4 flex flex-wrap gap-2">{job.tags.slice(0, list ? 4 : undefined).map((tag) => <span key={tag} className="rounded-full bg-[var(--paper)] px-3 py-1.5 text-[10px] font-medium text-[var(--muted)]">{tag}</span>)}</div>}
+        <div className={`${compact ? 'mt-3' : 'mt-4'} flex flex-wrap items-center gap-2`}>
+          {visibleSkills.map((skill) => <span key={skill} className="max-w-36 truncate rounded-full bg-[var(--paper)] px-3 py-1.5 text-[10px] font-medium text-[var(--muted)]">{skill}</span>)}
+          {remainingSkills > 0 && <span className="group/skills relative z-20">
+            <span aria-label={`${remainingSkills} more skills`} className="grid h-6 min-w-7 place-items-center rounded-full bg-[var(--lime)]/35 px-2 text-[9px] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/25 transition-all duration-300 group-hover/skills:bg-[var(--lime)] group-hover/skills:text-[#26320b]">+{remainingSkills}</span>
+            <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 mb-3 w-56 -translate-x-1/2 translate-y-2 rounded-2xl bg-[var(--ink)] p-2 text-white opacity-0 shadow-[0_22px_55px_rgba(20,28,21,.28)] ring-1 ring-white/10 transition-all duration-300 group-hover/skills:translate-y-0 group-hover/skills:opacity-100">
+              <span className="block rounded-xl bg-white/[.06] px-3 py-2.5">
+                <span className="block text-[8px] font-bold uppercase tracking-[.18em] text-white/45">All skills</span>
+                <span className="mt-2 flex flex-wrap gap-1.5">{skills.map((skill) => <span key={skill} className="rounded-full bg-white/10 px-2.5 py-1 text-[9px] font-medium text-white/80">{skill}</span>)}</span>
+              </span>
+              <span className="absolute -bottom-1 left-1/2 size-2 -translate-x-1/2 rotate-45 bg-[var(--ink)]" />
+            </span>
+          </span>}
+        </div>
       </div>
       <div className={`${list ? '' : compact ? 'mt-5' : 'mt-8 border-t border-[var(--line)]/70 pt-5'} flex items-end justify-between gap-4`}>
         <div className="rounded-xl bg-[var(--price-bg)] px-3 py-2 ring-1 ring-[var(--price-line)]"><p className={`${compact ? 'text-sm' : 'text-lg'} font-semibold tracking-[-.03em] text-[var(--price-text)]`}>{job.budget}</p><p className="mt-0.5 text-[9px] text-[var(--price-muted)]">{job.type} · {job.posted}</p></div>

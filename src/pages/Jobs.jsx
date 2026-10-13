@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import gsap from "gsap";
 import {
   BookmarkSimple,
@@ -50,11 +50,27 @@ export default function Jobs() {
     [savedViews, setSavedViews] = useState(loadSavedViews),
     [savingView, setSavingView] = useState(false);
   const showAllJobs = scope === "All Jobs";
-  const { data: jobs = [], isLoading, isFetching, isError, error, refetch } = useQuery({
+  const {
+    data: jobPages,
+    isLoading,
+    isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    isError,
+    error,
+    refetch,
+  } = useInfiniteQuery({
     queryKey: ["jobs", showAllJobs ? "all" : user?.email, gatewayDateFilter],
-    queryFn: () => api.getJobs({ dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs }),
+    queryFn: ({ pageParam }) => api.getJobsPage({ page: pageParam, perPage: 20, dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
     enabled: Boolean(user?.email),
   });
+  const jobs = useMemo(
+    () => (jobPages?.pages || []).flatMap((page) => page.records).filter((job, index, records) => records.findIndex((item) => item.id === job.id) === index),
+    [jobPages],
+  );
   const {
     data: skillPages,
     isLoading: skillsLoading,
@@ -70,7 +86,20 @@ export default function Jobs() {
     getNextPageParam: (lastPage) => lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
   });
   const root = useRef(null);
+  const loadMoreRef = useRef(null);
   useEffect(() => saveDateFilter("jobs", dateFilter), [dateFilter]);
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !hasNextPage) return undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isFetchingNextPage) fetchNextPage();
+      },
+      { rootMargin: "500px 0px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
   useEffect(() => {
     if (hasMoreSkills && !isFetchingMoreSkills) fetchMoreSkills();
   }, [fetchMoreSkills, hasMoreSkills, isFetchingMoreSkills]);
@@ -84,14 +113,14 @@ export default function Jobs() {
       jobs.filter(
         (job) =>
           (tab === "New" ? ["New", "Seen"].includes(job.status) : tab === "All" ? true : job.status === tab) &&
-          `${job.title} ${job.company} ${job.tags.join(" ")}`
+          `${job.title} ${job.company} ${job.tags.join(" ")} ${(job.skills || []).join(" ")}`
             .toLowerCase()
             .includes(search.toLowerCase()) &&
           (!skills.length ||
             skills.some(
               (skill) =>
-                job.tags.includes(skill) ||
-                `${job.title} ${job.company} ${job.description || ""} ${job.tags.join(" ")}`
+                (job.skills || []).some((jobSkill) => jobSkill.toLowerCase() === skill.toLowerCase()) ||
+                `${job.title} ${job.company} ${job.description || ""} ${job.tags.join(" ")} ${(job.skills || []).join(" ")}`
                   .toLowerCase()
                   .includes(skill.toLowerCase()),
             )),
@@ -344,21 +373,35 @@ export default function Jobs() {
             </button>
           </section>
         ) : filtered.length ? (
-          <section className={`mt-6 grid gap-4 ${layout === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : layout === "compact" ? "sm:grid-cols-2 xl:grid-cols-4" : "grid-cols-1"}`}>
-            {filtered.map((job) => (
-              <JobCard key={job.id} job={job} layout={layout} allJobs={showAllJobs} />
-            ))}
-          </section>
+          <>
+            <section className={`mt-6 grid gap-4 ${layout === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : layout === "compact" ? "sm:grid-cols-2 xl:grid-cols-4" : "grid-cols-1"}`}>
+              {filtered.map((job) => (
+                <JobCard key={job.id} job={job} layout={layout} allJobs={showAllJobs} />
+              ))}
+            </section>
+            <div ref={loadMoreRef} className="flex min-h-24 items-center justify-center py-8" aria-live="polite">
+              {isFetchingNextPage ? (
+                <div className="flex items-center gap-3 text-xs font-semibold text-[var(--muted)]">
+                  <span className="size-4 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />
+                  Loading more jobs
+                </div>
+              ) : hasNextPage ? (
+                <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--muted)]">Scroll for more jobs</span>
+              ) : (
+                <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--muted)]">All jobs loaded</span>
+              )}
+            </div>
+          </>
         ) : (
-          <section className="py-24 text-center">
+          <section ref={loadMoreRef} className="py-24 text-center">
             <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--ink)]/5">
-              <Briefcase size={22} />
+              {isFetchingNextPage ? <span className="size-5 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" /> : <Briefcase size={22} />}
             </div>
             <h3 className="mt-5 text-xl font-semibold">
-              No matching jobs
+              {hasNextPage ? "Looking for matching jobs" : "No matching jobs"}
             </h3>
             <p className="mt-2 text-sm text-[var(--muted)]">
-              Try another skill, time window, or search term.
+              {hasNextPage ? "Loading more results from the next page." : "Try another skill, time window, or search term."}
             </p>
           </section>
         )}

@@ -4,6 +4,7 @@ import gsap from "gsap";
 import { ArrowUpRight, Check, ShieldCheck } from "@phosphor-icons/react";
 import { Mark, primaryButton } from "../components/ui";
 import ThemeToggle from "../components/ThemeToggle";
+import GridPattern from "../components/GridPattern";
 import { useAuth } from "../contexts/AuthContext";
 
 function MicrosoftMark() {
@@ -55,6 +56,12 @@ export default function Login() {
       ref={root}
       className="relative grid min-h-[100dvh] bg-[var(--ink)] text-white lg:grid-cols-[.92fr_1.08fr]"
     >
+      <GridPattern
+        width={68}
+        height={68}
+        squares={[[1, 1], [3, 4], [6, 2], [9, 7], [13, 3]]}
+        className="app-grid-pattern app-grid-pattern-login pointer-events-none absolute inset-0 z-0"
+      />
       <div className="absolute right-6 top-6 z-20">
         <ThemeToggle inverted />
       </div>

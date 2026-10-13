@@ -115,12 +115,20 @@ function buildUpworkApplyUrl(value) {
   }
 }
 
+function parseJobSkills(value) {
+  return [...new Set(String(value || "")
+    .split(/[,;\n|]+/)
+    .map((skill) => skill.trim())
+    .filter(Boolean))];
+}
+
 export function mapGatewayJob(record) {
   const clientStats = parseClient(record.client);
   const changes = localChanges.get(record.id) || {};
   const category = record.category?.trim();
   const built = record.already_built?.trim();
   const tags = [...new Set([category, built].filter((value) => value && value !== "–" && value !== "—"))];
+  const skills = parseJobSkills(record.skills || descriptionValue(record.description, "Skills"));
   const owner = descriptionValue(record.description, "Lead");
   const url = descriptionValue(record.description, "Upwork link");
   return {
@@ -139,6 +147,7 @@ export function mapGatewayJob(record) {
     status: changes.status || record.status?.trim() || descriptionValue(record.description, "Status") || "New",
     match: Number(record.fit) || 0,
     tags: tags.length ? tags : ["General"],
+    skills,
     image: "",
     url,
     applyUrl: buildUpworkApplyUrl(url),
@@ -182,13 +191,25 @@ export async function findGatewayUserIdByEmail(email) {
   }
 }
 
-export async function fetchJobs({ page = 1, perPage = 20, dateFilter, userEmail, allJobs = false } = {}) {
+export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEmail, allJobs = false } = {}) {
   const assignedUserId = allJobs ? null : await findGatewayUserIdByEmail(userEmail);
   const query = { action: "fetch", module: JOBS_MODULE, page, per_page: perPage };
   if (assignedUserId) query.filters = { assigned_user_id: assignedUserId };
   const payload = addGatewayDateFilter(query, dateFilter);
   const data = await smartGateway(payload);
-  return (data.records || []).map(mapGatewayJob);
+  const records = (data.records || []).map(mapGatewayJob);
+  return {
+    records,
+    page: Number(data.page) || page,
+    perPage: Number(data.per_page) || perPage,
+    total: Number(data.total) || records.length,
+    totalPages: Number(data.total_pages) || Math.max(1, Math.ceil((Number(data.total) || records.length) / perPage)),
+  };
+}
+
+export async function fetchJobs(options = {}) {
+  const page = await fetchJobsPage(options);
+  return page.records;
 }
 
 export async function fetchJobById(id, { userEmail, allJobs = false } = {}) {
@@ -479,6 +500,7 @@ export async function fetchAllTechNews({ forceRefresh = false, dateFilter = null
 
 export const api = {
   getJobs: (params) => fetchJobs(params),
+  getJobsPage: (params) => fetchJobsPage(params),
   getJob: (id, options) => fetchJobById(id, options),
   getSkills: (params) => fetchSkills(params),
   createSkill,

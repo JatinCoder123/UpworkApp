@@ -23,6 +23,8 @@
   --orange: #f37a45;
   --lavender: #cbc6ef;
   --danger: #d75c4a;
+  --grid-line: rgb(67 87 62 / .105);
+  --grid-fill: rgb(145 180 61 / .065);
 }
 
 :root[data-theme='dark'] {
@@ -44,6 +46,8 @@
   --price-line: #38513d;
   --price-text: #cbe6ce;
   --price-muted: #91aa94;
+  --grid-line: rgb(206 222 194 / .085);
+  --grid-fill: rgb(185 230 83 / .055);
 }
 
 * { box-sizing: border-box; }
@@ -61,6 +65,17 @@ button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
 ::selection { background: var(--lime); color: var(--ink); }
 ::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-thumb { background: #b9baaf; border-radius: 999px; }
+
+.app-grid-pattern {
+  color: var(--grid-line);
+  mask-image: linear-gradient(to bottom, transparent, black 7rem, black calc(100% - 7rem), transparent);
+}
+.app-grid-squares { fill: var(--grid-fill); }
+.app-grid-pattern-login {
+  color: rgb(255 255 255 / .055);
+  mask-image: radial-gradient(ellipse 85% 82% at 30% 42%, black, transparent 78%);
+}
+.app-grid-pattern-login .app-grid-squares { fill: rgb(200 232 117 / .045); }
 
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 ::view-transition-new(root) { animation: theme-reveal 850ms cubic-bezier(.32,.72,0,1); }
@@ -119,14 +134,7 @@ h1[data-detail] { max-width: 56rem; font-size: clamp(2rem, 3.6vw, 3.75rem); line
   animation: login-type-in .65s steps(18, end) calc(var(--feature-delay) + .12s) forwards;
 }
 .jobs-results-surface {
-  background: linear-gradient(
-    180deg,
-    var(--paper) 0,
-    color-mix(in srgb, var(--lime) 8%, var(--frame)) 5rem,
-    color-mix(in srgb, var(--lime) 18%, var(--frame)) 11rem,
-    color-mix(in srgb, var(--lime) 20%, var(--frame)) 100%
-  );
-  transition: background 700ms cubic-bezier(.32,.72,0,1);
+  background: transparent;
 }
 @keyframes login-check-in {
   70% { opacity: 1; transform: scale(1.12) rotate(3deg); }

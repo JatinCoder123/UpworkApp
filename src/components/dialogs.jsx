@@ -62,7 +62,11 @@ export function StatusConfirmDialog({ job, status, onClose }) {
     mutationFn: () => api.updateStatus({ id: job.id, status, userEmail: user?.email }),
     onSuccess: (updatedJob) => {
       queryClient.setQueryData(['job', job.id], updatedJob)
-      queryClient.setQueryData(['jobs'], (jobs = []) => jobs.map((item) => item.id === job.id ? { ...item, status } : item))
+      queryClient.setQueriesData({ queryKey: ['jobs'] }, (data) => {
+        if (Array.isArray(data)) return data.map((item) => item.id === job.id ? { ...item, status } : item)
+        if (!data?.pages) return data
+        return { ...data, pages: data.pages.map((page) => ({ ...page, records: page.records.map((item) => item.id === job.id ? { ...item, status } : item) })) }
+      })
       onClose()
     },
   })
