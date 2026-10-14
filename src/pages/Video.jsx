@@ -5,7 +5,8 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { ArrowSquareOut, ArrowsClockwise, Check, Copy, Fire, FilmSlate, Hash, Lightning, MagnifyingGlass, ShieldCheck, Sparkle, Star, Timer, VideoCamera, X } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import LogoLoader from '../components/LogoLoader'
-import { primaryButton } from '../components/ui'
+import HScroll from '../components/HScroll'
+import { primaryButton, stickyBand } from '../components/ui'
 import { api } from '../services/api'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -120,9 +121,9 @@ export default function Video() {
           <div className="marquee-track flex w-max py-1">{[...hashtags, ...hashtags].map((tag, index) => <span key={`${tag}-${index}`} className="mr-2 shrink-0 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{tag}</span>)}</div>
         </div>}
 
-        <div className="sticky top-[5.25rem] z-20 mt-10 md:top-24">
-          <div className="flex flex-col gap-3 rounded-[1.6rem] bg-[var(--surface)]/90 p-2 ring-1 ring-[var(--line)]/70 shadow-[0_18px_50px_rgba(30,32,25,.08)] backdrop-blur-xl lg:flex-row lg:items-center">
-            <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">{categories.map((item) => <button type="button" key={item} onClick={() => setCategory(item)} className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-bold transition-all duration-300 ${category === item ? 'bg-[var(--lime)] !text-[#26320b] shadow-sm' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{item}</button>)}</div>
+        <div className={`${stickyBand} mt-10`}>
+          <div className="flex flex-col gap-3 rounded-[1.6rem] bg-[var(--surface)] p-2 ring-1 ring-[var(--line)]/70 shadow-[0_18px_50px_rgba(30,32,25,.08)] lg:flex-row lg:items-center">
+            <HScroll className="flex-1" innerClassName="gap-1" label="categories">{categories.map((item) => <button type="button" key={item} onClick={() => setCategory(item)} className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-bold transition-all duration-300 ${category === item ? 'bg-[var(--lime)] !text-[#26320b] shadow-sm' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{item}</button>)}</HScroll>
             <div className="flex items-center gap-2">
               <div className="flex rounded-full bg-[var(--paper)] p-1">{SORTS.map((item) => <button type="button" key={item.id} onClick={() => setSort(item.id)} aria-pressed={sort === item.id} className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${sort === item.id ? 'bg-[var(--raised)] text-[var(--ink)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{item.label}</button>)}</div>
               <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-3.5 py-2 lg:w-56 lg:flex-none">
@@ -138,7 +139,7 @@ export default function Video() {
         {isLoading ? <LogoLoader className="min-h-[40dvh]" label="Loading video briefs" />
           : isError ? <section className="py-24 text-center"><span className="mx-auto grid size-14 place-items-center rounded-2xl bg-[var(--bad-bg)] text-[var(--bad)]"><VideoCamera size={22} /></span><h3 className="mt-5 text-xl font-semibold">Could not load video briefs</h3><p className="mt-2 text-sm text-[var(--muted)]">{error?.message}</p><button type="button" onClick={() => refetch()} className={`${primaryButton} mt-6`}>Try again</button></section>
             : filtered.length ? <div className="mt-12 grid gap-10 xl:grid-cols-[13rem_minmax(0,1fr)]">
-              <nav aria-label="Brief index" className="hidden xl:block"><div className="sticky top-48 space-y-1">
+              <nav aria-label="Brief index" className="hidden xl:block"><div className="sticky top-[calc(var(--shell-h)+5.5rem)] space-y-1">
                 <p className="mb-3 text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">{filtered.length} briefs</p>
                 {filtered.map((brief, index) => <button type="button" key={brief.id} onClick={() => jumpTo(index)} className={`group flex w-full items-start gap-3 rounded-xl px-2 py-2 text-left transition-all duration-300 ${active === index ? 'bg-[var(--surface)] shadow-sm ring-1 ring-[var(--line)]' : 'opacity-55 hover:opacity-100'}`}>
                   <span className={`mt-0.5 font-mono text-[10px] font-bold ${active === index ? 'text-[var(--accent-strong)]' : 'text-[var(--muted)]'}`}>{String(index + 1).padStart(2, '0')}</span>
@@ -170,7 +171,7 @@ function BriefCard({ brief, index }) {
   const [showCheck, setShowCheck] = useState(false)
   const outlineText = brief.outline.map((beat) => [beat.time, beat.label && `${beat.label}:`, beat.text].filter(Boolean).join(' ')).join('\n')
 
-  return <article id={`brief-${brief.id}`} data-brief className="scroll-mt-44 origin-top rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70 will-change-transform">
+  return <article id={`brief-${brief.id}`} data-brief className="scroll-mt-[calc(var(--shell-h)+5.5rem)] origin-top rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70 will-change-transform">
     <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 sm:p-8">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-xs font-bold text-[var(--accent-strong)]">#{String(index + 1).padStart(2, '0')}</span>
@@ -194,7 +195,7 @@ function BriefCard({ brief, index }) {
       </div>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
-        <div className="space-y-5 lg:sticky lg:top-48 lg:self-start">
+        <div className="space-y-5 lg:sticky lg:top-[calc(var(--shell-h)+5.5rem)] lg:self-start">
           {brief.whyChosen && <section><p className="text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">Why this video</p><p className="mt-2.5 text-[15px] leading-7">{brief.whyChosen}</p></section>}
           {brief.targetSearchTerm && <section className="rounded-2xl bg-[var(--lime)]/20 p-4 ring-1 ring-[var(--lime-dark)]/20"><p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[.16em] text-[var(--accent-strong)]"><MagnifyingGlass size={12} weight="bold" />Target search</p><p className="mt-2 text-sm font-semibold leading-6">{brief.targetSearchTerm}</p></section>}
           {brief.duplicateCheck && <section className="rounded-2xl bg-[var(--paper)]">

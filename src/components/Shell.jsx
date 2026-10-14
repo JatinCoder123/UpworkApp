@@ -9,6 +9,18 @@ import GridPattern from './GridPattern'
 import { userInitials } from '../lib/auth'
 import { useAuth } from '../contexts/AuthContext'
 
+const navigationItems = [
+  ['/jobs', 'Jobs'],
+  ['/tech-news', 'AI News'],
+  ['/site-content', 'Site Content'],
+  ['/domain', 'Domain'],
+  ['/video', 'Video'],
+  ['/seo', 'SEO'],
+  ['/appscript', 'AppScript'],
+  ['/llm', 'LLM'],
+  ['/wordpress', 'Wordpress'],
+]
+
 export default function Shell({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -90,16 +102,11 @@ export default function Shell({ children }) {
       squares={[[1, 1], [4, 2], [8, 4], [12, 1], [16, 6], [20, 3], [3, 9], [10, 11], [18, 13]]}
       className="app-grid-pattern pointer-events-none fixed inset-0 z-0"
     />
-    <header className="sticky top-0 z-30 px-3 pt-3 md:px-6 md:pt-5">
+    <header className="sticky top-0 z-30 h-[var(--shell-h)] bg-[var(--paper)] px-3 pt-3 md:px-6 md:pt-5">
       <div className="mx-auto flex max-w-[1500px] items-center justify-between rounded-full bg-[var(--surface)]/90 px-3 py-2 ring-1 ring-black/5 shadow-[0_18px_60px_rgba(30,32,25,.08)] backdrop-blur-xl">
         <Link to="/jobs" className="flex items-center gap-2.5 rounded-full pr-3 text-sm font-bold tracking-[-.02em]"><Mark /><span className="hidden sm:inline">Outright Feed Portal</span></Link>
-        <nav className="hidden items-center gap-1 rounded-full bg-[var(--ink)]/[.045] p-1 lg:flex">
-          <Link to="/jobs" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/jobs') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Jobs</Link>
-          <Link to="/tech-news" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/tech-news') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>AI News</Link>
-          <Link to="/site-content" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/site-content') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Site Content</Link>
-          <Link to="/domain" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/domain') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Domain</Link>
-          <Link to="/video" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/video') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Video</Link>
-          <Link to="/seo" className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active('/seo') ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>SEO</Link>
+        <nav className="hidden items-center gap-0.5 rounded-full bg-[var(--ink)]/[.045] p-1 xl:flex">
+          {navigationItems.map(([path, label]) => <Link key={path} to={path} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active(path) ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{label}</Link>)}
         </nav>
         <div className="flex items-center gap-2">
           <div className="group relative" tabIndex={0} aria-label="Current CRM: Sales">
@@ -111,7 +118,7 @@ export default function Shell({ children }) {
             </span>
           </div>
           <ThemeToggle />
-          <div ref={menuRef} className="relative hidden lg:block">
+          <div ref={menuRef} className="relative hidden xl:block">
             <button aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)} className={`${iconButton} size-9`} aria-label="Open profile menu"><User size={17} weight="light" /></button>
             {profileOpen && <div className="absolute right-0 top-12 w-72 rounded-[1.5rem] bg-black/5 p-1.5 ring-1 ring-black/5 shadow-[0_24px_70px_rgba(30,32,25,.18)]"><div className="rounded-[calc(1.5rem-.375rem)] bg-[var(--surface)] p-3">
               <div className="flex items-center gap-3 px-2 py-3"><div className="grid size-11 place-items-center rounded-full bg-[var(--ink)] text-sm font-bold text-white">{userInitials(user?.name)}</div><div className="min-w-0"><p className="truncate text-sm font-bold">{user?.name}</p><p className="truncate text-[10px] text-[var(--muted)]">{user?.email}</p></div></div>
@@ -122,11 +129,11 @@ export default function Shell({ children }) {
               <button onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-[var(--danger)] transition-colors duration-300 hover:bg-[#f5d6cf]/50"><SignOut size={18} weight="light" />Log out</button>
             </div></div>}
           </div>
-          <button type="button" onClick={() => setMobileOpen(true)} aria-label="Open navigation menu" aria-expanded={mobileOpen} className={`${iconButton} size-9 lg:hidden`}><List size={18} weight="bold" /></button>
+          <button type="button" onClick={() => setMobileOpen(true)} aria-label="Open navigation menu" aria-expanded={mobileOpen} className={`${iconButton} size-9 xl:hidden`}><List size={18} weight="bold" /></button>
         </div>
       </div>
     </header>
-    <div ref={mobileMenuRef} className={`fixed inset-0 z-50 lg:hidden ${mobileOpen ? 'pointer-events-auto' : 'pointer-events-none'}`} aria-hidden={!mobileOpen}>
+    <div ref={mobileMenuRef} className={`fixed inset-0 z-50 xl:hidden ${mobileOpen ? 'pointer-events-auto' : 'pointer-events-none'}`} aria-hidden={!mobileOpen}>
       <button ref={mobileBackdropRef} type="button" onClick={() => setMobileOpen(false)} aria-label="Close navigation menu" className="absolute inset-0 bg-[var(--ink)]/55 backdrop-blur-sm" />
       <aside ref={mobilePanelRef} role="dialog" aria-modal="true" aria-label="Mobile navigation" className="absolute inset-y-0 right-0 flex w-[min(88vw,24rem)] flex-col overflow-y-auto bg-[var(--surface)] px-5 pb-6 pt-5 shadow-[-24px_0_70px_rgba(20,28,21,.24)] ring-1 ring-[var(--line)]">
         <div data-mobile-nav className="flex items-center justify-between">
@@ -138,7 +145,7 @@ export default function Shell({ children }) {
           <span className="grid size-10 place-items-center rounded-xl bg-[var(--lime)]/35 text-[var(--accent-strong)]"><ChartLineUp size={18} weight="duotone" /></span>
         </div>
         <nav className="mt-7 grid gap-1" aria-label="Mobile navigation links">
-          {[['/jobs', 'Jobs'], ['/tech-news', 'AI News'], ['/site-content', 'Site Content'], ['/domain', 'Domain'], ['/video', 'Video'], ['/seo', 'SEO']].map(([path, label]) => <Link data-mobile-nav key={path} to={path} onClick={(event) => navigateFromMobile(event, path)} className={`group flex items-center justify-between rounded-2xl px-4 py-4 text-base font-semibold transition-colors ${active(path) ? 'bg-[var(--lime)] !text-[#26320b]' : 'hover:bg-[var(--paper)]'}`}><span>{label}</span><ArrowLink /></Link>)}
+          {navigationItems.map(([path, label]) => <Link data-mobile-nav key={path} to={path} onClick={(event) => navigateFromMobile(event, path)} className={`group flex items-center justify-between rounded-2xl px-4 py-4 text-base font-semibold transition-colors ${active(path) ? 'bg-[var(--lime)] !text-[#26320b]' : 'hover:bg-[var(--paper)]'}`}><span>{label}</span><ArrowLink /></Link>)}
         </nav>
         <div className="mt-auto border-t border-[var(--line)] pt-5">
           <div data-mobile-nav className="mb-3 flex items-center gap-3 px-2"><div className="grid size-10 place-items-center rounded-xl bg-[var(--ink)] text-xs font-bold text-white">{userInitials(user?.name)}</div><div className="min-w-0"><p className="truncate text-sm font-bold">{user?.name}</p><p className="truncate text-[10px] text-[var(--muted)]">{user?.email}</p></div></div>

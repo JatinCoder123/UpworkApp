@@ -12,6 +12,7 @@ import Video from './pages/Video'
 import SiteContent from './pages/SiteContent'
 import Seo from './pages/Seo'
 import Domain from './pages/Domain'
+import ComingSoon from './pages/ComingSoon'
 import NotFound from './pages/NotFound'
 import SessionLoader from './components/SessionLoader'
 import LoginIntro from './components/LoginIntro'
@@ -51,6 +52,9 @@ export default function App() {
       <Route path="/domain" element={<ProtectedRoute><Domain /></ProtectedRoute>} />
       <Route path="/video" element={<ProtectedRoute><Video /></ProtectedRoute>} />
       <Route path="/seo" element={<ProtectedRoute><Seo /></ProtectedRoute>} />
+      <Route path="/appscript" element={<ProtectedRoute><ComingSoon title="AppScript" subtitle="automation incoming." description="The AppScript workspace is being prepared for automation workflows and integrations." type="appscript" /></ProtectedRoute>} />
+      <Route path="/llm" element={<ProtectedRoute><ComingSoon title="LLM" subtitle="intelligence incoming." description="The LLM workspace is being prepared for model tools, prompts, and experiments." type="llm" /></ProtectedRoute>} />
+      <Route path="/wordpress" element={<ProtectedRoute><ComingSoon title="Wordpress" subtitle="publishing incoming." description="The Wordpress workspace is being prepared for publishing and site management workflows." type="wordpress" /></ProtectedRoute>} />
       <Route path="/technews" element={<Navigate to="/tech-news" replace />} />
       <Route path="/news" element={<Navigate to="/tech-news" replace />} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

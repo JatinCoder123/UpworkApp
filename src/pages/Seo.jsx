@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowUpRight, BookmarkSimple, Clock, MagnifyingGlass, Newspaper, TrendUp, X } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
+import HScroll from '../components/HScroll'
 
 const topics = ['All', 'AI Search', 'Technical SEO', 'Content', 'Data & Studies']
 
@@ -141,9 +142,9 @@ export default function Seo() {
           </label>
         </header>
 
-        <nav className="mt-10 flex gap-1 overflow-x-auto border-y border-[var(--line)] py-3" aria-label="SEO article topics">
+        <nav className="mt-10 border-y border-[var(--line)] py-3" aria-label="SEO article topics"><HScroll innerClassName="gap-1" fade="var(--paper)" label="topics">
           {topics.map((item) => <button type="button" key={item} onClick={() => setTopic(item)} className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-bold transition-all ${topic === item ? 'bg-[var(--ink)] text-white' : 'text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]'}`}>{item}</button>)}
-        </nav>
+        </HScroll></nav>
 
         {!search && topic === 'All' && <section className="mt-8 grid overflow-hidden rounded-[2rem] bg-[var(--ink)] text-white shadow-[0_28px_80px_rgba(25,35,27,.18)] lg:grid-cols-[1.1fr_.9fr]">
           <a href={featured.url} target="_blank" rel="noopener noreferrer" className="group relative min-h-72 overflow-hidden sm:min-h-96 lg:min-h-[31rem]">

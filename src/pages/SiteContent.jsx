@@ -5,7 +5,8 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { ArrowSquareOut, ArrowsClockwise, Check, CheckCircle, Copy, Fire, Globe, Key, LinkSimple, MagnifyingGlass, Newspaper, Quotes, Target, X } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import LogoLoader from '../components/LogoLoader'
-import { Modal, primaryButton } from '../components/ui'
+import HScroll from '../components/HScroll'
+import { Modal, primaryButton, stickyBand } from '../components/ui'
 import { api } from '../services/api'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -125,14 +126,14 @@ export default function SiteContent() {
         </dl>
       </header>
 
-      {sites.length > 0 && <div data-hero-fade className="mt-10 flex gap-2 overflow-x-auto pb-1">
+      {sites.length > 0 && <HScroll data-hero-fade className="mt-10" innerClassName="gap-2 py-1" fade="var(--paper)" label="sites">
         <SiteTab active={site === 'All'} onClick={() => setSite('All')} label="All sites" count={items.length} />
         {sites.map(([name, count]) => <SiteTab key={name} active={site === name} onClick={() => setSite(name)} label={name} count={count} mark={<SiteMark site={name} size="size-7" />} />)}
-      </div>}
+      </HScroll>}
 
-      <div className="sticky top-[5.25rem] z-20 mt-4 md:top-24">
-        <div className="flex flex-col gap-2 rounded-[1.6rem] bg-[var(--surface)]/90 p-2 ring-1 ring-[var(--line)]/70 shadow-[0_18px_50px_rgba(30,32,25,.08)] backdrop-blur-xl lg:flex-row lg:items-center">
-          <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">{categories.map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-bold transition-all duration-300 ${category === item ? 'bg-[var(--lime)] !text-[#26320b] shadow-sm' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{item}</button>)}</div>
+      <div className={`${stickyBand} mt-4`}>
+        <div className="flex flex-col gap-2 rounded-[1.6rem] bg-[var(--surface)] p-2 ring-1 ring-[var(--line)]/70 shadow-[0_18px_50px_rgba(30,32,25,.08)] lg:flex-row lg:items-center">
+          <HScroll className="flex-1" innerClassName="gap-1" label="categories">{categories.map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-bold transition-all duration-300 ${category === item ? 'bg-[var(--lime)] !text-[#26320b] shadow-sm' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{item}</button>)}</HScroll>
           <div className="flex flex-wrap items-center gap-2">
             <Toggle active={urgentOnly} onClick={() => setUrgentOnly((value) => !value)} icon={Fire}>Hurry up</Toggle>
             <Toggle active={hideDone} onClick={() => setHideDone((value) => !value)} icon={CheckCircle}>Hide done</Toggle>
@@ -149,8 +150,8 @@ export default function SiteContent() {
       {isLoading ? <LogoLoader className="min-h-[40dvh]" label="Loading site content" />
         : isError ? <section className="py-24 text-center"><span className="mx-auto grid size-14 place-items-center rounded-2xl bg-[var(--bad-bg)] text-[var(--bad)]"><Newspaper size={22} /></span><h3 className="mt-5 text-xl font-semibold">Could not load site content</h3><p className="mt-2 text-sm text-[var(--muted)]">{error?.message}</p><button type="button" onClick={() => refetch()} className={`${primaryButton} mt-6`}>Try again</button></section>
           : filtered.length ? <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,.95fr)_minmax(0,1.05fr)]">
-            <ol className="space-y-3">{filtered.map((item) => <li key={item.id} id={`idea-${item.id}`} data-idea className="scroll-mt-48"><IdeaCard item={item} selected={desktop && selected?.id === item.id} onSelect={() => select(item.id)} /></li>)}</ol>
-            {desktop && selected && <div className="sticky top-48 self-start"><IdeaDetail key={selected.id} item={selected} /></div>}
+            <ol className="space-y-3">{filtered.map((item) => <li key={item.id} id={`idea-${item.id}`} data-idea className="scroll-mt-[calc(var(--shell-h)+6rem)]"><IdeaCard item={item} selected={desktop && selected?.id === item.id} onSelect={() => select(item.id)} /></li>)}</ol>
+            {desktop && selected && <div className="sticky top-[calc(var(--shell-h)+5.5rem)] self-start"><IdeaDetail key={selected.id} item={selected} /></div>}
           </div>
             : <div className="py-24 text-center"><span className="mx-auto grid size-14 place-items-center rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]"><Newspaper size={22} /></span><h3 className="mt-5 text-xl font-semibold">No ideas match</h3><p className="mt-2 text-sm text-[var(--muted)]">Try another site, category or search phrase.</p></div>}
       {!desktop && mobileOpen && selected && <Modal wide onClose={() => setMobileOpen(false)}><IdeaDetail item={selected} onClose={() => setMobileOpen(false)} bare /></Modal>}

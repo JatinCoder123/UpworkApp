@@ -289,10 +289,20 @@ export async function findGatewayUserIdByEmail(email) {
   }
 }
 
-export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEmail, allJobs = false } = {}) {
+// Fields the gateway searches when the user types in the jobs search box.
+const JOB_SEARCH_FIELDS = ["name", "job_title", "description", "skills", "matched_skills", "explain_job", "pitch", "category"];
+
+export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEmail, allJobs = false, search = "", status = "" } = {}) {
   const assignedUserId = allJobs ? null : await findGatewayUserIdByEmail(userEmail);
-  const query = { action: "fetch", module: JOBS_MODULE, page, per_page: perPage };
-  if (assignedUserId) query.filters = { assigned_user_id: assignedUserId };
+  const query = { action: "fetch", module: JOBS_MODULE, order_by: "date_entered", order_dir: "DESC", page, per_page: perPage };
+  const filters = { ai_processed: 1 };
+  if (assignedUserId) filters.assigned_user_id = assignedUserId;
+  if (status) filters.status = status;
+  if (Object.keys(filters).length) query.filters = filters;
+  if (search.trim()) {
+    query.search = search.trim();
+    query.search_fields = JOB_SEARCH_FIELDS;
+  }
   const payload = addGatewayDateFilter(query, dateFilter);
   const data = await smartGateway(payload);
   const records = (data.records || []).map(mapGatewayJob);
@@ -309,13 +319,13 @@ export async function fetchJobStats({ dateFilter, userEmail } = {}) {
   const assignedUserId = await findGatewayUserIdByEmail(userEmail);
   const statuses = ["New", "Seen", "Applied", "Rejected"];
   const queries = [
-    { key: "my_total", module: JOBS_MODULE, filters: { assigned_user_id: assignedUserId } },
-    { key: "all_total", module: JOBS_MODULE, filters: {} },
+    { key: "my_total", module: JOBS_MODULE, filters: { ai_processed: 1, assigned_user_id: assignedUserId } },
+    { key: "all_total", module: JOBS_MODULE, filters: { ai_processed: 1 } },
     ...statuses.flatMap((status) => {
       const statusKey = status.toLowerCase();
       return [
-        { key: `my_${statusKey}`, module: JOBS_MODULE, filters: { assigned_user_id: assignedUserId, status } },
-        { key: `all_${statusKey}`, module: JOBS_MODULE, filters: { status } },
+        { key: `my_${statusKey}`, module: JOBS_MODULE, filters: { ai_processed: 1, assigned_user_id: assignedUserId, status } },
+        { key: `all_${statusKey}`, module: JOBS_MODULE, filters: { ai_processed: 1, status } },
       ];
     }),
   ];

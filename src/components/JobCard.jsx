@@ -1,57 +1,81 @@
 import { Link } from 'react-router-dom'
-import { ArrowUpRight, Clock } from '@phosphor-icons/react'
+import { ArrowUpRight, Briefcase, CalendarBlank, Clock, Heart, Hourglass, MapPin, SealCheck, Star, Target } from '@phosphor-icons/react'
 import { StatusPill } from './ui'
 import { scoreJob } from '../lib/scoring'
-import { timeAgo, useNow } from '../lib/time'
+import { timeAgo } from '../lib/time'
+import { skillStyle } from '../lib/jobSignals'
 
-export default function JobCard({ job, layout = 'grid' }) {
-  const now = useNow()
-  const fit = scoreJob(job)
-  const postedAgo = timeAgo(job.postedAt, now) || job.posted
+function matchTone(score) {
+  if (score >= 75) return 'var(--lime-dark)'
+  if (score >= 55) return '#d9a53a'
+  return 'var(--danger)'
+}
+
+function Fact({ icon: Icon, children }) {
+  if (!children) return null
+  return <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]"><Icon size={13} weight="bold" className="shrink-0 opacity-70" />{children}</span>
+}
+
+function ReactionButton({ active, onClick, label, children }) {
+  return <button type="button" onClick={onClick} aria-pressed={active} aria-label={label} title={label} className={`grid size-9 place-items-center rounded-full ring-1 transition-all duration-300 active:scale-90 ${active ? 'bg-[var(--ink)] text-white ring-[var(--ink)]' : 'bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}>{children}</button>
+}
+
+export default function JobCard({ job, index, now, liked, favorite, onLike, onFavorite }) {
+  const fit = job.match > 0 ? null : scoreJob(job)
+  const score = fit ? fit.score : job.match
+  const matchLabel = fit ? fit.verdict : job.fitLabel
   const skills = job.skills?.length ? job.skills : job.tags
-  const visibleSkills = skills.slice(0, 2)
-  const remainingSkills = Math.max(0, skills.length - visibleSkills.length)
+  const visibleSkills = skills.slice(0, 5)
+  const client = job.clientStats
   const isNew = job.status === 'New'
-  const compact = layout === 'compact'
-  const list = layout === 'list'
+  const summary = job.summary || job.description
 
-  return <article data-card className={`group relative rounded-[1.6rem] p-1 transition-all duration-500 hover:z-30 hover:-translate-y-0.5 ${isNew ? 'bg-[var(--new-border)] shadow-[0_14px_42px_var(--new-shadow)]' : 'bg-[var(--frame)] ring-1 ring-[var(--line)]/60'}`}>
-    {isNew && <span className="absolute left-0 top-8 z-10 h-10 w-1 rounded-r-full bg-[var(--accent)]" />}
-    <Link to={`/jobs/${job.id}`} className={`relative block h-full rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] ${list ? 'p-4 sm:grid sm:grid-cols-[minmax(0,1.65fr)_minmax(13rem,.7fr)_auto] sm:items-center sm:gap-7 sm:p-5' : compact ? 'p-4' : 'p-5 sm:p-6'}`}>
-      <div className={list ? 'min-w-0' : ''}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className={`${compact ? 'size-9 rounded-xl' : 'size-11 rounded-2xl'} relative shrink-0 overflow-hidden bg-[var(--ink)] text-white`}>
-              <img src={job.image} className="size-full object-cover opacity-70 transition-transform duration-700 group-hover:scale-110" alt="" />
-              <span className="absolute inset-0 grid place-items-center text-[10px] font-bold">{job.client}</span>
-            </div>
-            <div className="min-w-0"><p className="truncate text-xs font-bold">{job.company}</p><p className="mt-1 flex items-center gap-1.5 truncate text-[10px] text-[var(--muted)]"><span className="truncate">{job.location}</span><span aria-hidden="true">·</span><time dateTime={job.postedAt} title={job.posted} className="inline-flex shrink-0 items-center gap-1 font-semibold text-[var(--accent-strong)]"><Clock size={11} weight="bold" />{postedAgo}</time></p></div>
-          </div>
-          {!list && <StatusPill status={job.status} />}
+  return <article id={`job-${job.id}`} data-card data-job-id={job.id} className="group relative scroll-mt-[calc(var(--shell-h)+1rem)] rounded-[1.6rem] bg-[var(--frame)] p-1 ring-1 ring-[var(--line)]/60 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(30,40,25,.1)]">
+    <span aria-hidden="true" className="absolute inset-y-6 left-0 w-1 rounded-r-full" style={{ background: matchTone(score) }} />
+    <div className="grid overflow-hidden rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] md:grid-cols-[minmax(0,1fr)_16.5rem]">
+      <Link to={`/jobs/${job.id}`} className="block min-w-0 p-5 sm:p-6">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {index != null && <span className="font-mono text-[11px] font-bold text-[var(--muted)]">{String(index + 1).padStart(2, '0')}</span>}
+          <StatusPill status={job.status} />
+          {isNew && <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--accent)] opacity-60" /><span className="relative size-2 rounded-full bg-[var(--accent)]" /></span>}
+          <time dateTime={job.postedAt} title={job.posted} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-strong)]"><Clock size={12} weight="bold" />{timeAgo(job.postedAt, now) || job.posted}</time>
+          <span className="truncate text-[11px] font-medium text-[var(--muted)]">{job.jobId}</span>
         </div>
-        <h3 className={`${compact ? 'mt-5 text-sm sm:text-[.9375rem]' : list ? 'mt-4 text-base sm:text-[1.0625rem]' : 'mt-7 text-lg sm:text-xl'} font-semibold leading-[1.3] tracking-[-.025em] transition-colors duration-300 group-hover:text-[var(--accent-strong)]`}>{job.title}</h3>
-        <div className={`${compact ? 'mt-3' : 'mt-4'} flex flex-wrap items-center gap-2`}>
-          {visibleSkills.map((skill) => <span key={skill} className="max-w-36 truncate rounded-full bg-[var(--paper)] px-3 py-1.5 text-[10px] font-medium text-[var(--muted)]">{skill}</span>)}
-          {remainingSkills > 0 && <span className="group/skills relative z-20">
-            <span aria-label={`${remainingSkills} more skills`} className="grid h-6 min-w-7 place-items-center rounded-full bg-[var(--lime)]/35 px-2 text-[9px] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/25 transition-all duration-300 group-hover/skills:bg-[var(--lime)] group-hover/skills:text-[#26320b]">+{remainingSkills}</span>
-            <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 mb-3 w-56 -translate-x-1/2 translate-y-2 rounded-2xl bg-[var(--ink)] p-2 text-white opacity-0 shadow-[0_22px_55px_rgba(20,28,21,.28)] ring-1 ring-white/10 transition-all duration-300 group-hover/skills:translate-y-0 group-hover/skills:opacity-100">
-              <span className="block rounded-xl bg-white/[.06] px-3 py-2.5">
-                <span className="block text-[8px] font-bold uppercase tracking-[.18em] text-white/45">All skills</span>
-                <span className="mt-2 flex flex-wrap gap-1.5">{skills.map((skill) => <span key={skill} className="rounded-full bg-white/10 px-2.5 py-1 text-[9px] font-medium text-white/80">{skill}</span>)}</span>
-              </span>
-              <span className="absolute -bottom-1 left-1/2 size-2 -translate-x-1/2 rotate-45 bg-[var(--ink)]" />
-            </span>
-          </span>}
+        <h3 className="mt-3 text-lg font-semibold leading-snug tracking-[-.025em] transition-colors duration-300 group-hover:text-[var(--accent-strong)] sm:text-[1.2rem]">{job.title}</h3>
+        {summary && <p className="mt-2 line-clamp-2 max-w-3xl text-[13px] leading-6 text-[var(--muted)]">{summary}</p>}
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+          <span className="rounded-lg bg-[var(--price-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--price-text)] ring-1 ring-[var(--price-line)]">{job.budget}</span>
+          <Fact icon={Briefcase}>{job.level !== 'Not specified' && job.level}</Fact>
+          <Fact icon={CalendarBlank}>{job.duration !== 'Duration not set' && job.duration}</Fact>
+          <Fact icon={Hourglass}>{job.workload}</Fact>
         </div>
-      </div>
-      <div className={`${list ? '' : compact ? 'mt-5' : 'mt-8 border-t border-[var(--line)]/70 pt-5'} flex items-end justify-between gap-4`}>
-        <div className="rounded-xl bg-[var(--price-bg)] px-3 py-2 ring-1 ring-[var(--price-line)]"><p className={`${compact ? 'text-sm' : 'text-lg'} font-semibold tracking-[-.03em] text-[var(--price-text)]`}>{job.budget}</p><p className="mt-0.5 text-[9px] text-[var(--price-muted)]">{job.type} · {job.level}</p></div>
-        {list && <StatusPill status={job.status} />}
-      </div>
-      <div className={`${list ? 'mt-4 sm:mt-0' : compact ? 'mt-4 border-t border-[var(--line)]/60 pt-3' : 'absolute bottom-5 right-5'} flex items-center justify-between gap-3`}>
-        <span className={list ? 'text-right' : ''}><span className="block text-[10px] font-bold text-[var(--accent-strong)]">{fit.score}% match</span>{!compact && <span className="mt-0.5 block text-[8px] text-[var(--muted)]">{fit.verdict}</span>}</span>
-        <span className={`${compact ? 'size-8' : 'size-9'} grid place-items-center rounded-full bg-[var(--ink)] text-white transition-transform duration-500 group-hover:rotate-12`}><ArrowUpRight size={14} weight="light" /></span>
-      </div>
-    </Link>
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {visibleSkills.map((skill) => <span key={skill} style={skillStyle(skill)} className="skill-chip max-w-44 truncate rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}
+          {skills.length > visibleSkills.length && <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)]">+{skills.length - visibleSkills.length}</span>}
+        </div>
+      </Link>
+
+      <aside className="flex flex-col gap-4 border-t border-[var(--line)]/70 bg-[var(--paper)]/45 p-5 md:border-l md:border-t-0">
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">About the client</p>
+          <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold"><MapPin size={14} weight="bold" className="text-[var(--muted)]" />{client.country || 'Location not shared'}</p>
+          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--muted)]">
+            {client.rating != null ? <><Star size={13} weight="fill" className="text-[#e6a817]" /><span className="font-semibold text-[var(--text)]">{client.rating.toFixed(1)}</span>{client.reviews != null && <span>({client.reviews} reviews)</span>}</> : 'No reviews yet'}
+          </p>
+          <p className="mt-1.5 text-xs text-[var(--muted)]">{[client.hires != null && `${client.hires} hires`, client.proposals != null && `${client.proposals} proposals`].filter(Boolean).join(' · ')}</p>
+          <p className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${client.paymentVerified ? 'bg-[var(--ok-bg)] text-[var(--ok)]' : 'bg-[var(--bad-bg)] text-[var(--bad)]'}`}><SealCheck size={11} weight="fill" />{client.paymentVerified ? 'Payment verified' : 'Payment unverified'}</p>
+        </div>
+        <div>
+          <div className="flex items-center justify-between text-[11px] font-bold"><span className="flex items-center gap-1 text-[var(--muted)]"><Target size={12} weight="bold" />{job.match > 0 ? 'AI match' : 'Fit'}</span><span>{score}%</span></div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-black/[.07] dark:bg-white/10"><div className="h-full rounded-full" style={{ width: `${score}%`, background: matchTone(score) }} /></div>
+          {matchLabel && <p className="mt-1.5 line-clamp-1 text-[11px] text-[var(--muted)]" title={matchLabel}>{matchLabel}</p>}
+        </div>
+        <div className="mt-auto flex items-center gap-2">
+          <ReactionButton active={liked} onClick={onLike} label={liked ? 'Unlike job' : 'Like job'}><Heart size={15} weight={liked ? 'fill' : 'bold'} /></ReactionButton>
+          <ReactionButton active={favorite} onClick={onFavorite} label={favorite ? 'Remove from favorites' : 'Add to favorites'}><Star size={15} weight={favorite ? 'fill' : 'bold'} /></ReactionButton>
+          <Link to={`/jobs/${job.id}`} aria-label={`Open ${job.title}`} className="ml-auto grid size-9 place-items-center rounded-full bg-[var(--ink)] text-white transition-transform duration-500 group-hover:rotate-12"><ArrowUpRight size={15} /></Link>
+        </div>
+      </aside>
+    </div>
   </article>
 }

@@ -83,7 +83,7 @@ export default function Login() {
           >
             AI-Powered
             <br />
-            <span className="font-serif italic text-[var(--lime)]">Platform</span>
+            <span className="font-serif italic text-[var(--lime)]">LiveFeeds</span>
           </h1>
 
           <ul

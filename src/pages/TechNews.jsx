@@ -16,6 +16,7 @@ import CategoryFilterDialog from '../components/CategoryFilterDialog'
 import DateTimeRangeFilter from '../components/DateTimeRangeFilter'
 import { ActiveDateFilterChip, RefreshFilterButton } from '../components/FilterToolbarControls'
 import LogoLoader from '../components/LogoLoader'
+import HScroll from '../components/HScroll'
 import { iconButton } from '../components/ui'
 import { api } from '../services/api'
 import {
@@ -327,7 +328,7 @@ export default function TechNews() {
             {/* Top Row: Source Types (Left) + Search & Filter (Right) */}
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
               {/* Source Type Tabs in rounded-full pill container (multi-select, "All" inside filter) */}
-              <div className="flex gap-1 overflow-x-auto rounded-full bg-[var(--paper)] p-1 scrollbar-none">
+              <HScroll className="rounded-full bg-[var(--paper)] p-1" innerClassName="gap-1" fade="var(--paper)" label="source types">
                 {SOURCE_TYPE_TABS.map((item) => {
                   const isSelected = selectedSourceTypes.includes(item)
                   const count = sourceTypeCounts[item] || 0
@@ -364,7 +365,7 @@ export default function TechNews() {
                     </button>
                   )
                 })}
-              </div>
+              </HScroll>
 
               {/* Layout Toggle + Search Bar + Filter Button (Matching Opportunity Desk) */}
               <div className="flex items-center gap-2.5 shrink-0">
@@ -442,7 +443,7 @@ export default function TechNews() {
                 label="Refresh news feed"
               />
 
-              <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
+              <HScroll className="flex-1" innerClassName="gap-2" label="categories">
                 {SCREEN_CATEGORIES.map((cat) => {
                   const isSelected = selectedCategories.includes(cat)
 
@@ -476,7 +477,7 @@ export default function TechNews() {
                 >
                   + More categories
                 </button>
-              </div>
+              </HScroll>
 
               <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} className="ml-auto" />
               {(refinementFilterCount > 0 || dateFilter.preset !== 'all' || search) && (

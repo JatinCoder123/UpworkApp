@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import gsap from 'gsap'
 import { X } from '@phosphor-icons/react'
 
 export const iconButton = 'grid size-10 shrink-0 place-items-center rounded-full bg-[var(--ink)]/5 text-[var(--ink)] transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] hover:scale-105 hover:bg-[var(--ink)] hover:text-white active:scale-95'
+// Page-level sticky bar that docks under the Shell header. The solid band hides content scrolling beneath it.
+export const stickyBand = 'sticky top-[var(--shell-h)] z-20 -mx-4 bg-[var(--paper)] px-4 pb-3 pt-1 sm:-mx-6 sm:px-6 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-gradient-to-b after:from-[var(--paper)] after:to-transparent'
 export const primaryButton = 'group inline-flex items-center justify-center gap-3 rounded-full bg-[var(--ink)] py-2 pl-5 pr-2 text-sm font-semibold text-white transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-0.5 active:scale-[.98] disabled:pointer-events-none disabled:opacity-50'
 
 export function Mark() {
@@ -35,7 +38,10 @@ export function Modal({ children, onClose, wide = false }) {
     document.body.style.overflow = 'hidden'
     return () => { tween.kill(); document.removeEventListener('keydown', closeOnEscape); document.body.style.overflow = '' }
   }, [])
-  return <div role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()} className="fixed inset-0 z-40 grid place-items-end bg-[var(--ink)]/55 p-2 backdrop-blur-md sm:place-items-center sm:p-5"><div ref={panel} role="dialog" aria-modal="true" className={`max-h-[92dvh] w-full overflow-y-auto rounded-[2rem] bg-black/10 p-1.5 ring-1 ring-white/15 ${wide ? 'max-w-3xl' : 'max-w-xl'}`}><div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 shadow-[0_40px_100px_rgba(0,0,0,.25)] sm:p-8">{children}</div></div></div>
+  return createPortal(
+    <div role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()} className="fixed inset-0 z-[100] grid place-items-end bg-[var(--ink)]/55 p-2 backdrop-blur-md sm:place-items-center sm:p-5"><div ref={panel} role="dialog" aria-modal="true" className={`max-h-[92dvh] w-full overflow-y-auto rounded-[2rem] bg-black/10 p-1.5 ring-1 ring-white/15 ${wide ? 'max-w-3xl' : 'max-w-xl'}`}><div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 shadow-[0_40px_100px_rgba(0,0,0,.25)] sm:p-8">{children}</div></div></div>,
+    document.body,
+  )
 }
 
 export function DialogHeader({ eyebrow, title, onClose }) {
