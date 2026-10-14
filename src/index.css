@@ -118,7 +118,20 @@ button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
 .upwork-apply-button:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lime-dark) 60%, transparent), 0 12px 30px color-mix(in srgb, var(--lime-dark) 32%, transparent); }
 .upwork-apply-button:hover::before { translate: 520% 0; }
 .upwork-apply-button:active, .upwork-view-button:active { transform: translateY(0) scale(.98); }
-h1[data-detail] { max-width: 56rem; font-size: clamp(2rem, 3.6vw, 3.75rem); line-height: 1.02; letter-spacing: -.045em; }
+.job-detail-title { max-width: 52rem; font-size: clamp(1.75rem, 2.9vw, 2.9rem); font-weight: 600; line-height: 1.1; letter-spacing: -.035em; text-wrap: balance; overflow-wrap: anywhere; }
+.live-radar { position: relative; display: grid; width: 8rem; height: 8rem; place-items: center; }
+.live-radar span { position: absolute; inset: 0; border: 1px solid color-mix(in srgb, var(--lime-dark) 55%, transparent); border-radius: 999px; animation: live-radar-ping 2.4s cubic-bezier(.2,.6,.35,1) infinite; }
+.live-radar span:nth-child(2) { animation-delay: .8s; }
+.live-radar span:nth-child(3) { animation-delay: 1.6s; }
+.live-radar i { position: absolute; inset: .9rem; border-radius: 999px; background: conic-gradient(from 0deg, color-mix(in srgb, var(--lime) 55%, transparent), transparent 28%); animation: session-loader-orbit 1.6s linear infinite; }
+.live-radar::after { content: ''; position: absolute; width: 3.4rem; height: 3.4rem; border-radius: 999px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.live-progress { transform-origin: left; animation: live-progress 5.2s cubic-bezier(.45,.05,.35,1) forwards; }
+.marquee-mask { mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent); }
+.marquee-track { animation: marquee 48s linear infinite; }
+.marquee-mask:hover .marquee-track { animation-play-state: paused; }
+@keyframes marquee { to { translate: -50% 0; } }
+@keyframes live-radar-ping { from { scale: .35; opacity: 1; } to { scale: 1; opacity: 0; } }
+@keyframes live-progress { from { scale: 0 1; } to { scale: 1 1; } }
 @keyframes session-loader-orbit { to { rotate: 360deg; } }
 @keyframes session-loader-breathe { 0%, 100% { scale: .92; opacity: .45; } 50% { scale: 1; opacity: 1; } }
 @keyframes session-loader-progress { from { translate: -105% 0; } to { translate: 205% 0; } }

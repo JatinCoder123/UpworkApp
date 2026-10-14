@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { ArrowClockwise, Brain, ClockCounterClockwise, GameController, Globe, Info, MagnifyingGlass, Plus, ShieldCheck, Star, Warning } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import SearchConsole from '../components/domain/SearchConsole'
 import SavedDrawer from '../components/domain/SavedDrawer'
 import { DirectResult, SuggestionCard } from '../components/domain/DomainCards'
 import { NamingLab, ScreeningBanner, WhileYouWait } from '../components/domain/NamingLab'
-import { useAuth } from '../contexts/AuthContext'
 import {
   BATCH_SIZE, DEFAULT_TLDS, MAX_SUGGESTIONS, analyzeDomains, applyMozToChecks, checkDomainAvailability, checkNameSiloDomain,
   collectAvailableSuggestions, crmBeginSearch, crmRecordCopy, crmSaveDomainResult, crmSaveMoz, crmSearchResults, crmSetFavorite,
-  crmUpdateSearch, detectInputMode, domainLabel, domainTld, integrations, isAbortError, makeId, normalizeDomain, normalizeTlds,
-  oneYearPricePlan, requestMozMetrics, visitorKeyFor,
+  crmUpdateSearch, detectInputMode, domainLabel, domainTld, getDomainConfig, isAbortError, makeId, normalizeDomain, normalizeTlds,
+  oneYearPricePlan, requestMozMetrics,
 } from '../services/domainApi'
 
 const EMPTY_LAB = { round: 0, step: 0, candidates: [] }
@@ -54,8 +54,10 @@ function readSessionKey() {
 }
 
 export default function Domain() {
-  const { user } = useAuth()
-  const visitorKey = useMemo(() => visitorKeyFor(user), [user])
+  const { data: domainConfig, isError: configFailed, error: configError, refetch: retryConfig } = useQuery({ queryKey: ['domain-config'], queryFn: getDomainConfig, staleTime: Infinity, retry: 1 })
+  const integrations = useMemo(() => domainConfig?.integrations || {}, [domainConfig])
+  const batchSize = domainConfig?.batchSize || BATCH_SIZE
+  const maxSuggestions = domainConfig?.maxSuggestions || MAX_SUGGESTIONS
   const [sessionKey] = useState(readSessionKey)
   const [input, setInput] = useState('')
   const [mode, setMode] = useState('auto')
@@ -98,14 +100,14 @@ export default function Domain() {
       .then(task)
       .then(() => setCrmStatus('Saved to CRM'))
       .catch((crmError) => setCrmStatus(`CRM sync pending: ${crmError.message}`))
-  }, [])
+  }, [integrations.crm])
 
   const ensureSearch = useCallback(async (crm, ctx) => {
     if (!crm.searchId) {
-      crm.searchId = await crmBeginSearch({ visitorKey, sessionKey, requestKey: crm.requestKey, inputText: ctx.inputText, selectedMode: ctx.selectedMode, detectedMode: ctx.detectedMode, sourceDomain: ctx.sourceDomain, tlds: ctx.tlds })
+      crm.searchId = await crmBeginSearch({ sessionKey, requestKey: crm.requestKey, inputText: ctx.inputText, selectedMode: ctx.selectedMode, detectedMode: ctx.detectedMode, sourceDomain: ctx.sourceDomain, tlds: ctx.tlds })
     }
     return crm.searchId
-  }, [visitorKey, sessionKey])
+  }, [sessionKey])
 
   const updateResult = (domain, patch) => setResults((current) => current.map((item) => (item.domain === domain ? { ...item, ...patch } : item)))
 
@@ -148,7 +150,7 @@ export default function Domain() {
         sourceDomain: ctx.sourceDomain,
         brief: ctx.brief,
         tlds: ctx.tlds,
-        targetCount: BATCH_SIZE,
+        targetCount: batchSize,
         excludedDomains: resultsRef.current.map((item) => item.domain),
         signal,
         onEvent: (event) => { if (!stale()) setLab((current) => labReducer(current, event)) },
@@ -239,12 +241,16 @@ export default function Domain() {
     if (integrations.foundry) runBatch(ctx, 1)
     else {
       setPhase('idle')
-      setNotice('Add VITE_FOUNDRY_RESPONSES_URL and VITE_FOUNDRY_API_KEY to .env to get AI alternatives.')
+      setNotice('AI alternatives are not configured on the server yet.')
     }
   }
 
   const startSearch = (raw = input) => {
     const text = String(raw).trim()
+    if (!domainConfig) {
+      setError(configFailed ? 'The domain service is unavailable. Retry loading it first.' : 'The domain service is still loading. Try again in a moment.')
+      return
+    }
     const detectedMode = mode === 'auto' ? detectInputMode(text) : mode
     if (!text || (detectedMode === 'prompt' && text.length < 3)) {
       setError(detectedMode === 'prompt' ? 'Describe your business or idea in at least 3 characters.' : 'Enter a domain name or describe your business.')
@@ -319,7 +325,7 @@ export default function Domain() {
   const loadMoz = async (item) => {
     setMozBusy((current) => new Set(current).add(item.domain))
     try {
-      const moz = await requestMozMetrics(item.domain)
+      const moz = await requestMozMetrics(item.domain).catch((mozError) => ({ spam_score: null, domain_authority: null, page_authority: null, linking_root_domains: null, error: mozError.message }))
       setResults((current) => current.map((result) => (result.domain === item.domain ? { ...result, moz, checks: applyMozToChecks(result.checks, moz) } : result)))
       setDirect((current) => (current?.domain === item.domain ? { ...current, moz } : current))
       if (integrations.crm && item.crm_result_id && !moz.error) crmSaveMoz(item.crm_result_id, moz).catch(() => {})
@@ -388,11 +394,11 @@ export default function Domain() {
     <WhileYouWait onCheckName={(label) => { setInput(label); setMode('auto'); inputRef.current?.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
   </>
   const missingKeys = [
-    !integrations.godaddy && 'VITE_GODADDY_PAT — live pricing (falling back to the public registry for availability)',
-    !integrations.foundry && 'VITE_FOUNDRY_API_KEY — AI name suggestions and screening',
-    !integrations.crm && 'VITE_DOMAIN_CRM_GATEWAY_SECRET — saved history and favorites',
-    !integrations.namesilo && 'VITE_NAMESILO_API_KEY — NameSilo price comparison',
-    !integrations.moz && 'VITE_MOZ_ACCESS_ID / VITE_MOZ_SECRET_KEY — Moz metrics',
+    !integrations.godaddy && 'GoDaddy — live pricing (falling back to the public registry for availability)',
+    !integrations.foundry && 'Azure AI Foundry — AI name suggestions and screening',
+    !integrations.crm && 'CRM gateway — saved history and favorites',
+    !integrations.namesilo && 'NameSilo — price comparison',
+    !integrations.moz && 'Moz — domain metrics',
   ].filter(Boolean)
 
   return (
@@ -410,8 +416,9 @@ export default function Domain() {
           </div>
         </header>
 
-        {import.meta.env.DEV && missingKeys.length > 0 && <details className="mt-6 rounded-2xl bg-[var(--warn-bg)] px-4 py-3 text-xs text-[var(--warn)]">
-          <summary className="cursor-pointer font-bold"><Warning size={14} weight="bold" className="mr-1.5 inline" />{missingKeys.length} integration {missingKeys.length === 1 ? 'key is' : 'keys are'} missing from .env (dev-only notice)</summary>
+        {configFailed && <div role="alert" className="mt-6 flex items-start gap-3 rounded-2xl bg-[var(--bad-bg)] px-4 py-3.5 text-sm font-semibold text-[var(--bad)]"><Warning size={18} weight="bold" className="mt-0.5 shrink-0" /><span className="flex-1">Could not load the domain service. {configError?.message}</span><button type="button" onClick={() => retryConfig()} className="inline-flex shrink-0 items-center gap-1 text-xs font-bold underline-offset-2 hover:underline"><ArrowClockwise size={13} weight="bold" />Retry</button></div>}
+        {import.meta.env.DEV && domainConfig && missingKeys.length > 0 && <details className="mt-6 rounded-2xl bg-[var(--warn-bg)] px-4 py-3 text-xs text-[var(--warn)]">
+          <summary className="cursor-pointer font-bold"><Warning size={14} weight="bold" className="mr-1.5 inline" />{missingKeys.length} {missingKeys.length === 1 ? 'integration is' : 'integrations are'} not configured on the backend (dev-only notice)</summary>
           <ul className="mt-2 list-disc space-y-1 pl-5">{missingKeys.map((key) => <li key={key}>{key}</li>)}</ul>
         </details>}
 
@@ -430,7 +437,7 @@ export default function Domain() {
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--line)] pb-4">
             <div>
               <h2 id="domain-results-title" className="text-2xl font-semibold tracking-[-.04em] sm:text-3xl">{context?.sourceDomain ? <>Alternatives to <span className="font-serif italic">{context.sourceDomain}</span></> : 'Available names for your idea'}</h2>
-              <p className="mt-1 text-xs font-medium text-[var(--muted)]">{results.length} of {MAX_SUGGESTIONS} available names{crmStatus && ` · ${crmStatus}`}</p>
+              <p className="mt-1 text-xs font-medium text-[var(--muted)]">{results.length} of {maxSuggestions} available names{crmStatus && ` · ${crmStatus}`}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {resultTlds.length > 1 && <div className="flex gap-1 rounded-full bg-[var(--surface)] p-1 ring-1 ring-[var(--line)]/70">
@@ -457,9 +464,9 @@ export default function Domain() {
 
           {labBlock}
 
-          {phase === 'idle' && context && results.length < MAX_SUGGESTIONS && <div className="mt-8 flex justify-center">
+          {phase === 'idle' && context && results.length < maxSuggestions && <div className="mt-8 flex justify-center">
             <button type="button" onClick={findMore} className="group inline-flex items-center justify-center gap-3 rounded-full bg-[var(--ink)] py-2 pl-5 pr-2 text-sm font-semibold text-white transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-0.5 active:scale-[.98]">
-              Find {BATCH_SIZE} more names<span className="grid size-8 place-items-center rounded-full bg-white/15 transition-transform group-hover:rotate-90"><Plus size={14} weight="bold" /></span>
+              Find {batchSize} more names<span className="grid size-8 place-items-center rounded-full bg-white/15 transition-transform group-hover:rotate-90"><Plus size={14} weight="bold" /></span>
             </button>
           </div>}
         </section>}
@@ -478,7 +485,7 @@ export default function Domain() {
         </section>}
       </main>
 
-      {saved && <SavedDrawer visitorKey={visitorKey} initialTab={saved} onClose={() => setSaved(null)} onOpenSearch={openSavedSearch} onCopy={copyDomain} onUnfavorite={unfavoriteFromDrawer} />}
+      {saved && <SavedDrawer crmEnabled={Boolean(integrations.crm)} initialTab={saved} onClose={() => setSaved(null)} onOpenSearch={openSavedSearch} onCopy={copyDomain} onUnfavorite={unfavoriteFromDrawer} />}
 
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
         {toast && <p key={toast} className="domain-ticker rounded-full bg-[var(--ink)] px-5 py-3 text-xs font-semibold text-white shadow-[0_18px_50px_rgba(20,28,21,.3)]">{toast}</p>}

@@ -1,4 +1,4 @@
-const AUTH_ORIGIN = "https://upworkapp.backend.outrightcrm.in".replace(/\/$/, "");
+export const AUTH_ORIGIN ="https://upworkapp.backend.outrightcrm.in".replace(/\/$/, "");
 const LOGIN_INTRO_KEY = "outrightfeedportal-login-intro";
 
 export function startMicrosoftLogin() {

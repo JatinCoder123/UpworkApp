@@ -40,7 +40,7 @@ export function scoreJob(job, preferences = loadPreferences()) {
     { label: 'Skill alignment', points: skillPoints, max: 35, detail: skillMatches.length ? `${skillMatches.join(', ')} match your profile` : 'No direct profile skill matches', tone: skillRatio >= .6 ? 'positive' : skillRatio ? 'neutral' : 'warning' },
     budget,
     { label: 'Client quality', points: clientPoints, max: 20, detail: `${rating.toFixed(2)} rating from a proven client`, tone: rating >= 4.8 ? 'positive' : 'neutral' },
-    { label: 'Hiring history', points: historyPoints, max: 12, detail: `${job.clientStats?.spent} spent · ${job.clientStats?.hires}`, tone: spent >= 50000 ? 'positive' : 'neutral' },
+    { label: 'Hiring history', points: historyPoints, max: 12, detail: `${job.clientStats?.spent} spent · ${job.clientStats?.hires ?? 0} hires`, tone: spent >= 50000 ? 'positive' : 'neutral' },
     { label: 'Experience level', points: levelPoints, max: 8, detail: preferences.preferredLevels.includes(job.level) ? `${job.level} matches your preferred level` : `${job.level} is outside your preferred levels`, tone: levelPoints === 8 ? 'positive' : 'neutral' },
     { label: 'Freshness', points: freshnessPoints, max: 8, detail: ageHours <= 24 ? 'Posted recently — early applications have an advantage' : 'The job has been open for a while', tone: ageHours <= 24 ? 'positive' : 'neutral' },
   ]

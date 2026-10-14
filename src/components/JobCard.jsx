@@ -1,10 +1,13 @@
 import { Link } from 'react-router-dom'
-import { ArrowUpRight } from '@phosphor-icons/react'
+import { ArrowUpRight, Clock } from '@phosphor-icons/react'
 import { StatusPill } from './ui'
 import { scoreJob } from '../lib/scoring'
+import { timeAgo, useNow } from '../lib/time'
 
-export default function JobCard({ job, layout = 'grid', allJobs = false }) {
+export default function JobCard({ job, layout = 'grid' }) {
+  const now = useNow()
   const fit = scoreJob(job)
+  const postedAgo = timeAgo(job.postedAt, now) || job.posted
   const skills = job.skills?.length ? job.skills : job.tags
   const visibleSkills = skills.slice(0, 2)
   const remainingSkills = Math.max(0, skills.length - visibleSkills.length)
@@ -14,7 +17,7 @@ export default function JobCard({ job, layout = 'grid', allJobs = false }) {
 
   return <article data-card className={`group relative rounded-[1.6rem] p-1 transition-all duration-500 hover:z-30 hover:-translate-y-0.5 ${isNew ? 'bg-[var(--new-border)] shadow-[0_14px_42px_var(--new-shadow)]' : 'bg-[var(--frame)] ring-1 ring-[var(--line)]/60'}`}>
     {isNew && <span className="absolute left-0 top-8 z-10 h-10 w-1 rounded-r-full bg-[var(--accent)]" />}
-    <Link to={`/jobs/${job.id}${allJobs ? '?scope=all' : ''}`} className={`relative block h-full rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] ${list ? 'p-4 sm:grid sm:grid-cols-[minmax(0,1.65fr)_minmax(13rem,.7fr)_auto] sm:items-center sm:gap-7 sm:p-5' : compact ? 'p-4' : 'p-5 sm:p-6'}`}>
+    <Link to={`/jobs/${job.id}`} className={`relative block h-full rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] ${list ? 'p-4 sm:grid sm:grid-cols-[minmax(0,1.65fr)_minmax(13rem,.7fr)_auto] sm:items-center sm:gap-7 sm:p-5' : compact ? 'p-4' : 'p-5 sm:p-6'}`}>
       <div className={list ? 'min-w-0' : ''}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -22,7 +25,7 @@ export default function JobCard({ job, layout = 'grid', allJobs = false }) {
               <img src={job.image} className="size-full object-cover opacity-70 transition-transform duration-700 group-hover:scale-110" alt="" />
               <span className="absolute inset-0 grid place-items-center text-[10px] font-bold">{job.client}</span>
             </div>
-            <div className="min-w-0"><p className="truncate text-xs font-bold">{job.company}</p><p className="mt-1 truncate text-[10px] text-[var(--muted)]">{job.location}</p></div>
+            <div className="min-w-0"><p className="truncate text-xs font-bold">{job.company}</p><p className="mt-1 flex items-center gap-1.5 truncate text-[10px] text-[var(--muted)]"><span className="truncate">{job.location}</span><span aria-hidden="true">·</span><time dateTime={job.postedAt} title={job.posted} className="inline-flex shrink-0 items-center gap-1 font-semibold text-[var(--accent-strong)]"><Clock size={11} weight="bold" />{postedAgo}</time></p></div>
           </div>
           {!list && <StatusPill status={job.status} />}
         </div>
@@ -42,7 +45,7 @@ export default function JobCard({ job, layout = 'grid', allJobs = false }) {
         </div>
       </div>
       <div className={`${list ? '' : compact ? 'mt-5' : 'mt-8 border-t border-[var(--line)]/70 pt-5'} flex items-end justify-between gap-4`}>
-        <div className="rounded-xl bg-[var(--price-bg)] px-3 py-2 ring-1 ring-[var(--price-line)]"><p className={`${compact ? 'text-sm' : 'text-lg'} font-semibold tracking-[-.03em] text-[var(--price-text)]`}>{job.budget}</p><p className="mt-0.5 text-[9px] text-[var(--price-muted)]">{job.type} · {job.posted}</p></div>
+        <div className="rounded-xl bg-[var(--price-bg)] px-3 py-2 ring-1 ring-[var(--price-line)]"><p className={`${compact ? 'text-sm' : 'text-lg'} font-semibold tracking-[-.03em] text-[var(--price-text)]`}>{job.budget}</p><p className="mt-0.5 text-[9px] text-[var(--price-muted)]">{job.type} · {job.level}</p></div>
         {list && <StatusPill status={job.status} />}
       </div>
       <div className={`${list ? 'mt-4 sm:mt-0' : compact ? 'mt-4 border-t border-[var(--line)]/60 pt-3' : 'absolute bottom-5 right-5'} flex items-center justify-between gap-3`}>

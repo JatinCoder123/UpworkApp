@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowRight, ClockCounterClockwise, Copy, MagicWand, Globe, Star } from '@phosphor-icons/react'
 import { DialogHeader, Modal } from '../ui'
 import { DomainName } from './DomainCards'
-import { crmFavorites, crmHistory, formatPrice, integrations, oneYearPricePlan } from '../../services/domainApi'
+import { crmFavorites, crmHistory, formatPrice, oneYearPricePlan } from '../../services/domainApi'
 
 function formatDate(value) {
   if (!value) return ''
@@ -14,31 +14,31 @@ function EmptyState({ icon: Icon, title, text }) {
   return <div className="py-14 text-center"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[var(--paper)] ring-1 ring-[var(--line)]"><Icon size={20} /></span><h3 className="mt-4 text-base font-semibold">{title}</h3><p className="mx-auto mt-1.5 max-w-xs text-xs leading-5 text-[var(--muted)]">{text}</p></div>
 }
 
-export default function SavedDrawer({ visitorKey, initialTab = 'history', onClose, onOpenSearch, onCopy, onUnfavorite }) {
+export default function SavedDrawer({ crmEnabled, initialTab = 'history', onClose, onOpenSearch, onCopy, onUnfavorite }) {
   const [tab, setTab] = useState(initialTab)
-  const [state, setState] = useState({ loading: integrations.crm, error: '', history: [], total: 0, page: 1, favorites: [] })
+  const [state, setState] = useState({ loading: crmEnabled, error: '', history: [], total: 0, page: 1, favorites: [] })
 
   const switchTab = (id) => {
     if (id === tab) return
     setTab(id)
-    setState((current) => ({ ...current, loading: integrations.crm, error: '' }))
+    setState((current) => ({ ...current, loading: crmEnabled, error: '' }))
   }
 
   useEffect(() => {
-    if (!integrations.crm) return undefined
+    if (!crmEnabled) return undefined
     let alive = true
     const load = tab === 'history'
-      ? crmHistory(visitorKey, 1).then(({ history, total }) => alive && setState((current) => ({ ...current, loading: false, history, total, page: 1 })))
-      : crmFavorites(visitorKey).then((favorites) => alive && setState((current) => ({ ...current, loading: false, favorites })))
+      ? crmHistory(1).then(({ history, total }) => alive && setState((current) => ({ ...current, loading: false, history, total, page: 1 })))
+      : crmFavorites().then((favorites) => alive && setState((current) => ({ ...current, loading: false, favorites })))
     load.catch((error) => alive && setState((current) => ({ ...current, loading: false, error: error.message })))
     return () => { alive = false }
-  }, [tab, visitorKey])
+  }, [tab, crmEnabled])
 
   const loadMore = async () => {
     const page = state.page + 1
     setState((current) => ({ ...current, loading: true }))
     try {
-      const { history } = await crmHistory(visitorKey, page)
+      const { history } = await crmHistory(page)
       setState((current) => ({ ...current, loading: false, page, history: [...current.history, ...history] }))
     } catch (error) {
       setState((current) => ({ ...current, loading: false, error: error.message }))
@@ -57,7 +57,7 @@ export default function SavedDrawer({ visitorKey, initialTab = 'history', onClos
     </div>
 
     <div className="mt-5 min-h-64">
-      {!integrations.crm ? <EmptyState icon={ClockCounterClockwise} title="CRM not connected" text="Add VITE_DOMAIN_CRM_GATEWAY_SECRET to .env to save searches and favorites." />
+      {!crmEnabled ? <EmptyState icon={ClockCounterClockwise} title="CRM not connected" text="Saved searches and favorites are not configured on the server yet." />
         : state.error ? <p className="rounded-2xl bg-[var(--bad-bg)] p-4 text-xs font-semibold text-[var(--bad)]">{state.error}</p>
           : state.loading && !(tab === 'history' ? state.history.length : state.favorites.length) ? <div className="space-y-2">{[0, 1, 2, 3].map((index) => <div key={index} className="skeleton-bone h-16 rounded-2xl" />)}</div>
             : tab === 'history' ? (state.history.length ? <>

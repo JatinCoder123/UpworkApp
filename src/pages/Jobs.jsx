@@ -4,6 +4,7 @@ import gsap from "gsap";
 import {
   BookmarkSimple,
   Briefcase,
+  Broadcast,
   Funnel,
   ListBullets,
   MagnifyingGlass,
@@ -20,6 +21,7 @@ import {
   SaveViewDialog,
 } from "../components/dialogs";
 import DateTimeRangeFilter from "../components/DateTimeRangeFilter";
+import LiveSearchDialog from "../components/LiveSearchDialog";
 import OpportunityFilterDialog from "../components/OpportunityFilterDialog";
 import { ActiveDateFilterChip, RefreshFilterButton } from "../components/FilterToolbarControls";
 import { iconButton, primaryButton } from "../components/ui";
@@ -45,6 +47,7 @@ export default function Jobs() {
     [layout, setLayout] = useState(loadJobLayout),
     [search, setSearch] = useState(""),
     [adding, setAdding] = useState(false),
+    [liveSearching, setLiveSearching] = useState(false),
     [skills, setSkills] = useState([]),
     [dateDialog, setDateDialog] = useState(false),
     [savedViews, setSavedViews] = useState(loadSavedViews),
@@ -367,7 +370,16 @@ export default function Jobs() {
                   Clear all
                 </button>
               )}
-              <button onClick={() => setAdding(true)} className={`${primaryButton} ml-auto shrink-0 !py-1.5 !pl-4`}>
+              <button
+                type="button"
+                onClick={() => setLiveSearching(true)}
+                className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--lime)]/30 py-2 pl-3 pr-4 text-xs font-bold text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/35 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--lime)]/55"
+              >
+                <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--lime-dark)] opacity-70" /><span className="relative inline-flex size-2 rounded-full bg-[var(--lime-dark)]" /></span>
+                <Broadcast size={14} weight="bold" />
+                Live search
+              </button>
+              <button onClick={() => setAdding(true)} className={`${primaryButton} shrink-0 !py-1.5 !pl-4`}>
                 <span>Add job</span>
                 <span className="grid size-7 place-items-center rounded-full bg-white/10">
                   <Plus size={14} />
@@ -398,7 +410,7 @@ export default function Jobs() {
           <>
             <section className={`mt-6 grid gap-4 ${layout === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : layout === "compact" ? "sm:grid-cols-2 xl:grid-cols-4" : "grid-cols-1"}`}>
               {filtered.map((job) => (
-                <JobCard key={job.id} job={job} layout={layout} allJobs={showAllJobs} />
+                <JobCard key={job.id} job={job} layout={layout} />
               ))}
             </section>
             <div ref={loadMoreRef} className="flex min-h-24 items-center justify-center py-8" aria-live="polite">
@@ -429,6 +441,7 @@ export default function Jobs() {
         )}
         </div>
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
+        {liveSearching && <LiveSearchDialog suggestions={skillRecords.map((record) => record.name)} onClose={() => setLiveSearching(false)} />}
         {dateDialog && (
           <OpportunityFilterDialog
             skills={skills}

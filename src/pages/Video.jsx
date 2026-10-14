@@ -1,201 +1,228 @@
-import { useMemo, useState } from 'react'
-import { BookmarkSimple, Eye, Heart, MagnifyingGlass, Play, Sparkle, VideoCamera, X } from '@phosphor-icons/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { ArrowSquareOut, ArrowsClockwise, Check, Copy, Fire, FilmSlate, Hash, Lightning, MagnifyingGlass, ShieldCheck, Sparkle, Star, Timer, VideoCamera, X } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
+import LogoLoader from '../components/LogoLoader'
+import { primaryButton } from '../components/ui'
+import { api } from '../services/api'
 
-const categories = ['All', 'AI & Tech', 'Tutorials', 'Marketing', 'Product']
+gsap.registerPlugin(ScrollTrigger)
 
-const videos = [
-  {
-    id: 'ai-workflows',
-    title: 'A new era for AI and Google Workspace',
-    description: 'See how generative AI can help teams write, organize, collaborate, and move routine work forward.',
-    category: 'AI & Tech',
-    creator: 'Google Workspace',
-    role: 'Product team',
-    views: '18.4K',
-    duration: '03:15',
-    published: '2 hours ago',
-    youtubeId: '6DaJVZBXETE',
-  },
-  {
-    id: 'story-edit',
-    title: 'Figma for beginners: Explore ideas',
-    description: 'Learn the Figma fundamentals while wireframing an app, organizing layers, and exploring early product ideas.',
-    category: 'Product',
-    creator: 'Figma',
-    role: 'Design education',
-    views: '9.7K',
-    duration: '16:08',
-    published: 'Yesterday',
-    youtubeId: 'dXQ7IHkTiMM',
-  },
-  {
-    id: 'search-content',
-    title: 'HubSpot Marketing Hub tutorial for beginners',
-    description: 'A complete introduction to CRM-powered campaigns, email, ads, social publishing, and AI-assisted copywriting.',
-    category: 'Marketing',
-    creator: 'HubSpot',
-    role: 'Marketing education',
-    views: '22.1K',
-    duration: '38:44',
-    published: '3 days ago',
-    youtubeId: '68mC70jSbek',
-  },
-  {
-    id: 'motion-basics',
-    title: 'Adobe Premiere Pro crash course for beginners',
-    description: 'A practical introduction to editing, timelines, essential tools, audio, color, and exporting a finished video.',
-    category: 'Tutorials',
-    creator: 'Bring Your Own Laptop',
-    role: 'Adobe training',
-    views: '14.8K',
-    duration: '19:33',
-    published: '5 days ago',
-    youtubeId: 'MqwlW76sFCM',
-  },
-  {
-    id: 'brief-to-video',
-    title: 'What is digital marketing? A beginner tutorial',
-    description: 'Understand the core channels, customer journey, content strategy, and measurement behind modern digital marketing.',
-    category: 'Marketing',
-    creator: 'HubSpot',
-    role: 'Marketing education',
-    views: '7.3K',
-    duration: '09:27',
-    published: '1 week ago',
-    youtubeId: 'XDpwDwcXGoU',
-  },
-  {
-    id: 'prototype-review',
-    title: 'Figma tutorial: A crash course for beginners',
-    description: 'Follow a hands-on design workflow covering interface tools, layout decisions, reusable components, and prototyping.',
-    category: 'Product',
-    creator: 'DesignCourse',
-    role: 'Design education',
-    views: '11.6K',
-    duration: '47:58',
-    published: '1 week ago',
-    youtubeId: 'IOVFRMuPeVQ',
-  },
+const SORTS = [
+  { id: 'newest', label: 'Newest' },
+  { id: 'match', label: 'Best match' },
+  { id: 'rating', label: 'Top rated' },
 ]
+const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-const youtubePoster = (id) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
+function useCopy() {
+  const [copied, setCopied] = useState('')
+  const copy = async (key, text) => {
+    await navigator.clipboard?.writeText(text)
+    setCopied(key)
+    window.setTimeout(() => setCopied((current) => current === key ? '' : current), 1600)
+  }
+  return [copied, copy]
+}
 
 export default function Video() {
-  const [selectedId, setSelectedId] = useState(videos[0].id)
+  const { data: briefs = [], isLoading, isError, error, refetch, isFetching } = useQuery({ queryKey: ['video-feeds'], queryFn: () => api.getVideoFeeds(), staleTime: 120_000 })
   const [category, setCategory] = useState('All')
   const [search, setSearch] = useState('')
-  const [saved, setSaved] = useState(() => new Set())
-  const [liked, setLiked] = useState(() => new Set())
+  const [sort, setSort] = useState('newest')
+  const [active, setActive] = useState(0)
+  const root = useRef(null)
 
-  const selected = videos.find((video) => video.id === selectedId) || videos[0]
+  const categories = useMemo(() => ['All', ...new Set(briefs.map((brief) => brief.category))], [briefs])
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return videos.filter((video) =>
-      (category === 'All' || video.category === category) &&
-      (!query || `${video.title} ${video.description} ${video.creator} ${video.category}`.toLowerCase().includes(query)),
-    )
-  }, [category, search])
+    const list = briefs.filter((brief) =>
+      (category === 'All' || brief.category === category) &&
+      (!query || `${brief.title} ${brief.category} ${brief.whyChosen} ${brief.targetSearchTerm} ${brief.hashtags.join(' ')}`.toLowerCase().includes(query)))
+    if (sort === 'match') return [...list].sort((a, b) => b.match - a.match)
+    if (sort === 'rating') return [...list].sort((a, b) => b.rating - a.rating)
+    return [...list].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt))
+  }, [briefs, category, search, sort])
+  const stats = useMemo(() => ({
+    total: briefs.length,
+    urgent: briefs.filter((brief) => brief.hurryUp).length,
+    p1: briefs.filter((brief) => brief.priority === 'P1').length,
+    match: briefs.length ? Math.round(briefs.reduce((sum, brief) => sum + brief.match, 0) / briefs.length) : 0,
+  }), [briefs])
+  const hashtags = useMemo(() => [...new Set(briefs.flatMap((brief) => brief.hashtags))].slice(0, 28), [briefs])
 
-  const toggleSet = (setter, id) => setter((current) => {
-    const next = new Set(current)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    return next
-  })
+  // Hero entrance and counters.
+  useEffect(() => {
+    if (isLoading || !root.current) return undefined
+    const ctx = gsap.context(() => {
+      if (reduceMotion()) return
+      gsap.fromTo('[data-hero-word]', { yPercent: 110, rotate: 4 }, { yPercent: 0, rotate: 0, duration: 1.1, stagger: .08, ease: 'expo.out' })
+      gsap.fromTo('[data-hero-fade]', { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .8, stagger: .08, delay: .35, ease: 'power3.out' })
+      gsap.utils.toArray('[data-count]').forEach((node) => {
+        const target = Number(node.dataset.count) || 0
+        const counter = { value: 0 }
+        gsap.to(counter, { value: target, duration: 1.4, delay: .4, ease: 'power3.out', onUpdate: () => { node.textContent = Math.round(counter.value) } })
+      })
+      gsap.to('[data-hero-title]', { yPercent: -18, autoAlpha: .25, ease: 'none', scrollTrigger: { trigger: '[data-hero]', start: 'top top', end: 'bottom top', scrub: true } })
+    }, root)
+    return () => ctx.revert()
+  }, [isLoading])
 
-  const selectVideo = (id) => {
-    setSelectedId(id)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+  // Scroll-driven card choreography, rebuilt whenever the visible list changes.
+  useEffect(() => {
+    if (isLoading || !root.current) return undefined
+    const ctx = gsap.context(() => {
+      gsap.to('[data-scroll-progress]', { scaleX: 1, ease: 'none', scrollTrigger: { start: 0, end: 'max', scrub: .3 } })
+      gsap.utils.toArray('[data-brief]').forEach((card, index) => {
+        ScrollTrigger.create({ trigger: card, start: 'top 55%', end: 'bottom 55%', onToggle: (self) => self.isActive && setActive(index) })
+        if (reduceMotion()) return
+        gsap.fromTo(card, { y: 90, scale: .93, rotateX: 9, autoAlpha: .2 }, { y: 0, scale: 1, rotateX: 0, autoAlpha: 1, ease: 'power2.out', scrollTrigger: { trigger: card, start: 'top 96%', end: 'top 50%', scrub: .7 } })
+        const ring = card.querySelector('[data-ring]')
+        if (ring) gsap.fromTo(ring, { strokeDashoffset: 100 }, { strokeDashoffset: 100 - Number(ring.dataset.ring), duration: 1.3, ease: 'power3.out', scrollTrigger: { trigger: card, start: 'top 75%', toggleActions: 'play none none reverse' } })
+        const beats = card.querySelector('[data-beats]')
+        const line = card.querySelector('[data-beat-line]')
+        if (beats && line) gsap.fromTo(line, { scaleY: 0 }, { scaleY: 1, ease: 'none', scrollTrigger: { trigger: beats, start: 'top 72%', end: 'bottom 62%', scrub: .4 } })
+        card.querySelectorAll('[data-beat]').forEach((beat) => {
+          gsap.fromTo(beat, { x: 28, autoAlpha: .12 }, { x: 0, autoAlpha: 1, ease: 'power2.out', scrollTrigger: { trigger: beat, start: 'top 88%', end: 'top 64%', scrub: .5 } })
+        })
+      })
+    }, root)
+    ScrollTrigger.refresh()
+    return () => ctx.revert()
+  }, [isLoading, filtered])
+
+  const jumpTo = (index) => document.getElementById(`brief-${filtered[index]?.id}`)?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' })
 
   return (
     <Shell>
-      <main className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-9 sm:px-6 md:pt-12">
-        <header className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div>
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.17em] text-[var(--muted)]"><VideoCamera size={15} weight="duotone" />Video feed</p>
-            <h1 className="mt-4 max-w-3xl text-[clamp(2.8rem,6vw,5.8rem)] font-semibold leading-[.9] tracking-[-.07em]">Ideas worth,<br /><span className="inline-block pb-1 font-serif font-medium italic leading-[1.1]">watching.</span></h1>
-            <p className="mt-5 max-w-xl text-sm leading-6 text-[var(--muted)]">Tutorials, product stories, and useful ideas selected for focused teams.</p>
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[3px]"><div data-scroll-progress className="h-full origin-left scale-x-0 bg-[var(--lime-dark)]" /></div>
+      <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-28 pt-9 sm:px-6 md:pt-12">
+        <header data-hero className="relative">
+          <div data-hero-title>
+            <p data-hero-fade className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.17em] text-[var(--muted)]"><VideoCamera size={15} weight="duotone" />Video feed · content briefs</p>
+            <h1 className="mt-4 max-w-4xl text-[clamp(2.8rem,6.6vw,6.2rem)] font-semibold leading-[.92] tracking-[-.07em]">
+              <span className="block overflow-hidden pb-1"><span data-hero-word className="inline-block">Ideas</span> <span data-hero-word className="inline-block">worth</span></span>
+              <span className="block overflow-hidden pb-2"><span data-hero-word className="inline-block font-serif font-medium italic">filming.</span></span>
+            </h1>
+            <p data-hero-fade className="mt-5 max-w-xl text-sm leading-6 text-[var(--muted)]">Researched video ideas with a run sheet, the search demand behind them and why each one made the cut. Scroll to walk through every brief.</p>
           </div>
-          <div className="flex items-center gap-2 rounded-full bg-[var(--surface)] p-1.5 ring-1 ring-[var(--line)] shadow-[0_12px_36px_rgba(36,49,38,.08)] focus-within:ring-[var(--lime-dark)]">
-            <MagnifyingGlass className="ml-3 shrink-0 text-[var(--muted)]" size={16} />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search videos" className="min-w-0 flex-1 bg-transparent px-1 text-xs outline-none sm:w-56" />
-            {search && <button type="button" onClick={() => setSearch('')} aria-label="Clear video search" className="grid size-8 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--paper)]"><X size={12} weight="bold" /></button>}
-          </div>
+          <dl data-hero-fade className="mt-9 grid max-w-3xl grid-cols-2 gap-px overflow-hidden rounded-[1.6rem] bg-[var(--line)]/70 ring-1 ring-[var(--line)]/70 sm:grid-cols-4">
+            {[['Briefs', stats.total, FilmSlate], ['Priority 1', stats.p1, Lightning], ['Hurry up', stats.urgent, Fire], ['Avg match %', stats.match, Sparkle]].map(([label, value, Icon]) => <div key={label} className="bg-[var(--surface)] px-5 py-4">
+              <dt className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]"><Icon size={13} weight="duotone" />{label}</dt>
+              <dd data-count={value} className="mt-2 text-3xl font-semibold tabular-nums tracking-[-.05em]">{value}</dd>
+            </div>)}
+          </dl>
         </header>
 
-        <section className="mt-10 grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(18rem,.65fr)]">
-          <div className="overflow-hidden rounded-[1.8rem] bg-[var(--ink)] p-1.5 shadow-[0_26px_70px_rgba(25,35,27,.18)]">
-            <div className="relative overflow-hidden rounded-[calc(1.8rem-.375rem)] bg-black">
-              <iframe
-                key={selected.id}
-                src={`https://www.youtube-nocookie.com/embed/${selected.youtubeId}?rel=0`}
-                title={selected.title}
-                className="aspect-video w-full border-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-              />
-            </div>
-            <div className="grid gap-5 px-5 pb-6 pt-5 text-white sm:px-7 lg:grid-cols-[1fr_auto] lg:items-end">
-              <div>
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.12em] text-white/70"><span className="font-bold text-[var(--lime)]">{selected.category}</span><span>{selected.duration}</span><span>{selected.published}</span></div>
-                <h2 className="mt-3 max-w-3xl text-xl font-semibold leading-tight tracking-[-.035em] sm:text-3xl">{selected.title}</h2>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">{selected.description}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <ActionButton active={liked.has(selected.id)} label="Like video" onClick={() => toggleSet(setLiked, selected.id)}><Heart size={17} weight={liked.has(selected.id) ? 'fill' : 'regular'} /></ActionButton>
-                <ActionButton active={saved.has(selected.id)} label="Save video" onClick={() => toggleSet(setSaved, selected.id)}><BookmarkSimple size={17} weight={saved.has(selected.id) ? 'fill' : 'regular'} /></ActionButton>
-              </div>
+        {hashtags.length > 0 && <div data-hero-fade className="marquee-mask relative -mx-4 mt-12 overflow-hidden sm:-mx-6" aria-hidden="true">
+          <div className="marquee-track flex w-max py-1">{[...hashtags, ...hashtags].map((tag, index) => <span key={`${tag}-${index}`} className="mr-2 shrink-0 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{tag}</span>)}</div>
+        </div>}
+
+        <div className="sticky top-[5.25rem] z-20 mt-10 md:top-24">
+          <div className="flex flex-col gap-3 rounded-[1.6rem] bg-[var(--surface)]/90 p-2 ring-1 ring-[var(--line)]/70 shadow-[0_18px_50px_rgba(30,32,25,.08)] backdrop-blur-xl lg:flex-row lg:items-center">
+            <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">{categories.map((item) => <button type="button" key={item} onClick={() => setCategory(item)} className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-bold transition-all duration-300 ${category === item ? 'bg-[var(--lime)] !text-[#26320b] shadow-sm' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{item}</button>)}</div>
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-full bg-[var(--paper)] p-1">{SORTS.map((item) => <button type="button" key={item.id} onClick={() => setSort(item.id)} aria-pressed={sort === item.id} className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${sort === item.id ? 'bg-[var(--raised)] text-[var(--ink)] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{item.label}</button>)}</div>
+              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-3.5 py-2 lg:w-56 lg:flex-none">
+                <MagnifyingGlass size={14} className="shrink-0 text-[var(--muted)]" />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search briefs" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
+                {search && <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="grid size-5 place-items-center rounded-full text-[var(--muted)] hover:bg-black/10"><X size={11} weight="bold" /></button>}
+              </label>
+              <button type="button" onClick={() => refetch()} aria-label="Refresh briefs" className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--paper)] text-[var(--muted)] hover:text-[var(--ink)]"><ArrowsClockwise size={15} className={isFetching ? 'animate-spin' : ''} /></button>
             </div>
           </div>
+        </div>
 
-          <aside className="rounded-[1.8rem] bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]/70 sm:p-5">
-            <div className="flex items-center justify-between"><div><p className="text-sm font-bold">Up next</p><p className="mt-1 text-xs font-medium text-[var(--muted)]">Continue exploring</p></div><Sparkle size={17} className="text-[var(--accent-strong)]" weight="duotone" /></div>
-            <div className="mt-5 grid gap-3">
-              {videos.filter((video) => video.id !== selected.id).slice(0, 3).map((video, index) => <button type="button" key={video.id} onClick={() => selectVideo(video.id)} className="group grid grid-cols-[7.5rem_1fr] gap-3 rounded-2xl p-1.5 text-left transition-colors hover:bg-[var(--paper)] sm:grid-cols-[9rem_1fr] lg:grid-cols-[7.5rem_1fr]">
-                <span className="relative aspect-video overflow-hidden rounded-xl bg-[var(--ink)]"><img src={youtubePoster(video.youtubeId)} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" /><span className="absolute inset-0 bg-black/10" /><span className="absolute bottom-1.5 right-1.5 rounded-md bg-black/75 px-1.5 py-0.5 text-[11px] font-bold text-white">{video.duration}</span>{index === 0 && <span className="absolute left-2 top-2 grid size-6 place-items-center rounded-full bg-[var(--lime)] text-[#26320b]"><Play size={9} weight="fill" /></span>}</span>
-                <span className="min-w-0 py-1"><span className="line-clamp-2 text-sm font-semibold leading-5">{video.title}</span><span className="mt-2 block truncate text-[11px] font-semibold text-[var(--muted)]">{video.creator}</span><span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-[var(--muted)]"><Eye size={12} />{video.views} views</span></span>
-              </button>)}
+        {isLoading ? <LogoLoader className="min-h-[40dvh]" label="Loading video briefs" />
+          : isError ? <section className="py-24 text-center"><span className="mx-auto grid size-14 place-items-center rounded-2xl bg-[var(--bad-bg)] text-[var(--bad)]"><VideoCamera size={22} /></span><h3 className="mt-5 text-xl font-semibold">Could not load video briefs</h3><p className="mt-2 text-sm text-[var(--muted)]">{error?.message}</p><button type="button" onClick={() => refetch()} className={`${primaryButton} mt-6`}>Try again</button></section>
+            : filtered.length ? <div className="mt-12 grid gap-10 xl:grid-cols-[13rem_minmax(0,1fr)]">
+              <nav aria-label="Brief index" className="hidden xl:block"><div className="sticky top-48 space-y-1">
+                <p className="mb-3 text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">{filtered.length} briefs</p>
+                {filtered.map((brief, index) => <button type="button" key={brief.id} onClick={() => jumpTo(index)} className={`group flex w-full items-start gap-3 rounded-xl px-2 py-2 text-left transition-all duration-300 ${active === index ? 'bg-[var(--surface)] shadow-sm ring-1 ring-[var(--line)]' : 'opacity-55 hover:opacity-100'}`}>
+                  <span className={`mt-0.5 font-mono text-[10px] font-bold ${active === index ? 'text-[var(--accent-strong)]' : 'text-[var(--muted)]'}`}>{String(index + 1).padStart(2, '0')}</span>
+                  <span className="line-clamp-2 text-[11px] font-semibold leading-4">{brief.title}</span>
+                </button>)}
+              </div></nav>
+              <div className="space-y-8 [perspective:1400px]">{filtered.map((brief, index) => <BriefCard key={brief.id} brief={brief} index={index} />)}</div>
             </div>
-          </aside>
-        </section>
-
-        <section className="mt-14">
-          <div className="flex flex-col gap-5 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-end sm:justify-between">
-            <div><h2 className="text-2xl font-semibold tracking-[-.04em] sm:text-3xl">Discover videos</h2><p className="mt-2 text-xs text-[var(--muted)]">{filtered.length} videos in this view</p></div>
-            <div className="flex gap-1 overflow-x-auto rounded-full bg-[var(--surface)] p-1 ring-1 ring-[var(--line)]/60">
-              {categories.map((item) => <button type="button" key={item} onClick={() => setCategory(item)} className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-bold transition-all ${category === item ? 'bg-[var(--lime)] !text-[#26320b] shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{item}</button>)}
-            </div>
-          </div>
-
-          {filtered.length ? <div className="mt-7 grid gap-x-5 gap-y-10 sm:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((video) => <VideoTile key={video.id} video={video} selected={video.id === selected.id} saved={saved.has(video.id)} onSelect={selectVideo} onSave={() => toggleSet(setSaved, video.id)} />)}
-          </div> : <div className="py-24 text-center"><span className="mx-auto grid size-14 place-items-center rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]"><VideoCamera size={22} /></span><h3 className="mt-5 text-xl font-semibold">No videos found</h3><p className="mt-2 text-sm text-[var(--muted)]">Try another category or search phrase.</p></div>}
-        </section>
+              : <div className="py-24 text-center"><span className="mx-auto grid size-14 place-items-center rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--line)]"><VideoCamera size={22} /></span><h3 className="mt-5 text-xl font-semibold">No briefs found</h3><p className="mt-2 text-sm text-[var(--muted)]">Try another category or search phrase.</p></div>}
       </main>
     </Shell>
   )
 }
 
-function ActionButton({ active, label, onClick, children }) {
-  return <button type="button" onClick={onClick} aria-label={label} aria-pressed={active} className={`grid size-10 place-items-center rounded-full ring-1 transition-all active:scale-95 ${active ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime)]' : 'bg-white/10 text-white ring-white/10 hover:bg-white/15'}`}>{children}</button>
+function MatchRing({ value }) {
+  return <div className="relative grid size-[4.5rem] shrink-0 place-items-center">
+    <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90"><circle cx="18" cy="18" r="15.9155" pathLength="100" fill="none" strokeWidth="3" className="stroke-black/[.07] dark:stroke-white/10" /><circle data-ring={value} cx="18" cy="18" r="15.9155" pathLength="100" fill="none" strokeWidth="3" strokeLinecap="round" strokeDasharray="100" strokeDashoffset={100 - value} className="stroke-[var(--lime-dark)]" /></svg>
+    <span className="text-center leading-none"><span className="block text-lg font-semibold tracking-[-.04em]">{value}</span><span className="text-[8px] font-bold uppercase tracking-[.12em] text-[var(--muted)]">match</span></span>
+  </div>
 }
 
-function VideoTile({ video, selected, saved, onSelect, onSave }) {
-  return <article className="group min-w-0">
-    <div className={`relative overflow-hidden rounded-[1.35rem] bg-[var(--ink)] ring-1 transition-all duration-500 ${selected ? 'ring-[var(--lime-dark)] shadow-[0_18px_42px_rgba(80,106,43,.18)]' : 'ring-[var(--line)]/70'}`}>
-      <img src={youtubePoster(video.youtubeId)} alt="" className="aspect-video w-full object-cover transition-transform duration-700 group-hover:scale-[1.035]" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
-      <button type="button" onClick={() => onSelect(video.id)} aria-label={`Play ${video.title}`} className="absolute inset-0 grid place-items-center"><span className="grid size-12 translate-y-2 place-items-center rounded-full bg-[var(--lime)] text-[#26320b] opacity-0 shadow-[0_12px_35px_rgba(0,0,0,.24)] transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"><Play size={17} weight="fill" /></span></button>
-      <span className="absolute bottom-3 right-3 rounded-lg bg-black/80 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-md">{video.duration}</span>
-      {selected && <span className="absolute left-3 top-3 rounded-lg bg-[var(--lime)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.1em] text-[#26320b]">Playing</span>}
-    </div>
-    <div className="mt-4 flex gap-3">
-      <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--ink)] text-[11px] font-bold text-white">{video.creator.split(' ').map((word) => word[0]).join('')}</div>
-      <div className="min-w-0 flex-1"><button type="button" onClick={() => onSelect(video.id)} className="line-clamp-2 text-left text-base font-semibold leading-5 tracking-[-.015em] hover:text-[var(--accent-strong)]">{video.title}</button><p className="mt-2 truncate text-xs font-semibold text-[var(--muted)]">{video.creator} · {video.role}</p><p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-[var(--muted)]"><Eye size={13} />{video.views} views · {video.published}</p></div>
-      <button type="button" onClick={onSave} aria-label={saved ? 'Remove saved video' : 'Save video'} aria-pressed={saved} className={`grid size-8 shrink-0 place-items-center rounded-full transition-colors ${saved ? 'bg-[var(--lime)] !text-[#26320b]' : 'text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]'}`}><BookmarkSimple size={15} weight={saved ? 'fill' : 'regular'} /></button>
+function Fact({ icon: Icon, label, value }) {
+  if (!value) return null
+  return <div className="rounded-2xl bg-[var(--paper)] px-4 py-3"><p className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[.15em] text-[var(--muted)]"><Icon size={12} weight="bold" />{label}</p><p className="mt-1.5 text-sm font-semibold leading-5">{value}</p></div>
+}
+
+function BriefCard({ brief, index }) {
+  const [copied, copy] = useCopy()
+  const [showCheck, setShowCheck] = useState(false)
+  const outlineText = brief.outline.map((beat) => [beat.time, beat.label && `${beat.label}:`, beat.text].filter(Boolean).join(' ')).join('\n')
+
+  return <article id={`brief-${brief.id}`} data-brief className="scroll-mt-44 origin-top rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70 will-change-transform">
+    <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 sm:p-8">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-xs font-bold text-[var(--accent-strong)]">#{String(index + 1).padStart(2, '0')}</span>
+        {brief.priority && <span className="rounded-full bg-[var(--ink)] px-2.5 py-1 text-[10px] font-bold text-white">{brief.priority}</span>}
+        <span className="rounded-full bg-[var(--paper)] px-3 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-[var(--muted)]">{brief.category}</span>
+        {brief.hurryUp && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bad-bg)] px-2.5 py-1 text-[10px] font-bold text-[var(--bad)]"><Fire size={12} weight="fill" />Hurry up</span>}
+        {brief.firstParty && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--ok-bg)] px-2.5 py-1 text-[10px] font-bold text-[var(--ok)]"><ShieldCheck size={12} weight="fill" />First party</span>}
+        <span className="ml-auto text-[11px] font-semibold text-[var(--muted)]">{brief.posted}</span>
+      </div>
+
+      <div className="mt-6 flex items-start gap-5">
+        <h2 className="max-w-4xl flex-1 text-[clamp(1.45rem,2.6vw,2.35rem)] font-semibold leading-[1.1] tracking-[-.04em] [text-wrap:balance]">{brief.title}</h2>
+        <MatchRing value={brief.match} />
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-4">
+        <Fact icon={FilmSlate} label="Format" value={brief.format} />
+        <Fact icon={Timer} label="Effort" value={brief.effort} />
+        <Fact icon={Star} label="Rating" value={brief.rating ? `${brief.rating} / 10` : ''} />
+        <Fact icon={Lightning} label="Mid-roll" value={brief.midRoll ? 'Yes' : 'No'} />
+      </div>
+
+      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
+        <div className="space-y-5 lg:sticky lg:top-48 lg:self-start">
+          {brief.whyChosen && <section><p className="text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">Why this video</p><p className="mt-2.5 text-[15px] leading-7">{brief.whyChosen}</p></section>}
+          {brief.targetSearchTerm && <section className="rounded-2xl bg-[var(--lime)]/20 p-4 ring-1 ring-[var(--lime-dark)]/20"><p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[.16em] text-[var(--accent-strong)]"><MagnifyingGlass size={12} weight="bold" />Target search</p><p className="mt-2 text-sm font-semibold leading-6">{brief.targetSearchTerm}</p></section>}
+          {brief.duplicateCheck && <section className="rounded-2xl bg-[var(--paper)]">
+            <button type="button" onClick={() => setShowCheck((open) => !open)} aria-expanded={showCheck} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-xs font-bold"><span className="flex items-center gap-2"><Check size={14} weight="bold" className="text-[var(--ok)]" />Duplicate check</span><span className={`text-base leading-none text-[var(--muted)] transition-transform duration-300 ${showCheck ? 'rotate-45' : ''}`}>+</span></button>
+            <div className={`grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${showCheck ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}><p className="overflow-hidden px-4 text-xs leading-5 text-[var(--muted)]"><span className="block pb-4">{brief.duplicateCheck}</span></p></div>
+          </section>}
+          {brief.hashtags.length > 0 && <section>
+            <div className="flex items-center justify-between"><p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]"><Hash size={12} weight="bold" />Hashtags</p><button type="button" onClick={() => copy('tags', brief.hashtags.join(' '))} className="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">{copied === 'tags' ? <Check size={12} weight="bold" /> : <Copy size={12} />}{copied === 'tags' ? 'Copied' : 'Copy'}</button></div>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">{brief.hashtags.map((tag) => <span key={tag} className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[11px] font-medium text-[var(--muted)]">{tag}</span>)}</div>
+          </section>}
+          <div className="flex flex-wrap gap-2 pt-1">
+            {brief.sourceUrl && <a href={brief.sourceUrl} target="_blank" rel="noopener noreferrer" className="upwork-view-button inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-bold">Source<ArrowSquareOut size={13} /></a>}
+            <button type="button" onClick={() => copy('outline', `${brief.title}\n\n${outlineText}`)} className="inline-flex items-center gap-2 rounded-full bg-[var(--ink)] px-4 py-2.5 text-xs font-bold text-white transition-transform hover:-translate-y-0.5">{copied === 'outline' ? <Check size={13} weight="bold" /> : <Copy size={13} />}{copied === 'outline' ? 'Copied' : 'Copy run sheet'}</button>
+          </div>
+        </div>
+
+        <section>
+          <p className="text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">Run sheet</p>
+          <ol data-beats className="relative mt-4 space-y-1">
+            <span aria-hidden="true" className="absolute bottom-3 left-[1.6rem] top-3 w-px bg-[var(--line)]" />
+            <span data-beat-line aria-hidden="true" className="absolute bottom-3 left-[1.6rem] top-3 w-px origin-top bg-[var(--lime-dark)]" />
+            {brief.outline.map((beat, beatIndex) => <li key={`${beat.time}-${beatIndex}`} data-beat className="relative grid grid-cols-[3.2rem_1fr] gap-3 rounded-2xl py-2.5 pr-2 transition-colors hover:bg-[var(--paper)]">
+              <span className="relative z-10 mx-auto h-fit rounded-lg bg-[var(--surface)] px-1.5 py-1 text-center font-mono text-[10px] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--line)]">{beat.time || '•'}</span>
+              <p className="text-sm leading-6">{beat.label && <strong className="font-semibold">{beat.label}. </strong>}<span className="text-[var(--muted)]">{beat.text}</span></p>
+            </li>)}
+          </ol>
+        </section>
+      </div>
     </div>
   </article>
 }

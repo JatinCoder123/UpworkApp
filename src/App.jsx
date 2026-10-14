@@ -8,8 +8,8 @@ import TechNews from './pages/TechNews'
 import TechNewsDetail from './pages/TechNewsDetail'
 import Profile from './pages/Profile'
 import Preferences from './pages/Preferences'
-import ComingSoon from './pages/ComingSoon'
 import Video from './pages/Video'
+import SiteContent from './pages/SiteContent'
 import Seo from './pages/Seo'
 import Domain from './pages/Domain'
 import NotFound from './pages/NotFound'
@@ -46,7 +46,8 @@ export default function App() {
       <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
       <Route path="/tech-news" element={<ProtectedRoute><TechNews /></ProtectedRoute>} />
       <Route path="/tech-news/:id" element={<ProtectedRoute><TechNewsDetail /></ProtectedRoute>} />
-      <Route path="/daily-news" element={<ProtectedRoute><ComingSoon eyebrow="Daily Digest" title="Daily News" subtitle="curated & incoming." description="Your daily general news and market intelligence feed is being prepared and will launch here soon." type="daily-news" /></ProtectedRoute>} />
+      <Route path="/site-content" element={<ProtectedRoute><SiteContent /></ProtectedRoute>} />
+      <Route path="/daily-news" element={<Navigate to="/site-content" replace />} />
       <Route path="/domain" element={<ProtectedRoute><Domain /></ProtectedRoute>} />
       <Route path="/video" element={<ProtectedRoute><Video /></ProtectedRoute>} />
       <Route path="/seo" element={<ProtectedRoute><Seo /></ProtectedRoute>} />
