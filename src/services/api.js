@@ -39,14 +39,17 @@ export function createAppError(code, message, meta = {}) {
   return error;
 }
 
-export async function smartGateway(payload) {
+export async function smartGateway(payload, { timeout, signal } = {}) {
   const token = generateToken();
   let response;
   try {
     response = await apiClient.post("", payload, {
       headers: { "X-Api-Token": token },
+      ...(timeout ? { timeout } : {}),
+      signal,
     });
   } catch (err) {
+    if (axios.isCancel(err)) throw createAppError("ABORTED", "Request cancelled");
     const status = err?.response?.status;
     if (status === 401 || status === 403) {
       throw createAppError("UNAUTHORIZED", "Your session has expired or you do not have permission to access this resource.", { status });
@@ -380,15 +383,121 @@ export async function fetchCoverLetter(job) {
   return letter;
 }
 
-const LIVE_SEARCH_DELAY_MS = 5200;
+// ----------------------------------------------------
+// Live Upwork jobs (fetched straight from Upwork through the gateway)
+// ----------------------------------------------------
 
-// Placeholder until the live Upwork search endpoint exists. It only simulates the wait and returns no jobs.
-export async function liveSearchUpworkJobs({ query, signal } = {}) {
-  await new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, LIVE_SEARCH_DELAY_MS);
-    signal?.addEventListener("abort", () => { clearTimeout(timer); reject(createAppError("ABORTED", "Search cancelled")); });
+const LIVE_LEVELS = { ENTRY_LEVEL: "Entry level", ENTRY: "Entry level", INTERMEDIATE: "Intermediate", EXPERT: "Expert" };
+
+// Upwork sends "2026-10-14T09:31:58+0000"; the colon-less offset is not valid ISO everywhere.
+function parseUpworkDate(value) {
+  if (!value) return null;
+  const date = new Date(String(value).replace(/([+-]\d{2})(\d{2})$/, "$1:$2"));
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+const money = (value) => {
+  const amount = Number(value?.rawValue ?? value?.amount ?? value);
+  return Number.isFinite(amount) && amount > 0 ? `$${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "";
+};
+
+function liveBudget(record) {
+  const fixed = money(record.amount);
+  if (fixed) return { amount: fixed, type: "Fixed price" };
+  const min = money(record.hourlyBudgetMin), max = money(record.hourlyBudgetMax);
+  if (min || max) return { amount: `${[min, max].filter(Boolean).join("–")}/hr`, type: "Hourly" };
+  const hourly = (record.hourlyBudgetType && record.hourlyBudgetType !== "NOT_PROVIDED") || /hrs?\/week|hours/i.test(record.engagement || "");
+  return { amount: "Budget not specified", type: hourly ? "Hourly" : "Fixed price" };
+}
+
+export function mapLiveJob(record) {
+  const client = record.client || {};
+  const location = client.location || {};
+  const budget = liveBudget(record);
+  const category = record.occupations?.category?.prefLabel || humanize(record.category);
+  const subcategory = record.occupations?.subCategories?.[0]?.prefLabel || humanize(record.subcategory);
+  const rating = Number(client.totalFeedback);
+  const workload = record.engagement && !/to be determined|not sure/i.test(record.engagement) ? record.engagement : "";
+  const country = location.country || "";
+  const url = record.url || (record.ciphertext ? `https://www.upwork.com/jobs/${record.ciphertext}` : "");
+  return {
+    id: record.id,
+    jobId: record.ciphertext || record.id,
+    title: decodeHtml(record.title || "Untitled job"),
+    company: category || "Upwork client",
+    location: country || "Location not shared",
+    posted: "",
+    postedAt: parseUpworkDate(record.publishedDateTime) || parseUpworkDate(record.createdDateTime) || new Date().toISOString(),
+    renewedAt: parseUpworkDate(record.renewedDateTime),
+    budget: budget.amount,
+    type: budget.type,
+    level: LIVE_LEVELS[String(record.experienceLevel || "").toUpperCase()] || humanize(String(record.experienceLevel || "").toLowerCase()) || "Not specified",
+    duration: record.durationLabel || record.engagementDuration?.label || "Duration not set",
+    workload,
+    status: "Live",
+    match: 0,
+    summary: "",
+    tags: [category, subcategory].filter(Boolean),
+    skills: [...new Set((record.skills || []).map((skill) => skill.prettyName || skill.name).filter(Boolean))],
+    highlightedSkills: (record.skills || []).filter((skill) => skill.highlighted).map((skill) => skill.prettyName || skill.name),
+    matchedSkills: record.matched_skills || [],
+    url,
+    applyUrl: buildUpworkApplyUrl(url),
+    description: decodeHtml(record.description || "") || "No description provided.",
+    applicants: Number(record.totalApplicants) || 0,
+    freelancersToHire: Number(record.freelancersToHire) || Number(record.totalFreelancersToHire) || 0,
+    preferredLocations: record.preferredFreelancerLocation || [],
+    preferredLocationMandatory: Boolean(record.preferredFreelancerLocationMandatory),
+    enterprise: Boolean(record.enterprise),
+    premium: Boolean(record.premium),
+    clientStats: {
+      country,
+      city: location.city || "",
+      timezone: location.timezone && location.timezone !== "Etc/UTC" ? location.timezone : "",
+      rating: rating > 0 ? rating : null,
+      reviews: Number(client.totalReviews) || null,
+      hires: client.totalHires != null ? Number(client.totalHires) : null,
+      activeHires: null,
+      proposals: record.totalApplicants != null ? Number(record.totalApplicants) : null,
+      jobsPosted: client.totalPostedJobs != null ? Number(client.totalPostedJobs) : null,
+      hireRate: "",
+      openJobs: null,
+      totalSpent: money(client.totalSpent),
+      avgHourlyRate: "",
+      totalHours: "",
+      paymentVerified: String(client.verificationStatus || "").toUpperCase() === "VERIFIED",
+      phoneVerified: null,
+      companyName: client.companyName || "",
+      location: country || "Location not shared",
+      spent: money(client.totalSpent) || "—",
+    },
+    raw: record,
+  };
+}
+
+// Upwork is queried live, which can take a while, so this call gets a longer timeout than the CRM fetches.
+export async function fetchLiveUpworkJobs({ skills = [], minutes = 60, includeRenewed = true, signal } = {}) {
+  const cleaned = [...new Set(skills.map((skill) => String(skill).trim()).filter(Boolean))];
+  if (!cleaned.length) throw createAppError("LIVE_SKILLS_REQUIRED", "Pick at least one skill to search.");
+  const data = await smartGateway({ action: "fetch_live_upwork_jobs", skills: cleaned, minutes, include_renewed: includeRenewed ? 1 : 0 }, { timeout: 90_000, signal });
+  // A job matching several skills can come back once per skill; merge those into one entry.
+  const byId = new Map();
+  (data.jobs || []).map(mapLiveJob).forEach((job) => {
+    const seen = byId.get(job.id);
+    byId.set(job.id, seen ? { ...seen, matchedSkills: [...new Set([...seen.matchedSkills, ...job.matchedSkills])] } : job);
   });
-  return { query, records: [], connected: false };
+  const jobs = [...byId.values()].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
+  return {
+    jobs,
+    total: Number(data.total_jobs) || jobs.length,
+    skillsSearched: data.skills_searched || {},
+    windowMinutes: Number(data.window_minutes) || minutes,
+    includeRenewed: Boolean(data.include_renewed ?? includeRenewed),
+    generatedAt: data.generated_at || new Date().toISOString(),
+    cutoff: data.cutoff_utc || "",
+    errors: data.errors || [],
+    skills: cleaned,
+  };
 }
 
 export async function fetchSkills({ page = 1, perPage = 20 } = {}) {
@@ -782,7 +891,7 @@ export const api = {
   getJobStats: (params) => fetchJobStats(params),
   getJob: (id) => fetchJobById(id),
   getCoverLetter: (job) => fetchCoverLetter(job),
-  liveSearchJobs: (params) => liveSearchUpworkJobs(params),
+  getLiveJobs: (params) => fetchLiveUpworkJobs(params),
   getVideoFeeds: (options) => fetchVideoFeeds(options),
   getSiteContent: (options) => fetchSiteContent(options),
   getSkills: (params) => fetchSkills(params),

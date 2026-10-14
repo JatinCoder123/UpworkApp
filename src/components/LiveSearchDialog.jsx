@@ -1,83 +1,106 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { ArrowUpRight, Broadcast, CheckCircle, Info, MagnifyingGlass, X } from '@phosphor-icons/react'
-import { DialogHeader, Modal, primaryButton } from './ui'
+import { useNavigate } from 'react-router-dom'
+import { Crosshair, MagnifyingGlass, Plus, WarningCircle, X } from '@phosphor-icons/react'
+import { DialogHeader, Modal } from './ui'
 import { api } from '../services/api'
+import { LIVE_WINDOWS, loadLiveResult, loadLiveSettings, newSince, saveLiveResult, saveLiveSettings, scanSteps, windowLabel } from '../lib/liveJobs'
 
-const STEPS = [
-  'Connecting to the Upwork marketplace',
-  'Searching jobs for your keywords',
-  'Filtering by posting time and budget',
-  'Scoring matches against your skills',
-  'Removing jobs already in your feed',
-]
-const STEP_MS = 1000
+const label = 'text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]'
 
-export default function LiveSearchDialog({ suggestions = [], onClose }) {
-  const [query, setQuery] = useState('')
+// Runs the live Upwork scan from the jobs feed and opens /live-jobs with the results.
+export default function LiveSearchDialog({ skillRecords = [], skillsLoading = false, onClose }) {
+  const navigate = useNavigate()
+  const [settings, setSettings] = useState(loadLiveSettings)
+  const [draft, setDraft] = useState('')
   const [step, setStep] = useState(0)
+  const [elapsed, setElapsed] = useState(0)
   const controller = useRef(null)
-  const search = useMutation({
-    mutationFn: (value) => {
+
+  const scan = useMutation({
+    mutationFn: (params) => {
       controller.current = new AbortController()
-      return api.liveSearchJobs({ query: value, signal: controller.current.signal })
+      return api.getLiveJobs({ ...params, signal: controller.current.signal })
+    },
+    onSuccess: (data) => {
+      const justIn = newSince(loadLiveResult(), data)
+      saveLiveResult(data)
+      navigate('/live-jobs', { state: { justIn, fromSearch: true } })
     },
   })
+  const scanning = scan.isPending
+  const steps = scanSteps(settings.skills, windowLabel(settings.minutes))
 
   useEffect(() => {
-    if (!search.isPending) return undefined
-    const timer = window.setInterval(() => setStep((current) => Math.min(current + 1, STEPS.length - 1)), STEP_MS)
-    return () => window.clearInterval(timer)
-  }, [search.isPending])
+    if (!scanning) return undefined
+    const stepTimer = window.setInterval(() => setStep((current) => Math.min(current + 1, steps.length - 1)), 1400)
+    const clock = window.setInterval(() => setElapsed((current) => current + 1), 1000)
+    return () => { window.clearInterval(stepTimer); window.clearInterval(clock) }
+  }, [scanning, steps.length])
   useEffect(() => () => controller.current?.abort(), [])
 
-  const start = (value = query) => {
-    const trimmed = value.trim()
-    if (!trimmed || search.isPending) return
-    setQuery(trimmed)
-    setStep(0)
-    search.mutate(trimmed)
+  const update = (patch) => setSettings((current) => { const next = { ...current, ...patch }; saveLiveSettings(next); return next })
+  const toggleSkill = (name) => update({ skills: settings.skills.includes(name) ? settings.skills.filter((item) => item !== name) : [...settings.skills, name] })
+  const addSkill = () => {
+    const value = draft.trim()
+    if (value && !settings.skills.some((item) => item.toLowerCase() === value.toLowerCase())) update({ skills: [...settings.skills, value] })
+    setDraft('')
   }
-  const cancel = () => { controller.current?.abort(); search.reset() }
-  const done = search.isSuccess
+  const start = () => { if (!settings.skills.length || scanning) return; setStep(0); setElapsed(0); scan.mutate(settings) }
+  const stop = () => { controller.current?.abort(); scan.reset() }
+  const known = new Set(skillRecords.map((record) => record.name.toLowerCase()))
+  const custom = settings.skills.filter((skill) => !known.has(skill.toLowerCase()))
 
   return <Modal onClose={onClose} wide>
     <DialogHeader eyebrow="Live from Upwork" title="Search jobs live" onClose={onClose} />
-    <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--muted)]">Search Upwork directly for fresh jobs that are not in your feed yet.</p>
+    <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--muted)]">Scan Upwork directly for fresh posts in your skills, before they reach the feed.</p>
 
-    <form onSubmit={(event) => { event.preventDefault(); start() }} className="mt-7 flex items-center gap-2 rounded-2xl bg-[var(--paper)] p-2 ring-1 ring-black/5 focus-within:ring-[var(--lime-dark)]">
-      <span className="grid size-10 shrink-0 place-items-center text-[var(--muted)]"><MagnifyingGlass size={18} /></span>
-      <input autoFocus value={query} disabled={search.isPending} onChange={(event) => { setQuery(event.target.value); if (done) search.reset() }} placeholder="e.g. WordPress plugin, SuiteCRM, Twilio" className="min-w-0 flex-1 bg-transparent px-1 text-sm outline-none disabled:opacity-60" />
-      {search.isPending
-        ? <button type="button" onClick={cancel} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-bold text-[var(--muted)] hover:bg-black/5"><X size={13} weight="bold" />Stop</button>
-        : <button type="submit" disabled={!query.trim()} className="shrink-0 rounded-xl bg-[var(--ink)] px-4 py-2.5 text-xs font-bold text-white transition-opacity disabled:opacity-40">Search</button>}
-    </form>
-
-    {!search.isPending && !done && suggestions.length > 0 && <div className="mt-4 flex flex-wrap items-center gap-2">
-      <span className="text-[10px] font-bold uppercase tracking-[.14em] text-[var(--muted)]">Try</span>
-      {suggestions.slice(0, 6).map((item) => <button key={item} type="button" onClick={() => start(item)} className="rounded-full bg-[var(--surface)] px-3 py-1.5 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)] transition-colors hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]">{item}</button>)}
-    </div>}
-
-    {search.isPending && <div className="mt-7 grid gap-6 sm:grid-cols-[9rem_1fr] sm:items-center" role="status" aria-live="polite">
-      <div className="live-radar mx-auto" aria-hidden="true"><span /><span /><span /><i /><Broadcast size={22} weight="duotone" className="relative z-10 text-[var(--accent-strong)]" /></div>
-      <div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-black/[.07] dark:bg-white/10"><div className="live-progress h-full rounded-full bg-[var(--lime-dark)]" /></div>
-        <ol className="mt-5 space-y-2.5">{STEPS.map((label, index) => <li key={label} className={`flex items-center gap-2.5 text-xs font-semibold transition-all duration-500 ${index > step ? 'translate-x-2 opacity-0' : 'translate-x-0 opacity-100'}`}>
-          {index < step ? <CheckCircle size={15} weight="fill" className="shrink-0 text-[var(--lime-dark)]" /> : <span className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />}
-          <span className={index < step ? 'text-[var(--muted)]' : ''}>{index === 1 ? `Searching jobs for “${query}”` : label}</span>
+    {scanning ? <div className="live-hero mt-7 grid gap-6 rounded-[1.6rem] p-6 sm:grid-cols-[9rem_1fr] sm:items-center" role="status" aria-live="polite">
+      <div className="mx-auto w-36"><div className="live-scope" data-scanning="true"><span className="live-ping" /><span className="live-ping" /><span className="live-sweep" /><span className="absolute left-1/2 top-1/2 z-[1] size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#c8e875] shadow-[0_0_20px_#c8e875]" /></div></div>
+      <div className="min-w-0">
+        <p className="flex items-center justify-between text-[11px] font-semibold text-white/50"><span>Scanning the last {windowLabel(settings.minutes)}</span><span className="font-mono">{elapsed}s</span></p>
+        <ol className="mt-3 space-y-2">{steps.map((text, index) => <li key={text} className={`flex items-center gap-2.5 text-xs font-semibold transition-opacity duration-300 ${index > step ? 'opacity-25' : 'opacity-100'} ${index < step ? 'text-white/55' : 'text-white'}`}>
+          {index < step ? <span className="grid size-3.5 shrink-0 place-items-center rounded-full bg-[#c8e875] text-[8px] text-[#1d2810]">✓</span> : <span className={`size-3.5 shrink-0 rounded-full border-2 border-white/20 ${index === step ? 'animate-spin border-t-[#c8e875]' : ''}`} />}
+          {text}
         </li>)}</ol>
+        <button type="button" onClick={stop} className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-xs font-bold text-white ring-1 ring-white/15 hover:bg-white/15"><X size={12} weight="bold" />Stop</button>
       </div>
-      <div className="grid gap-2 sm:col-span-2">{[0, 1, 2].map((item) => <div key={item} className="flex items-center gap-3 rounded-2xl bg-[var(--paper)] p-3"><span className="skeleton-bone size-9 rounded-xl" /><div className="flex-1 space-y-2"><span className="skeleton-bone block h-2.5 w-3/4 rounded-full" /><span className="skeleton-bone block h-2 w-1/3 rounded-full" /></div></div>)}</div>
-    </div>}
+    </div>
+      : <>
+        <div className="mt-7 flex items-center justify-between gap-3">
+          <p className={label}>Skills to scan{settings.skills.length > 0 && <span className="ml-2 rounded-full bg-[var(--ink)] px-1.5 py-0.5 text-white">{settings.skills.length}</span>}</p>
+          {settings.skills.length > 0 && <button type="button" onClick={() => update({ skills: [] })} className="text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear</button>}
+        </div>
+        <div className="mt-3 flex max-h-36 flex-wrap gap-1.5 overflow-y-auto pr-1 [scrollbar-width:thin]">
+          {skillRecords.map(({ id, name }) => <button key={id} type="button" aria-pressed={settings.skills.includes(name)} onClick={() => toggleSkill(name)} className="skill-tag rounded-full px-3 py-1.5 text-[11px] font-semibold">{name}</button>)}
+          {custom.map((name) => <button key={name} type="button" aria-pressed="true" onClick={() => toggleSkill(name)} className="skill-tag inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold">{name}<X size={10} weight="bold" /></button>)}
+          {skillsLoading && <span className="skeleton-bone h-7 w-40 rounded-full" />}
+        </div>
+        <form onSubmit={(event) => { event.preventDefault(); addSkill() }} className="mt-3 flex items-center gap-2 rounded-full bg-[var(--paper)] py-1 pl-4 pr-1 ring-1 ring-black/5 focus-within:ring-[var(--lime-dark)]">
+          <MagnifyingGlass size={14} className="shrink-0 text-[var(--muted)]" />
+          <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Add any skill, e.g. Laravel" aria-label="Add a skill" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
+          <button type="submit" disabled={!draft.trim()} aria-label="Add skill" className="grid size-8 place-items-center rounded-full bg-[var(--ink)] text-white disabled:opacity-30"><Plus size={13} weight="bold" /></button>
+        </form>
 
-    {done && (search.data.records.length ? <ul className="mt-7 grid gap-2">{search.data.records.map((job) => <li key={job.id || job.url}><a href={job.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--paper)] p-4 text-sm font-semibold transition-colors hover:bg-[var(--lime)]/25"><span className="min-w-0 truncate">{job.title}</span><ArrowUpRight size={15} className="shrink-0" /></a></li>)}</ul> : <div className="mt-7 rounded-2xl bg-[var(--paper)] p-5">
-      <div className="flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--lime)]/40 text-[var(--accent-strong)]"><Info size={18} weight="duotone" /></span><div>
-        <p className="text-sm font-semibold">{search.data.connected ? `No new jobs for “${search.data.query}”` : 'Live search is not connected yet'}</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{search.data.connected ? 'Try broader keywords or check back in a few minutes.' : 'The search ran in preview mode. Live Upwork results will appear here once the search endpoint is connected.'}</p>
-      </div></div>
-    </div>)}
-    {search.isError && search.error?.code !== 'ABORTED' && <p role="alert" className="mt-5 rounded-xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]">{search.error?.message}</p>}
+        <div className="mt-6 flex flex-wrap items-end gap-4 border-t border-[var(--line)]/70 pt-5">
+          <div>
+            <p className={label}>Posted within</p>
+            <div className="mt-2 flex flex-wrap gap-1 rounded-full bg-[var(--paper)] p-1" role="radiogroup" aria-label="Posted within">
+              {LIVE_WINDOWS.map((item) => <button key={item.minutes} type="button" role="radio" aria-checked={settings.minutes === item.minutes} onClick={() => update({ minutes: item.minutes })} className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${settings.minutes === item.minutes ? 'bg-[var(--ink)] text-white' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{item.label}</button>)}
+            </div>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2.5 pb-1.5 text-[11px] font-semibold text-[var(--muted)]">
+            <input type="checkbox" checked={settings.includeRenewed} onChange={(event) => update({ includeRenewed: event.target.checked })} className="peer sr-only" />
+            <span className="relative h-5 w-9 rounded-full bg-black/10 transition-colors peer-checked:bg-[var(--lime-dark)] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--lime-dark)]/50 after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4 dark:bg-white/15" />
+            Include renewed posts
+          </label>
+        </div>
 
-    {done && <button type="button" onClick={() => start()} className={`${primaryButton} mt-6 w-full`}><span>Search again</span><span className="ml-auto grid size-8 place-items-center rounded-full bg-white/10"><ArrowUpRight size={15} /></span></button>}
+        {scan.isError && scan.error?.code !== 'ABORTED' && <p role="alert" className="mt-5 flex items-start gap-2 rounded-xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" />{scan.error?.message || 'The live scan failed.'}</p>}
+
+        <button type="button" onClick={start} disabled={!settings.skills.length} className="upwork-apply-button mt-6 flex h-12 w-full items-center justify-center gap-2.5 rounded-full text-sm font-bold disabled:pointer-events-none disabled:opacity-40">
+          <Crosshair size={18} weight="bold" className="relative z-10" /><span className="relative z-10">{settings.skills.length ? `Scan ${settings.skills.length} skill${settings.skills.length === 1 ? '' : 's'} live` : 'Pick a skill to scan'}</span>
+        </button>
+      </>}
   </Modal>
 }

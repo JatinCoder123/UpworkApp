@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import Login from './pages/Login'
 import Jobs from './pages/Jobs'
 import JobDetail from './pages/JobDetail'
+import LiveJobs from './pages/LiveJobs'
+import LiveJobDetail from './pages/LiveJobDetail'
 import Activity from './pages/Activity'
 import TechNews from './pages/TechNews'
 import TechNewsDetail from './pages/TechNewsDetail'
@@ -44,6 +46,8 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
       <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
+      <Route path="/live-jobs" element={<ProtectedRoute><LiveJobs /></ProtectedRoute>} />
+      <Route path="/live-jobs/:id" element={<ProtectedRoute><LiveJobDetail /></ProtectedRoute>} />
       <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
       <Route path="/tech-news" element={<ProtectedRoute><TechNews /></ProtectedRoute>} />
       <Route path="/tech-news/:id" element={<ProtectedRoute><TechNewsDetail /></ProtectedRoute>} />

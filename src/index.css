@@ -123,24 +123,42 @@ button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
 .upwork-apply-button:hover::before { translate: 520% 0; }
 .upwork-apply-button:active, .upwork-view-button:active { transform: translateY(0) scale(.98); }
 .job-detail-title { max-width: 52rem; font-size: clamp(1.75rem, 2.9vw, 2.9rem); font-weight: 600; line-height: 1.1; letter-spacing: -.035em; text-wrap: balance; overflow-wrap: anywhere; }
-.live-radar { position: relative; display: grid; width: 8rem; height: 8rem; place-items: center; }
-.live-radar span { position: absolute; inset: 0; border: 1px solid color-mix(in srgb, var(--lime-dark) 55%, transparent); border-radius: 999px; animation: live-radar-ping 2.4s cubic-bezier(.2,.6,.35,1) infinite; }
-.live-radar span:nth-child(2) { animation-delay: .8s; }
-.live-radar span:nth-child(3) { animation-delay: 1.6s; }
-.live-radar i { position: absolute; inset: .9rem; border-radius: 999px; background: conic-gradient(from 0deg, color-mix(in srgb, var(--lime) 55%, transparent), transparent 28%); animation: session-loader-orbit 1.6s linear infinite; }
-.live-radar::after { content: ''; position: absolute; width: 3.4rem; height: 3.4rem; border-radius: 999px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
-.live-progress { transform-origin: left; animation: live-progress 5.2s cubic-bezier(.45,.05,.35,1) forwards; }
+/* Live Upwork scanner */
+.live-hero { position: relative; isolation: isolate; overflow: hidden; color: #f4f7ea; background: radial-gradient(120% 90% at 85% 10%, #3a5229 0%, transparent 55%), radial-gradient(90% 80% at 0% 100%, #1e2c1c 0%, transparent 60%), #172015; }
+.live-hero::before { content: ''; position: absolute; inset: 0; z-index: -1; background-image: linear-gradient(rgb(200 232 117 / .055) 1px, transparent 1px), linear-gradient(90deg, rgb(200 232 117 / .055) 1px, transparent 1px); background-size: 34px 34px; mask-image: radial-gradient(80% 90% at 70% 40%, black, transparent); }
+.live-scope { position: relative; aspect-ratio: 1; width: 100%; border-radius: 999px; background: repeating-radial-gradient(circle, transparent 0 calc(20% - 1px), rgb(200 232 117 / .16) calc(20% - 1px) 20%), radial-gradient(circle, rgb(200 232 117 / .1), transparent 70%); box-shadow: inset 0 0 0 1px rgb(200 232 117 / .28), 0 0 80px rgb(145 180 61 / .16); }
+.live-scope::before, .live-scope::after { content: ''; position: absolute; background: rgb(200 232 117 / .12); }
+.live-scope::before { inset: 0 50% 0 auto; width: 1px; }
+.live-scope::after { inset: 50% 0 auto 0; height: 1px; }
+.live-sweep { position: absolute; inset: 0; border-radius: 999px; background: conic-gradient(from 0deg, rgb(200 232 117 / .42), rgb(200 232 117 / .08) 16%, transparent 30%); animation: session-loader-orbit 4.5s linear infinite; }
+.live-scope[data-scanning='true'] .live-sweep { animation-duration: 1.1s; }
+.live-ping { position: absolute; inset: 0; border-radius: 999px; border: 1px solid rgb(200 232 117 / .5); animation: live-radar-ping 2.6s cubic-bezier(.2,.6,.35,1) infinite; }
+.live-ping:nth-of-type(2) { animation-delay: 1.3s; }
+.live-blip { position: absolute; z-index: 2; width: .8rem; height: .8rem; margin: -.4rem; border-radius: 999px; background: var(--blip, #c8e875); box-shadow: 0 0 0 .3rem color-mix(in srgb, var(--blip, #c8e875) 22%, transparent), 0 0 1.1rem var(--blip, #c8e875); animation: live-blip-in .3s ease-out both; transition: transform 250ms ease; }
+.live-blip::after { content: ''; position: absolute; inset: -.35rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--blip, #c8e875) 45%, transparent); }
+.live-blip:hover, .live-blip:focus-visible { transform: scale(1.5); outline: none; }
+.live-ticker { animation: domain-ticker .45s cubic-bezier(.32,.72,0,1) both; }
+.live-card { position: relative; }
+.live-card::before { content: ''; position: absolute; inset: 0; z-index: 0; border-radius: inherit; padding: 1px; background: linear-gradient(120deg, var(--fresh, var(--lime-dark)), transparent 40%); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; opacity: .8; pointer-events: none; }
+.live-just-in { animation: live-glow 2.4s ease-in-out 1; }
+.live-meter span { height: .45rem; flex: 1; border-radius: 999px; background: color-mix(in srgb, var(--muted) 18%, transparent); }
+.live-meter span[data-on='true'] { background: var(--meter); }
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .skill-chip { --skill-bg: hsl(var(--skill-h) 62% 91%); --skill-fg: hsl(var(--skill-h) 48% 28%); --skill-line: hsl(var(--skill-h) 45% 78%); background: var(--skill-bg); color: var(--skill-fg); box-shadow: inset 0 0 0 1px var(--skill-line); }
 :root[data-theme='dark'] .skill-chip { --skill-bg: hsl(var(--skill-h) 30% 18%); --skill-fg: hsl(var(--skill-h) 70% 80%); --skill-line: hsl(var(--skill-h) 30% 30%); }
 .skill-chip[aria-pressed='true'] { --skill-bg: hsl(var(--skill-h) 55% 40%); --skill-fg: #fff; --skill-line: transparent; }
+.skill-tag { background: var(--paper); color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); transition: background-color 200ms ease, color 200ms ease; }
+.skill-tag:is(button):hover { color: var(--text); }
+.skill-tag[aria-pressed='true'] { background: color-mix(in srgb, var(--lime) 55%, var(--surface)); color: #26320b; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lime-dark) 45%, transparent); }
+:root[data-theme='dark'] .skill-tag[aria-pressed='true'] { background: color-mix(in srgb, var(--lime) 18%, var(--surface)); color: var(--accent-strong); }
 .marquee-mask {mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent); }
 .marquee-track { animation: marquee 48s linear infinite; }
 .marquee-mask:hover .marquee-track { animation-play-state: paused; }
 @keyframes marquee { to { translate: -50% 0; } }
 @keyframes live-radar-ping { from { scale: .35; opacity: 1; } to { scale: 1; opacity: 0; } }
-@keyframes live-progress { from { scale: 0 1; } to { scale: 1 1; } }
+@keyframes live-blip-in { from { opacity: 0; scale: .6; } to { opacity: 1; scale: 1; } }
+@keyframes live-glow { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--lime) 45%, transparent), 0 18px 46px color-mix(in srgb, var(--lime-dark) 25%, transparent); } }
 @keyframes session-loader-orbit { to { rotate: 360deg; } }
 @keyframes session-loader-breathe { 0%, 100% { scale: .92; opacity: .45; } 50% { scale: 1; opacity: 1; } }
 @keyframes session-loader-progress { from { translate: -105% 0; } to { translate: 205% 0; } }

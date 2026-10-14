@@ -8,8 +8,8 @@ import LogoLoader from "../components/LogoLoader";
 import HScroll from "../components/HScroll";
 import { AddJobDialog } from "../components/dialogs";
 import DateTimeRangeFilter from "../components/DateTimeRangeFilter";
-import LiveSearchDialog from "../components/LiveSearchDialog";
 import OpportunityFilterDialog from "../components/OpportunityFilterDialog";
+import LiveSearchDialog from "../components/LiveSearchDialog";
 import { ActiveDateFilterChip, RefreshFilterButton } from "../components/FilterToolbarControls";
 import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
@@ -248,7 +248,7 @@ export default function Jobs() {
         </div>
 
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
-        {liveSearching && <LiveSearchDialog suggestions={skillRecords.map((record) => record.name)} onClose={() => setLiveSearching(false)} />}
+        {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}
         {skillDialog && <OpportunityFilterDialog skills={skills} skillRecords={skillRecords} isLoading={skillsLoading || isFetchingMoreSkills} error={skillsError ? skillsQueryError : null} onClose={() => setSkillDialog(false)} onApply={(nextSkills) => { setSkills(nextSkills); setSkillDialog(false); }} />}
       </main>
     </Shell>
