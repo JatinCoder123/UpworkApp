@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Navigate } from "react-router-dom";
 import gsap from "gsap";
-import { ArrowUpRight, Check, ShieldCheck } from "@phosphor-icons/react";
+import { ArrowUpRight, FileText, Globe, PencilSimpleLine, Plus, Rss, ShieldCheck, Stack, VideoCamera } from "@phosphor-icons/react";
 import { Mark, primaryButton } from "../components/ui";
 import ThemeToggle from "../components/ThemeToggle";
 import GridPattern from "../components/GridPattern";
@@ -19,11 +19,13 @@ function MicrosoftMark() {
 }
 
 const highlights = [
-  "Get live AI news",
-  "Get the latest projects",
-  "Get customized content for your website",
-  "Add your custom feeds",
-  "Select and buy a domain",
+  { icon: Rss, label: "Get live AI news" },
+  { icon: Stack, label: "Get the latest projects" },
+  { icon: PencilSimpleLine, label: "Customized content for your website" },
+  { icon: Plus, label: "Add your custom feeds" },
+  { icon: Globe, label: "Select and buy a domain" },
+  { icon: FileText, label: "AI-generated cover letters", isNew: true },
+  { icon: VideoCamera, label: "AI-generated videos", isNew: true },
 ];
 
 export default function Login() {
@@ -76,7 +78,7 @@ export default function Login() {
           </span>
         </div>
 
-        <div className="my-auto max-w-xl py-16">
+        <div className="my-auto max-w-3xl py-16">
           <h1
             data-enter
             className="max-w-lg text-[clamp(3rem,7vw,6.8rem)] font-medium leading-[.86] tracking-[-.075em]"
@@ -86,20 +88,25 @@ export default function Login() {
             <span className="font-serif italic text-[var(--lime)]">LiveFeeds</span>
           </h1>
 
+          <p data-enter className="mt-8 max-w-xl text-[15px] leading-7 text-white/55">
+            News, projects, content and creative assets — generated and delivered by AI, the moment you need them.
+          </p>
+
           <ul
-            className="mt-7 grid max-w-lg grid-cols-2 gap-x-5 gap-y-2.5"
+            className="mt-8 grid gap-3 sm:grid-cols-2"
             aria-label="Platform features"
           >
-            {highlights.map((highlight, index) => (
+            {highlights.map(({ icon: Icon, label, isNew }, index) => (
               <li
-                key={highlight}
-                className="login-feature flex min-w-0 items-center gap-2 text-[11px] font-semibold leading-4 text-white/75"
-                style={{ "--feature-delay": `${0.55 + index * 0.3}s` }}
+                key={label}
+                className="login-feature-card flex min-w-0 items-center gap-3.5 rounded-2xl bg-white/[.035] p-3 pr-4 ring-1 ring-inset ring-white/[.08] backdrop-blur-sm transition-colors duration-300 hover:bg-white/[.06] hover:ring-[var(--lime)]/25"
+                style={{ "--feature-delay": `${0.45 + index * 0.12}s` }}
               >
-                <span className="login-feature-check grid size-4 shrink-0 place-items-center rounded-[.3rem] bg-[var(--lime)]/10 text-[var(--lime)] ring-1 ring-inset ring-[var(--lime)]/40 shadow-[0_0_14px_rgba(200,232,117,.2)]">
-                  <Check size={10} weight="bold" />
+                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[var(--lime)]/[.07] text-[var(--lime)] ring-1 ring-inset ring-[var(--lime)]/30 shadow-[0_0_18px_rgba(200,232,117,.14)]">
+                  <Icon size={19} />
                 </span>
-                <span className="login-feature-copy">{highlight}</span>
+                <span className="min-w-0 flex-1 text-sm font-semibold leading-5 text-white/85">{label}</span>
+                {isNew && <span className="shrink-0 rounded-md bg-[var(--lime)] px-2 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-[#1d2810]">New</span>}
               </li>
             ))}
           </ul>

@@ -2,6 +2,18 @@ function Bone({ className = '' }) {
   return <span className={`skeleton-bone block rounded-full ${className}`} />
 }
 
+export function DrawerDetailSkeleton() {
+  return <div role="status" aria-live="polite" className="space-y-5 p-4 sm:p-6">
+    <span className="sr-only">Loading job details</span>
+    <div className="rounded-[1.8rem] bg-[var(--surface)] p-6 ring-1 ring-[var(--line)]/70">
+      <div className="flex gap-3"><Bone className="h-6 w-20" /><Bone className="h-6 w-32" /></div>
+      <div className="mt-6 space-y-3"><Bone className="h-8 w-[92%] rounded-2xl" /><Bone className="h-8 w-[60%] rounded-2xl" /></div>
+      <div className="mt-6 grid gap-3 sm:grid-cols-2"><Bone className="h-16 rounded-2xl" /><Bone className="h-16 rounded-2xl" /><Bone className="h-16 rounded-2xl" /><Bone className="h-16 rounded-2xl" /></div>
+    </div>
+    <div className="space-y-3 rounded-[1.6rem] bg-[var(--surface)] p-6 ring-1 ring-[var(--line)]/70"><Bone className="h-3 w-24" /><Bone className="h-4 w-full rounded-lg" /><Bone className="h-4 w-[90%] rounded-lg" /><Bone className="h-4 w-[75%] rounded-lg" /></div>
+  </div>
+}
+
 export default function JobDetailSkeleton() {
   return <main role="status" aria-live="polite" className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-10 sm:px-6 md:pt-14">
     <span className="sr-only">Loading job details</span>

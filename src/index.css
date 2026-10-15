@@ -175,6 +175,22 @@ button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
 }
 .intro-orbit::after { content: ''; position: absolute; inset: 1rem; border: 1px dashed rgb(255 255 255 / .08); border-radius: 999px; }
 
+/* Job preview drawer: scroll on its own compositor layer and skip painting sections that are off screen. */
+.drawer-scroll { transform: translateZ(0); will-change: scroll-position; -webkit-overflow-scrolling: touch; }
+.drawer-scroll [data-detail] { content-visibility: auto; contain-intrinsic-size: auto 320px; }
+
+/* Toggle track that stays visible on both themes; checked state comes from the preceding peer input. */
+.usa-switch { background: color-mix(in srgb, var(--muted) 45%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent); }
+.usa-switch::after { background: #fff; }
+.peer:checked + .usa-switch { background: var(--lime-dark); box-shadow: none; }
+.login-feature-card {
+  opacity: 0;
+  animation: login-card-in .6s cubic-bezier(.2,.85,.3,1) var(--feature-delay) forwards;
+}
+@keyframes login-card-in {
+  from { opacity: 0; transform: translateY(14px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
 .login-feature-check {
   opacity: 0;
   transform: scale(.45) rotate(-18deg);

@@ -5,9 +5,12 @@ import gsap from 'gsap'
 import { ArrowClockwise, ArrowLeft, Broadcast, Clock, Lightning, MagnifyingGlass, Plus, Crosshair, Sparkle, Timer, Users, WarningCircle, X } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import LiveJobCard, { freshnessTone } from '../components/LiveJobCard'
+import JobDrawer from '../components/JobDrawer'
+import { MoreFiltersMenu, SortMenu } from '../components/JobListControls'
 import { api } from '../services/api'
 import { LIVE_WINDOWS, isEarlyBird, loadLiveResult, loadLiveSettings, minutesSince, newSince, saveLiveResult, saveLiveSettings, scanSteps } from '../lib/liveJobs'
-import { useJobReactions } from '../lib/jobSignals'
+import { loadExtraFilters, saveExtraFilters } from '../lib/preferences'
+import { matchesExtraFilters, useJobReactions } from '../lib/jobSignals'
 import { timeAgo, useNow } from '../lib/time'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -15,6 +18,13 @@ const AUTO_SCAN_MS = 5 * 60_000
 // Brighter versions of the card freshness tones, readable on the dark radar.
 const BLIP_COLORS = { 'var(--lime-dark)': '#c8e875', '#d9a53a': '#e8c867', 'var(--orange)': '#f39a6b' }
 const label = 'text-[9px] font-bold uppercase tracking-[.18em]'
+// Live jobs come straight from Upwork, so they are sorted in the browser.
+const LIVE_SORTS = [
+  { id: 'newest', label: 'Newest first', compare: (a, b) => new Date(b.postedAt) - new Date(a.postedAt) },
+  { id: 'oldest', label: 'Oldest first', compare: (a, b) => new Date(a.postedAt) - new Date(b.postedAt) },
+  { id: 'applicants', label: 'Fewest applicants', compare: (a, b) => a.applicants - b.applicants },
+  { id: 'spent', label: 'Client spend: high to low', compare: (a, b) => (Number(b.raw?.client?.totalSpent?.rawValue ?? b.raw?.client?.totalSpent) || 0) - (Number(a.raw?.client?.totalSpent?.rawValue ?? a.raw?.client?.totalSpent) || 0) },
+]
 
 // Stable pseudo-random angle per job so blips do not jump between renders.
 function angleFor(id) {
@@ -89,6 +99,10 @@ export default function LiveJobs() {
   const [step, setStep] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [autoScan, setAutoScan] = useState(false)
+  const [sort, setSort] = useState('newest')
+  const [extraFilters, setExtraFilters] = useState(() => loadExtraFilters('live'))
+  const [preview, setPreview] = useState(null)
+  useEffect(() => saveExtraFilters('live', extraFilters), [extraFilters])
   const root = useRef(null)
   const resultsRef = useRef(null)
   const jobsRef = useRef(null)
@@ -151,6 +165,10 @@ export default function LiveJobs() {
   }, [autoScan])
 
   const jobs = useMemo(() => result?.jobs || [], [result])
+  const visibleJobs = useMemo(() => {
+    const compare = (LIVE_SORTS.find((item) => item.id === sort) || LIVE_SORTS[0]).compare
+    return jobs.filter((job) => matchesExtraFilters(job, extraFilters)).sort(compare)
+  }, [jobs, sort, extraFilters])
   const earlyBirds = jobs.filter((job) => isEarlyBird(job, now)).length
   const avgApplicants = jobs.length ? Math.round(jobs.reduce((sum, job) => sum + job.applicants, 0) / jobs.length) : 0
   const resultWindow = result?.windowMinutes || settings.minutes
@@ -201,7 +219,7 @@ export default function LiveJobs() {
                   : <button type="button" onClick={() => setAutoScan((value) => !value)} aria-pressed={autoScan} className={`inline-flex items-center gap-2 text-xs font-semibold transition-colors ${autoScan ? 'text-[#c8e875]' : 'text-white/50 hover:text-white'}`}><Timer size={14} weight="bold" />{autoScan ? 'Auto-scan on · every 5 minutes' : 'Turn on auto-scan every 5 minutes'}</button>}
             </div>
           </div>
-          <LiveScope jobs={jobs} windowMinutes={resultWindow} scanning={scanning} now={now} onOpen={(id) => navigate(`/live-jobs/${id}`)} />
+          <LiveScope jobs={jobs} windowMinutes={resultWindow} scanning={scanning} now={now} onOpen={(id) => setPreview(jobs.find((job) => job.id === id) || null)} />
         </div>
       </div>
     </section>
@@ -220,14 +238,20 @@ export default function LiveJobs() {
           </div>
 
           <div ref={jobsRef} className="mt-8 flex scroll-mt-[calc(var(--shell-h)+1rem)] flex-wrap items-center gap-3">
-            <h2 className="text-lg font-semibold tracking-[-.02em]">Newest first</h2>
+            <h2 className="text-lg font-semibold tracking-[-.02em]">{visibleJobs.length === jobs.length ? `${jobs.length} jobs` : `${visibleJobs.length} of ${jobs.length} jobs`}</h2>
+            <SortMenu value={sort} options={LIVE_SORTS} onChange={setSort} label="Sort live jobs" />
+            <MoreFiltersMenu value={extraFilters} onChange={setExtraFilters} />
             <div className="flex flex-wrap gap-1.5">{Object.entries(result.skillsSearched || {}).map(([skill, count]) => <span key={skill} className="rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]">{skill} · {count}</span>)}</div>
             <span className="ml-auto flex items-center gap-3 text-[11px] font-semibold text-[var(--muted)]">Scanned {timeAgo(result.generatedAt, now).toLowerCase()}
               <button type="button" onClick={start} disabled={!settings.skills.length} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-3 py-1.5 font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)] disabled:opacity-40"><ArrowClockwise size={12} weight="bold" />Rescan</button>
             </span>
           </div>
 
-          {jobs.length ? <section className="mt-4 space-y-4">{jobs.map((job, index) => <LiveJobCard key={job.id} job={job} index={index} now={now} windowMinutes={resultWindow} justIn={justIn.includes(job.id)} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id)} onFavorite={() => reactions.toggleFavorite(job.id)} />)}</section>
+          {jobs.length && !visibleJobs.length ? <section className="mt-4 rounded-[1.6rem] bg-[var(--surface)] px-6 py-12 text-center ring-1 ring-[var(--line)]/70">
+            <h3 className="text-lg font-semibold">No jobs match these filters</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">{jobs.length} jobs were found in this scan, but none match the job type or client location filter.</p>
+          </section>
+            : jobs.length ? <section className="mt-4 space-y-4">{visibleJobs.map((job, index) => <LiveJobCard key={job.id} job={job} index={index} now={now} windowMinutes={resultWindow} justIn={justIn.includes(job.id)} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id)} onFavorite={() => reactions.toggleFavorite(job.id)} applied={reactions.isApplied(job.id)} dismissed={reactions.isDismissed(job.id)} onOpen={() => setPreview(job)} />)}</section>
             : <section className="mt-4 rounded-[1.6rem] bg-[var(--surface)] px-6 py-16 text-center ring-1 ring-[var(--line)]/70">
               <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--lime)]/30 text-[var(--accent-strong)]"><Crosshair size={24} weight="duotone" /></div>
               <h3 className="mt-5 text-xl font-semibold">Quiet out there</h3>
@@ -243,5 +267,6 @@ export default function LiveJobs() {
             </div>)}
           </section>}
     </div>
+    {preview && <JobDrawer job={preview} jobs={visibleJobs} live onSelect={setPreview} onClose={() => setPreview(null)} />}
   </main></Shell>
 }

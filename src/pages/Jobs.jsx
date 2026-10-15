@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import gsap from "gsap";
-import { Briefcase, Broadcast, ClockCounterClockwise, Funnel, MagnifyingGlass, Plus, Star, X } from "@phosphor-icons/react";
+import { Briefcase, Broadcast, ClockCounterClockwise, Funnel, GearSix, MagnifyingGlass, Plus, Star, X } from "@phosphor-icons/react";
 import Shell from "../components/Shell";
 import JobCard from "../components/JobCard";
+import JobDrawer from "../components/JobDrawer";
+import { MoreFiltersMenu, SortMenu } from "../components/JobListControls";
 import LogoLoader from "../components/LogoLoader";
 import HScroll from "../components/HScroll";
 import { AddJobDialog } from "../components/dialogs";
@@ -13,9 +15,9 @@ import LiveSearchDialog from "../components/LiveSearchDialog";
 import { ActiveDateFilterChip, RefreshFilterButton } from "../components/FilterToolbarControls";
 import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
-import { loadDateFilter, loadJobScope, loadJobStatus, saveDateFilter, saveJobScope, saveJobStatus } from "../lib/preferences";
+import { EMPTY_EXTRA_FILTERS, JOB_SORTS, loadDateFilter, loadExtraFilters, loadJobScope, loadJobSort, loadJobStatus, saveDateFilter, saveExtraFilters, saveJobScope, saveJobSort, saveJobStatus } from "../lib/preferences";
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from "../lib/dateRange";
-import { forgetSearch, loadRecentSearches, rememberSearch, skillStyle, useJobReactions } from "../lib/jobSignals";
+import { countExtraFilters, forgetSearch, loadRecentSearches, matchesExtraFilters, rememberSearch, skillStyle, useJobReactions } from "../lib/jobSignals";
 import { timeAgo, useNow } from "../lib/time";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -34,6 +36,13 @@ function useDebounced(value, delay) {
   return debounced;
 }
 
+function FilterChip({ children, onClear }) {
+  return <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1.5 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+    {children}
+    <button type="button" onClick={onClear} aria-label={`Remove ${children} filter`} className="grid size-4 place-items-center rounded-full transition-colors hover:bg-black/10"><X size={11} /></button>
+  </span>;
+}
+
 export default function Jobs() {
   const { user } = useAuth();
   const now = useNow();
@@ -50,12 +59,17 @@ export default function Jobs() {
   const [liveSearching, setLiveSearching] = useState(false);
   const [skillDialog, setSkillDialog] = useState(false);
   const [activeId, setActiveId] = useState(null);
+  const [sort, setSort] = useState(loadJobSort);
+  const [extraFilters, setExtraFilters] = useState(() => loadExtraFilters("jobs"));
+  const [preview, setPreview] = useState(null);
+  const [searchFocused, setSearchFocused] = useState(false);
   const showAllJobs = scope === "All Jobs";
   const status = serverStatus(tab);
+  const order = JOB_SORTS.find((item) => item.id === sort) || JOB_SORTS[0];
 
   const { data: jobPages, isLoading, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, isError, error, refetch } = useInfiniteQuery({
-    queryKey: ["jobs", showAllJobs ? "all" : user?.email, gatewayDateFilter, search, status],
-    queryFn: ({ pageParam }) => api.getJobsPage({ page: pageParam, perPage: 20, dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs, search, status }),
+    queryKey: ["jobs", showAllJobs ? "all" : user?.email, gatewayDateFilter, search, status, order.orderBy, order.orderDir],
+    queryFn: ({ pageParam }) => api.getJobsPage({ page: pageParam, perPage: 20, dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs, search, status, orderBy: order.orderBy, orderDir: order.orderDir }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => (lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined),
     enabled: Boolean(user?.email),
@@ -88,11 +102,7 @@ export default function Jobs() {
   const loadMoreRef = useRef(null);
 
   useEffect(() => saveDateFilter("jobs", dateFilter), [dateFilter]);
-  useEffect(() => {
-    if (search.length < 2) return undefined;
-    const timer = window.setTimeout(() => setRecentSearches(rememberSearch(user?.email, search)), 0);
-    return () => window.clearTimeout(timer);
-  }, [search, user?.email]);
+  useEffect(() => saveExtraFilters("jobs", extraFilters), [extraFilters]);
   useEffect(() => {
     if (hasMoreSkills && !isFetchingMoreSkills) fetchMoreSkills();
   }, [fetchMoreSkills, hasMoreSkills, isFetchingMoreSkills]);
@@ -105,8 +115,9 @@ export default function Jobs() {
   const filtered = useMemo(
     () => jobs.filter((job) =>
       (tab === "New" ? ["New", "Seen"].includes(job.status) : tab === "All" || job.status === tab) &&
+      matchesExtraFilters(job, extraFilters) &&
       (!skills.length || skills.some((skill) => (job.skills || []).some((jobSkill) => jobSkill.toLowerCase() === skill.toLowerCase()) || `${job.title} ${job.description}`.toLowerCase().includes(skill.toLowerCase())))),
-    [jobs, tab, skills],
+    [jobs, tab, skills, extraFilters],
   );
   const favoriteJobs = useMemo(() => filtered.filter((job) => reactions.favorites.includes(job.id)), [filtered, reactions.favorites]);
 
@@ -133,14 +144,18 @@ export default function Jobs() {
     if (isLoading || !root.current) return undefined;
     const ctx = gsap.context(() => gsap.fromTo("[data-card]", { y: 24, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.6, stagger: 0.05, ease: "power3.out", clearProps: "transform" }), root);
     return () => ctx.revert();
-  }, [scope, tab, search, skills, dateFilter, isLoading]);
+  }, [scope, tab, search, skills, dateFilter, sort, extraFilters, isLoading]);
 
+  // Searches are saved to history on Enter, on picking a past search, or when leaving the box with a term in it.
   const commitSearch = (value = searchInput) => setRecentSearches(rememberSearch(user?.email, value));
-  const applySearch = (value) => { setSearchInput(value); commitSearch(value); };
+  const applySearch = (value) => { setSearchInput(value); commitSearch(value); setSearchFocused(false); };
+  const historyTerm = searchInput.trim().toLowerCase();
+  const searchHistory = recentSearches.filter((term) => !historyTerm || (term.toLowerCase().includes(historyTerm) && term.toLowerCase() !== historyTerm));
+  const changeSort = (value) => { setSort(value); saveJobSort(value); };
   const toggleSkill = (skill) => setSkills((current) => (current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill]));
   const changeTab = (item) => { const next = tab === item ? "All" : item; setTab(next); saveJobStatus(next); };
   const jumpTo = (id) => document.getElementById(`job-${id}`)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-  const hasFilters = skills.length > 0 || dateFilter.preset !== "all" || searchInput;
+  const hasFilters = skills.length > 0 || dateFilter.preset !== "all" || searchInput || countExtraFilters(extraFilters) > 0;
   const searching = isFetching && !isFetchingNextPage && searchInput.trim() === search;
 
   return (
@@ -149,7 +164,7 @@ export default function Jobs() {
         <section className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
           <div className="space-y-4 rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-4 sm:p-5">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-              <HScroll className="xl:max-w-[60%]" innerClassName="items-center gap-2" label="job filters">
+              <HScroll className="xl:max-w-[52%]" innerClassName="items-center gap-2" label="job filters">
                 <div className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--paper)] p-1" aria-label="Job scope">
                   {scopes.map((item) => <button key={item} type="button" aria-pressed={scope === item} onClick={() => { setScope(item); saveJobScope(item); }} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition-all duration-300 ${scope === item ? "bg-[var(--lime)] !text-[#26320b] shadow-[0_4px_18px_rgba(105,130,32,.14)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}>
                     {item}<span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] tabular-nums ${scope === item ? "bg-black/10" : "bg-black/5 dark:bg-white/10"}`}>{isFetchingStats && scopeCounts[item] == null ? "…" : scopeCounts[item] ?? 0}</span>
@@ -162,11 +177,22 @@ export default function Jobs() {
                 </div>
               </HScroll>
               <div className="flex flex-1 items-center gap-2">
-                <form onSubmit={(event) => { event.preventDefault(); commitSearch(); }} className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-4 py-2.5 ring-1 ring-transparent transition-shadow focus-within:ring-[var(--lime-dark)]">
+                <form onSubmit={(event) => { event.preventDefault(); commitSearch(); setSearchFocused(false); }} className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-4 py-2.5 ring-1 ring-transparent transition-shadow focus-within:ring-[var(--lime-dark)]">
                   {searching ? <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" /> : <MagnifyingGlass size={15} className="shrink-0 text-[var(--muted)]" />}
-                  <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search title, description, skills…" aria-label="Search jobs" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
+                  <input value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setSearchFocused(true); }} onFocus={() => setSearchFocused(true)} onBlur={() => { setSearchFocused(false); if (searchInput.trim()) commitSearch(); }} onKeyDown={(event) => event.key === "Escape" && setSearchFocused(false)} placeholder="Search title, description, skills…" aria-label="Search jobs" aria-expanded={searchFocused && searchHistory.length > 0} aria-controls="job-search-history" autoComplete="off" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
                   {searchInput && <button type="button" onClick={() => setSearchInput("")} aria-label="Clear search" className="grid size-5 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] hover:bg-black/15 dark:bg-white/10"><X size={11} weight="bold" /></button>}
+                  {searchFocused && searchHistory.length > 0 && <div id="job-search-history" onMouseDown={(event) => event.preventDefault()} className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5">
+                    <div className="rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
+                      <div className="flex items-center justify-between px-2 pb-1.5 pt-1"><span className={label}>Recent searches</span><button type="button" onClick={() => { recentSearches.forEach((term) => forgetSearch(user?.email, term)); setRecentSearches([]); }} className="text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear history</button></div>
+                      <ul>{searchHistory.map((term) => <li key={term} className="group/term flex items-center rounded-xl hover:bg-[var(--paper)]">
+                        <button type="button" onClick={() => applySearch(term)} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-[var(--muted)] group-hover/term:text-[var(--ink)]"><ClockCounterClockwise size={14} className="shrink-0" /><span className="truncate">{term}</span></button>
+                        <button type="button" onClick={() => setRecentSearches(forgetSearch(user?.email, term))} aria-label={`Forget search ${term}`} className="mr-1.5 grid size-6 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-black/10 hover:text-[var(--ink)]"><X size={11} /></button>
+                      </li>)}</ul>
+                    </div>
+                  </div>}
                 </form>
+                <SortMenu value={sort} options={JOB_SORTS} onChange={changeSort} />
+                <MoreFiltersMenu value={extraFilters} onChange={setExtraFilters} />
                 <DateTimeRangeFilter value={dateFilter} onApply={setDateFilter} label="Job posting time" />
                 <button type="button" onClick={() => setSkillDialog(true)} aria-label="Open skill filters" className={`relative ${iconButton} ${skills.length ? "bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40" : ""}`}>
                   <Funnel size={16} weight={skills.length ? "fill" : "regular"} />
@@ -182,7 +208,7 @@ export default function Jobs() {
                 {skillRecords.map(({ id, name }) => <button key={id} type="button" onClick={() => toggleSkill(name)} aria-pressed={skills.includes(name)} style={skillStyle(name)} className="skill-chip shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-transform duration-300 hover:-translate-y-0.5">{name}</button>)}
                 {skillsLoading && <span className="skeleton-bone h-7 w-40 shrink-0 rounded-full" />}
               </HScroll>
-              <button type="button" onClick={() => setSkillDialog(true)} className="shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold text-[var(--muted)] ring-1 ring-[var(--line)] hover:text-[var(--ink)]">Manage</button>
+              <button type="button" onClick={() => setSkillDialog(true)} aria-label="Skill settings" title="Skill settings" className="grid size-8 shrink-0 place-items-center rounded-full text-[var(--muted)] ring-1 ring-[var(--line)] transition-all duration-300 hover:rotate-45 hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]"><GearSix size={16} weight="bold" /></button>
               <div className="ml-auto flex shrink-0 items-center gap-2">
                 <button type="button" onClick={() => setLiveSearching(true)} className="inline-flex items-center gap-2 rounded-full bg-[var(--lime)]/30 py-2 pl-3 pr-4 text-xs font-bold text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/35 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--lime)]/55">
                   <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--lime-dark)] opacity-70" /><span className="relative inline-flex size-2 rounded-full bg-[var(--lime-dark)]" /></span>
@@ -192,19 +218,12 @@ export default function Jobs() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
-              {recentSearches.length > 0 && <HScroll className="min-w-0 flex-1" innerClassName="items-center gap-2" label="recent searches">
-                <span className={`${label} shrink-0`}>Recent</span>
-                {recentSearches.map((term) => <span key={term} className="flex shrink-0 items-center rounded-full bg-[var(--paper)]">
-                  <button type="button" onClick={() => applySearch(term)} className="flex items-center gap-1.5 py-1.5 pl-3 pr-1.5 text-[11px] font-semibold text-[var(--muted)] hover:text-[var(--ink)]"><ClockCounterClockwise size={12} />{term}</button>
-                  <button type="button" onClick={() => setRecentSearches(forgetSearch(user?.email, term))} aria-label={`Forget search ${term}`} className="mr-1 grid size-5 place-items-center rounded-full text-[var(--muted)] hover:bg-black/10"><X size={10} /></button>
-                </span>)}
-              </HScroll>}
-              <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
-                <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} />
-                {hasFilters && <button type="button" onClick={() => { setSkills([]); setSearchInput(""); setDateFilter(EMPTY_DATE_RANGE); }} className="text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear all</button>}
-              </div>
-            </div>
+            {hasFilters && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
+              {extraFilters.jobType !== "any" && <FilterChip onClear={() => setExtraFilters({ ...extraFilters, jobType: "any" })}>{extraFilters.jobType === "hourly" ? "Hourly jobs" : "Fixed-price jobs"}</FilterChip>}
+              {extraFilters.usaOnly && <FilterChip onClear={() => setExtraFilters({ ...extraFilters, usaOnly: false })}>USA clients</FilterChip>}
+              <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} />
+              <button type="button" onClick={() => { setSkills([]); setSearchInput(""); setDateFilter(EMPTY_DATE_RANGE); setExtraFilters(EMPTY_EXTRA_FILTERS); }} className="text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear all</button>
+            </div>}
           </div>
         </section>
 
@@ -233,7 +252,7 @@ export default function Jobs() {
                   </div>
                 </nav>
                 <div className="min-w-0">
-                  <section className="space-y-4">{filtered.map((job, index) => <JobCard key={job.id} job={job} index={index} now={now} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id)} onFavorite={() => reactions.toggleFavorite(job.id)} />)}</section>
+                  <section className="space-y-4">{filtered.map((job, index) => <JobCard key={job.id} job={job} index={index} now={now} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id)} onFavorite={() => reactions.toggleFavorite(job.id)} onOpen={() => setPreview(job)} />)}</section>
                   <div ref={loadMoreRef} className="flex min-h-24 items-center justify-center py-8" aria-live="polite">
                     {isFetchingNextPage ? <div className="flex items-center gap-3 text-xs font-semibold text-[var(--muted)]"><span className="size-4 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />Loading more jobs</div>
                       : <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--muted)]">{hasNextPage ? "Scroll for more jobs" : "All jobs loaded"}</span>}
@@ -247,6 +266,7 @@ export default function Jobs() {
                 </section>}
         </div>
 
+        {preview && <JobDrawer job={preview} jobs={filtered} onSelect={setPreview} onClose={() => setPreview(null)} />}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}
         {skillDialog && <OpportunityFilterDialog skills={skills} skillRecords={skillRecords} isLoading={skillsLoading || isFetchingMoreSkills} error={skillsError ? skillsQueryError : null} onClose={() => setSkillDialog(false)} onApply={(nextSkills) => { setSkills(nextSkills); setSkillDialog(false); }} />}

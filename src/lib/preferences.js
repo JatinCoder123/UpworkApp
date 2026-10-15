@@ -46,6 +46,41 @@ export function saveJobStatus(status) {
   localStorage.setItem(JOB_STATUS_KEY, status)
 }
 
+const JOB_SORT_KEY = 'pitchflow-job-sort'
+const JOB_EXTRA_FILTERS_KEY = 'pitchflow-job-extra-filters'
+
+export const JOB_SORTS = [
+  { id: 'newest', label: 'Newest first', orderBy: 'date_entered', orderDir: 'DESC' },
+  { id: 'oldest', label: 'Oldest first', orderBy: 'date_entered', orderDir: 'ASC' },
+  { id: 'score-desc', label: 'AI score: high to low', orderBy: 'match_score', orderDir: 'DESC' },
+  { id: 'score-asc', label: 'AI score: low to high', orderBy: 'match_score', orderDir: 'ASC' },
+]
+
+export function loadJobSort() {
+  const sort = localStorage.getItem(JOB_SORT_KEY)
+  return JOB_SORTS.some((item) => item.id === sort) ? sort : 'newest'
+}
+
+export function saveJobSort(sort) {
+  localStorage.setItem(JOB_SORT_KEY, sort)
+}
+
+export const EMPTY_EXTRA_FILTERS = { jobType: 'any', usaOnly: false }
+
+export function loadExtraFilters(scope = 'jobs') {
+  try {
+    const saved = JSON.parse(localStorage.getItem(`${JOB_EXTRA_FILTERS_KEY}:${scope}`) || '{}')
+    return {
+      jobType: ['any', 'hourly', 'fixed'].includes(saved.jobType) ? saved.jobType : 'any',
+      usaOnly: Boolean(saved.usaOnly),
+    }
+  } catch { return EMPTY_EXTRA_FILTERS }
+}
+
+export function saveExtraFilters(scope, filters) {
+  try { localStorage.setItem(`${JOB_EXTRA_FILTERS_KEY}:${scope}`, JSON.stringify(filters)) } catch { /* storage unavailable */ }
+}
+
 const JOB_LAYOUT_KEY = 'pitchflow-job-layout'
 
 export function loadJobLayout() {

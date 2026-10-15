@@ -11,6 +11,8 @@ export const SITE_CONTENT_MODULE = "sites_tech_content";
 export const DEFAULT_TECH_NEWS_PER_PAGE = 10;
 // Endpoint that generates a cover letter for a job. Set it in .env once the backend is ready.
 const COVER_LETTER_URL = import.meta.env?.VITE_COVER_LETTER_URL || "";
+// Endpoint that rewrites a cover letter from an instruction. Falls back to the generator endpoint.
+const COVER_LETTER_EDIT_URL = import.meta.env?.VITE_COVER_LETTER_EDIT_URL || COVER_LETTER_URL;
 
 const apiClient = axios.create({
   baseURL: SMART_GATEWAY_URL,
@@ -295,9 +297,18 @@ export async function findGatewayUserIdByEmail(email) {
 // Fields the gateway searches when the user types in the jobs search box.
 const JOB_SEARCH_FIELDS = ["name", "job_title", "description", "skills", "matched_skills", "explain_job", "pitch", "category"];
 
-export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEmail, allJobs = false, search = "", status = "" } = {}) {
+const JOB_ORDER_FIELDS = ["date_entered", "match_score"];
+
+export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEmail, allJobs = false, search = "", status = "", orderBy = "date_entered", orderDir = "DESC" } = {}) {
   const assignedUserId = allJobs ? null : await findGatewayUserIdByEmail(userEmail);
-  const query = { action: "fetch", module: JOBS_MODULE, order_by: "date_entered", order_dir: "DESC", page, per_page: perPage };
+  const query = {
+    action: "fetch",
+    module: JOBS_MODULE,
+    order_by: JOB_ORDER_FIELDS.includes(orderBy) ? orderBy : "date_entered",
+    order_dir: orderDir === "ASC" ? "ASC" : "DESC",
+    page,
+    per_page: perPage,
+  };
   const filters = { ai_processed: 1 };
   if (assignedUserId) filters.assigned_user_id = assignedUserId;
   if (status) filters.status = status;
@@ -381,6 +392,63 @@ export async function fetchCoverLetter(job) {
   const letter = decodeCoverLetter(typeof raw === "string" ? raw : "");
   if (!letter) throw createAppError("COVER_LETTER_EMPTY", "The endpoint did not return a cover letter.");
   return letter;
+}
+
+// Saves an edited cover letter on the CRM job. Live Upwork jobs have no CRM record, so they stay local.
+export async function saveCoverLetter(job, letter) {
+  if (job.status === "Live") return letter;
+  await smartGateway({ action: "update", module: JOBS_MODULE, id: job.id, data: { cover_letter: letter } });
+  localChanges.set(job.id, { ...(localChanges.get(job.id) || {}), coverLetter: letter });
+  return letter;
+}
+
+export async function editCoverLetterWithAi(job, letter, instruction) {
+  if (!COVER_LETTER_EDIT_URL) {
+    throw createAppError("COVER_LETTER_ENDPOINT_MISSING", "The AI edit endpoint is not configured yet. Set VITE_COVER_LETTER_EDIT_URL (or VITE_COVER_LETTER_URL) in .env.");
+  }
+  let response;
+  try {
+    response = await axios.post(COVER_LETTER_EDIT_URL, {
+      id: job.id,
+      job_id: job.jobId,
+      title: job.title,
+      description: job.description,
+      skills: job.skills,
+      upwork_url: job.url,
+      cover_letter: letter,
+      instruction,
+    }, { timeout: 90_000, headers: { "Content-Type": "application/json", "X-Api-Token": generateToken() } });
+  } catch (err) {
+    throw createAppError("COVER_LETTER_FAILED", err?.response?.data?.message || "Could not edit the cover letter. Please try again.");
+  }
+  const data = response.data;
+  const raw = typeof data === "string" ? data : data?.cover_letter ?? data?.data?.cover_letter ?? data?.content ?? data?.data ?? "";
+  const edited = decodeCoverLetter(typeof raw === "string" ? raw : "");
+  if (!edited) throw createAppError("COVER_LETTER_EMPTY", "The endpoint did not return an edited cover letter.");
+  return edited;
+}
+
+let teamMembersRequest = null;
+
+// Active CRM users with an email, used to pick teammates to notify about a job.
+export async function fetchTeamMembers() {
+  teamMembersRequest ||= (async () => {
+    const perPage = 100;
+    const first = await smartGateway({ action: "fetch", module: USERS_MODULE, page: 1, per_page: perPage });
+    const totalPages = Math.max(Number(first.total_pages) || 1, Math.ceil((Number(first.total) || 0) / perPage));
+    const rest = await Promise.all(Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) => smartGateway({ action: "fetch", module: USERS_MODULE, page: index + 2, per_page: perPage })));
+    return [first, ...rest]
+      .flatMap((page) => page.records || [])
+      .filter((record) => record.deleted !== "1" && String(record.status || "Active") === "Active" && /@/.test(record.email1 || ""))
+      .map((record) => ({
+        id: record.id,
+        email: String(record.email1).trim(),
+        name: decodeHtml([record.first_name, record.last_name].filter(Boolean).join(" ") || record.user_name || record.email1),
+        title: decodeHtml(record.title || record.department || ""),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  })().catch((error) => { teamMembersRequest = null; throw error; });
+  return teamMembersRequest;
 }
 
 // ----------------------------------------------------
@@ -891,6 +959,9 @@ export const api = {
   getJobStats: (params) => fetchJobStats(params),
   getJob: (id) => fetchJobById(id),
   getCoverLetter: (job) => fetchCoverLetter(job),
+  saveCoverLetter,
+  editCoverLetter: editCoverLetterWithAi,
+  getTeamMembers: () => fetchTeamMembers(),
   getLiveJobs: (params) => fetchLiveUpworkJobs(params),
   getVideoFeeds: (options) => fetchVideoFeeds(options),
   getSiteContent: (options) => fetchSiteContent(options),
