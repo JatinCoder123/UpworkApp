@@ -42,7 +42,7 @@ export default function JobDrawer({ job, jobs = [], live = false, onSelect, onCl
   return createPortal(
     <div role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()} className="fixed inset-0 z-[90] flex justify-end bg-[var(--ink)]/45">
       {/* No backdrop blur and an isolated, contained panel: a blurred layer under the scroller gets re-rendered on every scroll frame. */}
-      <aside ref={panel} role="complementary" aria-label={`Job preview: ${job.title}`} className="flex h-full w-full max-w-[52rem] flex-col overflow-hidden bg-[var(--paper)] shadow-[-30px_0_80px_rgba(0,0,0,.18)] ring-1 ring-[var(--line)] [contain:layout_paint] sm:rounded-l-[2rem]">
+      <aside ref={panel} role="complementary" aria-label={`Job preview: ${job.title}`} className="flex h-full w-full max-w-[min(96vw,72rem)] xl:max-w-[76rem] 2xl:max-w-[82rem] flex-col overflow-hidden bg-[var(--paper)] shadow-[-35px_0_90px_rgba(0,0,0,.22)] ring-1 ring-[var(--line)] [contain:layout_paint] sm:rounded-l-[2rem]">
         <header className="flex items-center gap-2 border-b border-[var(--line)]/70 bg-[var(--surface)] px-4 py-3 sm:rounded-tl-[2rem] sm:px-6">
           <div className="min-w-0 flex-1">
             <p className="text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">{live ? 'Live job preview' : 'Job preview'}</p>

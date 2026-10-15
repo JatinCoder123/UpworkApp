@@ -79,8 +79,8 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
     onDismiss={() => job.status !== 'Rejected' && setDialog('reject')}
     liked={reactions.isLiked(job.id)}
     favorite={reactions.isFavorite(job.id)}
-    onLike={() => reactions.toggleLike(job.id)}
-    onFavorite={() => reactions.toggleFavorite(job.id)}
+    onLike={() => reactions.toggleLike(job.id, job)}
+    onFavorite={() => reactions.toggleFavorite(job.id, job)}
     onShare={setShare}
   />
   const activity = <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
@@ -91,13 +91,23 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
   const content = <div ref={root} className={embedded ? 'space-y-5 p-4 sm:p-6' : 'mx-auto w-full max-w-[1320px] px-4 pb-20 pt-6 sm:px-6 md:pt-8'}>
     {!embedded && <Link data-detail to="/jobs" className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--muted)] transition-colors hover:text-[var(--ink)]"><span className="grid size-8 place-items-center rounded-full bg-[var(--surface)] ring-1 ring-[var(--line)]"><ArrowLeft size={14} /></span>All jobs</Link>}
 
-    <div className={embedded ? 'space-y-5' : 'mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] xl:gap-8'}>
+    <div className={embedded ? 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] xl:gap-8'}>
       <div className="min-w-0 space-y-5">
         <header data-detail className="relative overflow-hidden rounded-[1.8rem] bg-[var(--surface)] ring-1 ring-[var(--line)]/70">
           <div aria-hidden="true" className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[var(--lime)]/25 to-transparent" />
           <div className="relative p-5 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill status={job.status} />
+              {reactions.isFavorite(job.id) && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#fef9c3] px-2.5 py-1 text-[11px] font-bold text-[#92400e] ring-1 ring-[#fde047]/60 dark:bg-[#fef08a]/15 dark:text-[#fde047] dark:ring-[#fde047]/30">
+                  <Star size={12} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" /> Favorited
+                </span>
+              )}
+              {reactions.isLiked(job.id) && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#ffe4e6] px-2.5 py-1 text-[11px] font-bold text-[#be123c] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/15 dark:text-[#fda4af] dark:ring-[#fda4af]/30">
+                  <Heart size={12} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" /> Liked
+                </span>
+              )}
               <span className="rounded-full bg-[var(--surface)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]">{job.jobId}</span>
               {job.tags[0] && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]"><Tag size={12} weight="bold" />{job.tags[0]}</span>}
               <time dateTime={job.postedAt} title={job.posted} className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent-strong)]"><Clock size={13} weight="bold" />Posted {timeAgo(job.postedAt, now) || job.posted}</time>
@@ -105,7 +115,7 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
             <h1 className="job-detail-title mt-5">{job.title}</h1>
             {job.clientStats.country && <p className="mt-3 flex items-center gap-1.5 text-sm text-[var(--muted)]"><MapPin size={15} weight="bold" />{job.clientStats.country}{job.clientStats.rating != null && <><span aria-hidden="true">·</span><Star size={14} weight="fill" className="text-[#e6a817]" />{job.clientStats.rating.toFixed(1)}</>}{job.clientStats.paymentVerified && <><span aria-hidden="true">·</span><SealCheck size={14} weight="fill" className="text-[var(--ok)]" />Payment verified</>}</p>}
             {job.summary && <ExpandableText className="mt-5 max-w-3xl" collapsedHeight="3.6rem"><p className="text-[15px] leading-7">{job.summary}</p></ExpandableText>}
-            <div className={`mt-6 grid gap-3 sm:grid-cols-2 ${embedded ? '' : 'xl:grid-cols-4'}`}>
+            <div className="mt-6 grid gap-3 grid-cols-2 sm:grid-cols-4">
               <FactTile icon={CurrencyDollar} label="Budget" value={job.budget} note={job.type} />
               <FactTile icon={ChartBar} label="Experience" value={job.level} />
               <FactTile icon={CalendarBlank} label="Duration" value={job.duration} />
@@ -114,9 +124,9 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
           </div>
         </header>
 
-        <AboutClient stats={job.clientStats} now={now} />
+        {embedded && <div data-detail className="xl:hidden">{actions}</div>}
 
-        {embedded && <div data-detail>{actions}</div>}
+        <AboutClient stats={job.clientStats} now={now} />
 
         {job.match > 0 && <section data-detail className={`${card} flex flex-col gap-5 sm:flex-row sm:items-start`}>
           <MatchRing value={job.match} />
@@ -143,13 +153,13 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
 
         <CoverLetter job={job} onLetter={setLetter} />
 
-        {embedded && <div data-detail>{activity}</div>}
+        {embedded && <div data-detail className="xl:hidden">{activity}</div>}
       </div>
 
-      {!embedded && <aside data-detail className="space-y-4 lg:sticky lg:top-[calc(var(--shell-h)+1rem)] lg:self-start">
+      <aside data-detail className={`space-y-4 ${embedded ? 'hidden xl:block xl:sticky xl:top-2 xl:self-start' : 'lg:sticky lg:top-[calc(var(--shell-h)+1rem)] lg:self-start'}`}>
         {actions}
         {activity}
-      </aside>}
+      </aside>
     </div>
     {dialog && <ActionDialog type={dialog} job={job} stay={embedded} onClose={() => setDialog(null)} />}
     {share && <ShareJobDialog job={job} mode={share} onClose={() => setShare(null)} />}

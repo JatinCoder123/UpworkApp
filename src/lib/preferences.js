@@ -39,7 +39,7 @@ export function saveJobScope(scope) {
 export function loadJobStatus() {
   const status = localStorage.getItem(JOB_STATUS_KEY)
   if (['My Jobs', 'All Jobs', 'Most recent'].includes(status)) return 'All'
-  return ['All', 'New', 'Applied', 'Rejected'].includes(status) ? status : 'All'
+  return ['All', 'New', 'Applied', 'Rejected', 'Favorites', 'Liked'].includes(status) ? status : 'All'
 }
 
 export function saveJobStatus(status) {

@@ -24,7 +24,13 @@ function readReactions(email) {
     let stored = {}
     try { stored = JSON.parse(localStorage.getItem(key) || '{}') } catch { stored = {} }
     // applied/dismissed only track live Upwork jobs, which have no CRM status to update.
-    cache.set(key, { liked: stored.liked || [], favorites: stored.favorites || [], applied: stored.applied || [], dismissed: stored.dismissed || [] })
+    cache.set(key, {
+      liked: stored.liked || [],
+      favorites: stored.favorites || [],
+      applied: stored.applied || [],
+      dismissed: stored.dismissed || [],
+      jobRecords: stored.jobRecords || {},
+    })
   }
   return cache.get(key)
 }
@@ -40,18 +46,58 @@ const subscribe = (listener) => { listeners.add(listener); return () => listener
 
 export function useJobReactions(email) {
   const reactions = useSyncExternalStore(subscribe, () => readReactions(email))
-  const toggle = (field, id) => {
+  const toggle = (field, id, job = null) => {
     const current = readReactions(email)
-    const list = current[field].includes(id) ? current[field].filter((item) => item !== id) : [id, ...current[field]]
-    writeReactions(email, { ...current, [field]: list })
+    const exists = current[field].includes(id)
+    const list = exists ? current[field].filter((item) => item !== id) : [id, ...current[field]]
+    const jobRecords = { ...(current.jobRecords || {}) }
+
+    if (!exists && job) {
+      jobRecords[id] = {
+        id: job.id,
+        jobId: job.jobId || job.id,
+        title: job.title || 'Untitled job',
+        company: job.company || 'Upwork client',
+        client: job.client,
+        location: job.location,
+        posted: job.posted,
+        postedAt: job.postedAt,
+        budget: job.budget,
+        type: job.type,
+        level: job.level,
+        duration: job.duration,
+        workload: job.workload,
+        status: job.status,
+        match: job.match,
+        fitLabel: job.fitLabel,
+        tags: job.tags || [],
+        skills: job.skills || [],
+        url: job.url,
+        applyUrl: job.applyUrl,
+        description: job.description,
+        summary: job.summary,
+        clientStats: job.clientStats,
+        applicants: job.applicants,
+        raw: job.raw,
+      }
+    } else if (exists) {
+      const otherField = field === 'favorites' ? 'liked' : 'favorites'
+      if (!current[otherField]?.includes(id) && !current.applied?.includes(id) && !current.dismissed?.includes(id)) {
+        delete jobRecords[id]
+      }
+    }
+
+    writeReactions(email, { ...current, [field]: list, jobRecords })
   }
+
   return {
     liked: reactions.liked,
     favorites: reactions.favorites,
+    jobRecords: reactions.jobRecords || {},
     isLiked: (id) => reactions.liked.includes(id),
     isFavorite: (id) => reactions.favorites.includes(id),
-    toggleLike: (id) => toggle('liked', id),
-    toggleFavorite: (id) => toggle('favorites', id),
+    toggleLike: (id, job) => toggle('liked', id, job),
+    toggleFavorite: (id, job) => toggle('favorites', id, job),
     isApplied: (id) => reactions.applied.includes(id),
     isDismissed: (id) => reactions.dismissed.includes(id),
     toggleApplied: (id) => toggle('applied', id),
@@ -61,26 +107,26 @@ export function useJobReactions(email) {
 
 /* Recent searches, newest first, per signed-in user. */
 
-const searchKey = (email) => `outright-job-searches:${String(email || 'guest').toLowerCase()}`
+const searchKey = (email, module = 'job') => `outright-${module}-searches:${String(email || 'guest').toLowerCase()}`
 
-export function loadRecentSearches(email) {
+export function loadRecentSearches(email, module = 'job') {
   try {
-    const stored = JSON.parse(localStorage.getItem(searchKey(email)) || '[]')
+    const stored = JSON.parse(localStorage.getItem(searchKey(email, module)) || '[]')
     return Array.isArray(stored) ? stored.slice(0, 10) : []
   } catch { return [] }
 }
 
-export function rememberSearch(email, term) {
+export function rememberSearch(email, term, module = 'job') {
   const value = String(term || '').trim()
-  if (value.length < 2) return loadRecentSearches(email)
-  const next = [value, ...loadRecentSearches(email).filter((item) => item.toLowerCase() !== value.toLowerCase())].slice(0, 10)
-  try { localStorage.setItem(searchKey(email), JSON.stringify(next)) } catch { /* ignore */ }
+  if (value.length < 2) return loadRecentSearches(email, module)
+  const next = [value, ...loadRecentSearches(email, module).filter((item) => item.toLowerCase() !== value.toLowerCase())].slice(0, 10)
+  try { localStorage.setItem(searchKey(email, module), JSON.stringify(next)) } catch { /* ignore */ }
   return next
 }
 
-export function forgetSearch(email, term) {
-  const next = loadRecentSearches(email).filter((item) => item !== term)
-  try { localStorage.setItem(searchKey(email), JSON.stringify(next)) } catch { /* ignore */ }
+export function forgetSearch(email, term, module = 'job') {
+  const next = loadRecentSearches(email, module).filter((item) => item !== term)
+  try { localStorage.setItem(searchKey(email, module), JSON.stringify(next)) } catch { /* ignore */ }
   return next
 }
 

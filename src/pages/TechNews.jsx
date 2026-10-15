@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import gsap from 'gsap'
 import {
   ArrowUpRight,
+  ClockCounterClockwise,
   Funnel,
   MagnifyingGlass,
   Newspaper,
@@ -33,8 +34,19 @@ import {
   saveTechNewsFilters,
   saveTechNewsLayout,
 } from '../lib/preferences'
+import { forgetSearch, loadRecentSearches, rememberSearch } from '../lib/jobSignals'
+import { useAuth } from '../contexts/AuthContext'
 import LayoutToggle from '../components/LayoutToggle'
 import TechNewsCard from '../components/TechNewsCard'
+
+function useDebounced(value, delay) {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay)
+    return () => window.clearTimeout(timer)
+  }, [value, delay])
+  return debounced
+}
 
 // Screen categories displayed on the main toolbar ("All" is inside the filter dialog)
 const SCREEN_CATEGORIES = ['Other Tech (Cloud)', 'AI']
@@ -43,13 +55,16 @@ const SCREEN_CATEGORIES = ['Other Tech (Cloud)', 'AI']
 const SOURCE_TYPE_TABS = ['FirstParty', 'ThirdParty', 'YouBlogging', 'HurryUp']
 
 export default function TechNews() {
+  const { user } = useAuth()
   const [layout, setLayout] = useState(loadTechNewsLayout)
   const [selectedCategories, setSelectedCategories] = useState(() => loadTechNewsFilters().categories)
   const [customCategories, setCustomCategories] = useState(loadCustomTechNewsCategories)
   const [selectedTiers, setSelectedTiers] = useState(() => loadTechNewsFilters().tiers)
   const [selectedSourceTypes, setSelectedSourceTypes] = useState(() => loadTechNewsFilters().sourceTypes)
-  const [search, setSearch] = useState(() => loadTechNewsFilters().search)
-  const [debouncedSearch, setDebouncedSearch] = useState(() => loadTechNewsFilters().search.trim())
+  const [searchInput, setSearchInput] = useState(() => loadTechNewsFilters().search)
+  const debouncedSearch = useDebounced(searchInput.trim(), 450)
+  const [recentSearches, setRecentSearches] = useState(() => loadRecentSearches(user?.email, 'technews'))
+  const [searchFocused, setSearchFocused] = useState(false)
   const [filterDialog, setFilterDialog] = useState(false)
   const [categoryDialog, setCategoryDialog] = useState(false)
   const [dateFilter, setDateFilter] = useState(() => loadDateFilter('techNews'))
@@ -60,59 +75,105 @@ export default function TechNews() {
 
   useEffect(() => saveDateFilter('techNews', dateFilter), [dateFilter])
 
+  useEffect(() => {
+    setRecentSearches(loadRecentSearches(user?.email, 'technews'))
+  }, [user?.email])
+
   // Save selected filters to localStorage so they persist across tabs and navigation
   useEffect(() => {
     saveTechNewsFilters({
       categories: selectedCategories,
       sourceTypes: selectedSourceTypes,
       tiers: selectedTiers,
-      search,
+      search: searchInput,
     })
-  }, [selectedCategories, selectedSourceTypes, selectedTiers, search])
+  }, [selectedCategories, selectedSourceTypes, selectedTiers, searchInput])
 
-  // 350ms debounce for Smart Gateway search query
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search.trim())
-    }, 350)
-    return () => clearTimeout(timer)
-  }, [search])
+  const primaryCategory = selectedCategories.length === 1 ? selectedCategories[0] : undefined
+  const primarySourceType = selectedSourceTypes.length === 1 ? selectedSourceTypes[0] : undefined
 
-  // Single cached unified query from Smart Gateway
+  // Infinite query for stories feed from Smart Gateway (page by page as user scrolls)
   const {
-    data: newsData,
+    data: newsPages,
     isLoading,
     isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    isError,
+    error,
     refetch,
-  } = useQuery({
-    queryKey: ['tech-news-feed', gatewayDateFilter],
-    queryFn: () => api.getAllTechNews({ dateFilter: gatewayDateFilter }),
-    staleTime: 5 * 60 * 1000,
+  } = useInfiniteQuery({
+    queryKey: [
+      'tech-news-feed',
+      gatewayDateFilter,
+      debouncedSearch,
+      primaryCategory,
+      primarySourceType,
+    ],
+    queryFn: ({ pageParam = 1 }) =>
+      api.getTechNewsPage({
+        page: pageParam,
+        perPage: 16,
+        dateFilter: gatewayDateFilter,
+        search: debouncedSearch,
+        category: primaryCategory,
+        tag: primarySourceType,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
+    placeholderData: (previous) => previous,
   })
 
+  // Fast lightweight stats query for accurate total and badge counts from Smart Gateway
+  const {
+    data: newsStats = {},
+    isFetching: isFetchingStats,
+    refetch: refetchStats,
+  } = useQuery({
+    queryKey: ['tech-news-stats', gatewayDateFilter],
+    queryFn: () => api.getTechNewsStats({ dateFilter: gatewayDateFilter }),
+  })
+
+  const searching = isFetching && !isFetchingNextPage && searchInput.trim() === debouncedSearch
+
   const handleRefresh = async () => {
-    if (isRefreshing || isFetching) return
+    if (isRefreshing || isFetching || isFetchingStats) return
     try {
       setIsRefreshing(true)
-      await api.getAllTechNews({ forceRefresh: true, dateFilter: gatewayDateFilter })
-      await refetch()
+      await Promise.all([refetch(), refetchStats()])
     } finally {
       setIsRefreshing(false)
     }
   }
 
+  // Searches are saved to history on Enter, on picking a past search, or when leaving the box with a term in it.
+  const commitSearch = (value = searchInput) => setRecentSearches(rememberSearch(user?.email, value, 'technews'))
+  const applySearch = (value) => {
+    setSearchInput(value)
+    commitSearch(value)
+    setSearchFocused(false)
+  }
+  const historyTerm = searchInput.trim().toLowerCase()
+  const searchHistory = recentSearches.filter(
+    (term) => !historyTerm || (term.toLowerCase().includes(historyTerm) && term.toLowerCase() !== historyTerm)
+  )
+
   // All records gathered across all loaded pages — strictly deduplicated by unique ID (zero duplication, zero repetition)
   const rawNews = useMemo(() => {
     const seen = new Set()
     const unique = []
-    for (const item of newsData?.records || []) {
-      if (item?.id && !seen.has(item.id)) {
-        seen.add(item.id)
-        unique.push(item)
+    for (const page of newsPages?.pages || []) {
+      for (const item of page.records || []) {
+        if (item?.id && !seen.has(item.id)) {
+          seen.add(item.id)
+          unique.push(item)
+        }
       }
     }
     return unique
-  }, [newsData])
+  }, [newsPages])
 
   // Dynamically extract categories from Smart Gateway module and user's saved custom categories
   const categoryList = useMemo(() => {
@@ -180,52 +241,38 @@ export default function TechNews() {
         })
 
       const matchesSource =
+        selectedSourceTypes.includes('All') ||
         selectedSourceTypes.length === 0 ||
         selectedSourceTypes.some((src) => {
-          if (src === 'HurryUp') {
-            return item.hurryUp === true
-          }
-          return item.sourceType === src
+          if (src === 'HurryUp') return item.hurryUp === true || (item.tags || []).some((t) => /hurryup/i.test(t))
+          return item.sourceType === src || (item.tags || []).some((t) => t.toLowerCase() === src.toLowerCase())
         })
 
-      const textToSearch = `${item.title} ${item.summary} ${item.source} ${item.sourceNote || ''} ${(item.tags || []).join(' ')}`.toLowerCase()
-      const matchesSearch = !debouncedSearch || textToSearch.includes(debouncedSearch.toLowerCase())
-
-      return matchesCategory && matchesTier && matchesSource && matchesSearch
+      return matchesCategory && matchesTier && matchesSource
     })
-  }, [digestStories, selectedCategories, selectedTiers, selectedSourceTypes, debouncedSearch])
+  }, [digestStories, selectedCategories, selectedTiers, selectedSourceTypes])
+
+  const totalCount = newsStats.total ?? newsPages?.pages?.[0]?.total ?? rawNews.length
 
   const categoryCounts = useMemo(() => {
-    const counts = { All: newsData?.total || rawNews.length }
-
+    const counts = { All: totalCount }
     categoryList.forEach((cat) => {
       if (cat !== 'All') {
-        counts[cat] = rawNews.filter((item) => item.category === cat).length
+        counts[cat] = newsStats[`cat_${cat}`] ?? rawNews.filter((item) => item.category === cat).length
       }
     })
-
     return counts
-  }, [newsData, rawNews, categoryList])
+  }, [newsStats, totalCount, categoryList, rawNews])
 
   const sourceTypeCounts = useMemo(() => {
-    const counts = {
-      All: rawNews.length,
-      FirstParty: 0,
-      ThirdParty: 0,
-      YouBlogging: 0,
-      HurryUp: 0,
+    return {
+      All: totalCount,
+      FirstParty: newsStats.FirstParty ?? 0,
+      ThirdParty: newsStats.ThirdParty ?? 0,
+      YouBlogging: newsStats.YouBlogging ?? 0,
+      HurryUp: newsStats.HurryUp ?? 0,
     }
-
-    for (const item of rawNews) {
-      if (item.sourceType === 'FirstParty') counts.FirstParty++
-      else if (item.sourceType === 'ThirdParty') counts.ThirdParty++
-      else if (item.sourceType === 'YouBlogging') counts.YouBlogging++
-
-      if (item.hurryUp) counts.HurryUp++
-    }
-
-    return counts
-  }, [rawNews])
+  }, [newsStats, totalCount])
 
   const refinementFilterCount = selectedCategories.length + selectedTiers.length + selectedSourceTypes.length
 
@@ -239,46 +286,27 @@ export default function TechNews() {
     setSelectedCategories([])
     setSelectedTiers([])
     setSelectedSourceTypes([])
-    setSearch('')
+    setSearchInput('')
     setDateFilter(EMPTY_DATE_RANGE)
   }
 
-  const filterKey = `${selectedCategories.join(',')}|${selectedTiers.join(',')}|${selectedSourceTypes.join(',')}|${debouncedSearch}|${dateFilter.preset}|${dateFilter.from}|${dateFilter.to}`
-  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
-  const [visibleCount, setVisibleCount] = useState(16)
-
-  if (prevFilterKey !== filterKey) {
-    setPrevFilterKey(filterKey)
-    setVisibleCount(16)
-  }
-
-  const displayedArticles = useMemo(() => {
-    return filteredArticles.slice(0, visibleCount)
-  }, [filteredArticles, visibleCount])
-
-  const hasMore = visibleCount < filteredArticles.length
-
-  const loadMore = useCallback(() => {
-    setVisibleCount((prev) => Math.min(prev + 12, filteredArticles.length))
-  }, [filteredArticles.length])
-
-  // Automatic Infinite Scroll observer (seamlessly reveals next chunk of stories on scroll)
+  // Automatic Infinite Scroll observer (hits Smart Gateway for next page on scroll)
   useEffect(() => {
     const sentinel = loadMoreRef.current
-    if (!sentinel || !hasMore) return
+    if (!sentinel || !hasNextPage) return undefined
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore) {
-          loadMore()
+      ([entry]) => {
+        if (entry.isIntersecting && !isFetchingNextPage) {
+          fetchNextPage()
         }
       },
-      { threshold: 0.1, rootMargin: '250px' }
+      { rootMargin: '500px 0px' }
     )
 
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [hasMore, loadMore])
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, filteredArticles.length])
 
   useEffect(() => {
     if (!isLoading && !isRefreshing && root.current) {
@@ -297,7 +325,7 @@ export default function TechNews() {
       }, root)
       return () => ctx.revert()
     }
-  }, [selectedCategories, selectedTiers, selectedSourceTypes, search, dateFilter, isLoading, isRefreshing])
+  }, [selectedCategories, selectedTiers, selectedSourceTypes, debouncedSearch, dateFilter, isLoading, isRefreshing])
 
   return (
     <Shell>
@@ -331,7 +359,7 @@ export default function TechNews() {
               <HScroll className="rounded-full bg-[var(--paper)] p-1" innerClassName="gap-1" fade="var(--paper)" label="source types">
                 {SOURCE_TYPE_TABS.map((item) => {
                   const isSelected = selectedSourceTypes.includes(item)
-                  const count = sourceTypeCounts[item] || 0
+                  const count = sourceTypeCounts[item] ?? 0
 
                   return (
                     <button
@@ -340,9 +368,7 @@ export default function TechNews() {
                       aria-pressed={isSelected}
                       onClick={() => {
                         setSelectedSourceTypes((prev) =>
-                          prev.includes(item)
-                            ? prev.filter((t) => t !== item)
-                            : [...prev, item]
+                          prev.includes(item) ? [] : [item]
                         )
                       }}
                       className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-all duration-300 ${
@@ -360,7 +386,7 @@ export default function TechNews() {
                             : 'bg-black/5 dark:bg-white/10 text-[var(--muted)]'
                         }`}
                       >
-                        {count}
+                        {isFetchingStats && sourceTypeCounts[item] == null ? '…' : count}
                       </span>
                     </button>
                   )
@@ -378,30 +404,102 @@ export default function TechNews() {
                   ariaLabel="AI news layout"
                 />
 
-                <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-3.5 py-2 ring-1 ring-black/5 dark:ring-white/10 transition-all focus-within:ring-[var(--lime-dark)] sm:w-64">
-                  <MagnifyingGlass size={15} className="shrink-0 text-[var(--muted)]" />
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    commitSearch()
+                    setSearchFocused(false)
+                  }}
+                  className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-4 py-2.5 ring-1 ring-transparent transition-shadow focus-within:ring-[var(--lime-dark)] sm:w-72"
+                >
+                  {searching ? (
+                    <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />
+                  ) : (
+                    <MagnifyingGlass size={15} className="shrink-0 text-[var(--muted)]" />
+                  )}
                   <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search stories, sources..."
-                    className="min-w-0 flex-1 bg-transparent text-xs font-medium outline-none text-[var(--ink)] placeholder:text-[var(--muted)]"
+                    value={searchInput}
+                    onChange={(event) => {
+                      setSearchInput(event.target.value)
+                      setSearchFocused(true)
+                    }}
+                    onFocus={() => setSearchFocused(true)}
+                    onBlur={() => {
+                      setSearchFocused(false)
+                      if (searchInput.trim()) commitSearch()
+                    }}
+                    onKeyDown={(event) => event.key === 'Escape' && setSearchFocused(false)}
+                    placeholder="Search stories, sources, topics…"
+                    aria-label="Search tech news"
+                    aria-expanded={searchFocused && searchHistory.length > 0}
+                    aria-controls="tech-news-search-history"
+                    autoComplete="off"
+                    className="min-w-0 flex-1 bg-transparent text-xs outline-none"
                   />
-                  {search && (
+                  {searchInput && (
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        setSearch('')
-                        setDebouncedSearch('')
+                      onClick={() => {
+                        setSearchInput('')
+                        setSearchFocused(false)
                       }}
                       aria-label="Clear search"
-                      className="grid size-5 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] transition-colors hover:bg-black/15 hover:text-[var(--ink)] dark:bg-white/10 dark:hover:bg-white/20"
+                      className="grid size-5 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] hover:bg-black/15 dark:bg-white/10"
                     >
                       <X size={11} weight="bold" />
                     </button>
                   )}
-                </label>
+                  {searchFocused && searchHistory.length > 0 && (
+                    <div
+                      id="tech-news-search-history"
+                      onMouseDown={(event) => event.preventDefault()}
+                      className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5"
+                    >
+                      <div className="rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
+                        <div className="flex items-center justify-between px-2 pb-1.5 pt-1">
+                          <span className="text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">
+                            Recent searches
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              recentSearches.forEach((term) => forgetSearch(user?.email, term, 'technews'))
+                              setRecentSearches([])
+                            }}
+                            className="text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]"
+                          >
+                            Clear history
+                          </button>
+                        </div>
+                        <ul>
+                          {searchHistory.map((term) => (
+                            <li
+                              key={term}
+                              className="group/term flex items-center rounded-xl hover:bg-[var(--paper)]"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => applySearch(term)}
+                                className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-[var(--muted)] group-hover/term:text-[var(--ink)]"
+                              >
+                                <ClockCounterClockwise size={14} className="shrink-0" />
+                                <span className="truncate">{term}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRecentSearches(forgetSearch(user?.email, term, 'technews'))}
+                                aria-label={`Forget search ${term}`}
+                                className="mr-1.5 grid size-6 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-black/10 hover:text-[var(--ink)]"
+                              >
+                                <X size={11} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </form>
 
                 <DateTimeRangeFilter
                   value={dateFilter}
@@ -454,18 +552,25 @@ export default function TechNews() {
                       aria-pressed={isSelected}
                       onClick={() => {
                         setSelectedCategories((prev) =>
-                          prev.includes(cat)
-                            ? prev.filter((c) => c !== cat)
-                            : [...prev, cat]
+                          prev.includes(cat) ? [] : [cat]
                         )
                       }}
-                      className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold ring-1 transition-all duration-300 ${
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 ${
                         isSelected
                           ? 'bg-[var(--ink)] text-white ring-black/10 shadow-xs'
                           : 'bg-[var(--paper)] text-[var(--muted)] ring-black/5 hover:bg-black/5 hover:text-[var(--ink)] dark:ring-white/10 dark:hover:bg-white/5'
                       }`}
                     >
-                      {cat}
+                      <span>{cat}</span>
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-[9px] tabular-nums font-bold ${
+                          isSelected
+                            ? 'bg-white/20 text-white'
+                            : 'bg-black/5 dark:bg-white/10 text-[var(--muted)]'
+                        }`}
+                      >
+                        {isFetchingStats && categoryCounts[cat] == null ? '…' : categoryCounts[cat] ?? 0}
+                      </span>
                     </button>
                   )
                 })}
@@ -480,7 +585,7 @@ export default function TechNews() {
               </HScroll>
 
               <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} className="ml-auto" />
-              {(refinementFilterCount > 0 || dateFilter.preset !== 'all' || search) && (
+              {(refinementFilterCount > 0 || dateFilter.preset !== 'all' || searchInput) && (
                 <button
                   type="button"
                   onClick={clearAllFilters}
@@ -499,18 +604,37 @@ export default function TechNews() {
           <div className="space-y-6 min-w-0">
             <div className="flex items-center justify-between text-xs text-[var(--muted)]">
               <span className="font-bold uppercase tracking-wider text-[var(--ink)]">
-                {activeCategoryTitle} ({filteredArticles.length})
+                {activeCategoryTitle} ({totalCount != null ? totalCount : filteredArticles.length})
               </span>
               <span className="text-[11px]">Click any story to open whole-page detail</span>
             </div>
 
             {/* Articles Grid */}
-            {isLoading || isRefreshing ? (
+            {isLoading && !isFetchingNextPage ? (
               <div className="py-12 flex flex-col items-center justify-center">
                 <LogoLoader
                   className="min-h-[38dvh]"
                   label={isRefreshing ? 'Refreshing AI news feed...' : 'Loading AI news feed...'}
                 />
+              </div>
+            ) : isError ? (
+              <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+                <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] py-20 text-center">
+                  <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-[var(--paper)] text-rose-500">
+                    <Newspaper size={24} weight="light" />
+                  </div>
+                  <p className="text-sm font-semibold text-[var(--ink)]">Could not load stories</p>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    {error?.message || "Check your connection and try again."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => refetch()}
+                    className="mt-5 rounded-full bg-[var(--ink)] px-5 py-2 text-xs font-bold text-white"
+                  >
+                    Try again
+                  </button>
+                </div>
               </div>
             ) : filteredArticles.length === 0 ? (
               <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
@@ -541,7 +665,7 @@ export default function TechNews() {
                     : 'grid-cols-1'
                 }`}
               >
-                {displayedArticles.map((story) => (
+                {filteredArticles.map((story) => (
                   <TechNewsCard key={story.id} story={story} layout={layout} />
                 ))}
               </div>
@@ -549,13 +673,18 @@ export default function TechNews() {
 
             {/* Progressive Scroll Sentinel element */}
             <div ref={loadMoreRef} className="py-6 flex flex-col items-center justify-center">
-              {hasMore ? (
+              {isFetchingNextPage ? (
                 <div className="flex items-center gap-2.5 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
                   <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Showing {displayedArticles.length} of {filteredArticles.length} stories...</span>
+                  <span>Loading more stories from gateway...</span>
+                </div>
+              ) : hasNextPage ? (
+                <div className="flex items-center gap-2.5 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
+                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Scroll for more stories</span>
                 </div>
               ) : (
-                rawNews.length > 0 && (
+                filteredArticles.length > 0 && (
                   <p className="text-center text-xs text-[var(--muted)]">
                     All {filteredArticles.length} stories loaded from live feed.
                   </p>

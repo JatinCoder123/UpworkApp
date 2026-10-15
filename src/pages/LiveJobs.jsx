@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useInfiniteQuery, useMutation } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import gsap from 'gsap'
-import { ArrowClockwise, ArrowLeft, Broadcast, Clock, Lightning, MagnifyingGlass, Plus, Crosshair, Sparkle, Timer, Users, WarningCircle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, ArrowLeft, Broadcast, Clock, Crosshair, Heart, Lightning, MagnifyingGlass, Plus, Sparkle, Star, Timer, Users, WarningCircle, X } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import LiveJobCard, { freshnessTone } from '../components/LiveJobCard'
 import JobDrawer from '../components/JobDrawer'
@@ -102,6 +102,7 @@ export default function LiveJobs() {
   const [sort, setSort] = useState('newest')
   const [extraFilters, setExtraFilters] = useState(() => loadExtraFilters('live'))
   const [preview, setPreview] = useState(null)
+  const [reactionFilter, setReactionFilter] = useState('all')
   useEffect(() => saveExtraFilters('live', extraFilters), [extraFilters])
   const root = useRef(null)
   const resultsRef = useRef(null)
@@ -167,8 +168,14 @@ export default function LiveJobs() {
   const jobs = useMemo(() => result?.jobs || [], [result])
   const visibleJobs = useMemo(() => {
     const compare = (LIVE_SORTS.find((item) => item.id === sort) || LIVE_SORTS[0]).compare
-    return jobs.filter((job) => matchesExtraFilters(job, extraFilters)).sort(compare)
-  }, [jobs, sort, extraFilters])
+    return jobs
+      .filter((job) => {
+        if (reactionFilter === 'favorites' && !reactions.isFavorite(job.id)) return false
+        if (reactionFilter === 'liked' && !reactions.isLiked(job.id)) return false
+        return matchesExtraFilters(job, extraFilters)
+      })
+      .sort(compare)
+  }, [jobs, sort, extraFilters, reactionFilter, reactions.favorites, reactions.liked])
   const earlyBirds = jobs.filter((job) => isEarlyBird(job, now)).length
   const avgApplicants = jobs.length ? Math.round(jobs.reduce((sum, job) => sum + job.applicants, 0) / jobs.length) : 0
   const resultWindow = result?.windowMinutes || settings.minutes
@@ -241,6 +248,38 @@ export default function LiveJobs() {
             <h2 className="text-lg font-semibold tracking-[-.02em]">{visibleJobs.length === jobs.length ? `${jobs.length} jobs` : `${visibleJobs.length} of ${jobs.length} jobs`}</h2>
             <SortMenu value={sort} options={LIVE_SORTS} onChange={setSort} label="Sort live jobs" />
             <MoreFiltersMenu value={extraFilters} onChange={setExtraFilters} />
+            <div className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--paper)] p-1" aria-label="Filter favorites and likes">
+              <button
+                type="button"
+                aria-pressed={reactionFilter === 'favorites'}
+                onClick={() => setReactionFilter((cur) => cur === 'favorites' ? 'all' : 'favorites')}
+                title="Filter favorites"
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${reactionFilter === 'favorites' ? 'bg-[#fef9c3] text-[#b45309] ring-1 ring-[#fde047] shadow-sm dark:bg-[#fef08a]/20 dark:text-[#fde047]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
+              >
+                <Star size={13} weight={reactionFilter === 'favorites' || jobs.some((j) => reactions.isFavorite(j.id)) ? 'fill' : 'regular'} className={reactionFilter === 'favorites' ? 'text-[#b45309] dark:text-[#fde047]' : 'text-[#f59e0b]'} />
+                <span>Favorites</span>
+                {jobs.filter((j) => reactions.isFavorite(j.id)).length > 0 && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums ${reactionFilter === 'favorites' ? 'bg-[#fde047]/40 text-[#92400e] dark:bg-[#fef08a]/20 dark:text-[#fde047]' : 'bg-black/5 text-[var(--muted)] dark:bg-white/10'}`}>
+                    {jobs.filter((j) => reactions.isFavorite(j.id)).length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                aria-pressed={reactionFilter === 'liked'}
+                onClick={() => setReactionFilter((cur) => cur === 'liked' ? 'all' : 'liked')}
+                title="Filter liked"
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${reactionFilter === 'liked' ? 'bg-[#ffe4e6] text-[#e11d48] ring-1 ring-[#fecdd3] shadow-sm dark:bg-[#fda4af]/20 dark:text-[#fda4af]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}
+              >
+                <Heart size={13} weight={reactionFilter === 'liked' || jobs.some((j) => reactions.isLiked(j.id)) ? 'fill' : 'regular'} className={reactionFilter === 'liked' ? 'text-[#e11d48] dark:text-[#fda4af]' : 'text-[#fb7185]'} />
+                <span>Liked</span>
+                {jobs.filter((j) => reactions.isLiked(j.id)).length > 0 && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums ${reactionFilter === 'liked' ? 'bg-[#fda4af]/40 text-[#be123c] dark:bg-[#fda4af]/20 dark:text-[#fda4af]' : 'bg-black/5 text-[var(--muted)] dark:bg-white/10'}`}>
+                    {jobs.filter((j) => reactions.isLiked(j.id)).length}
+                  </span>
+                )}
+              </button>
+            </div>
             <div className="flex flex-wrap gap-1.5">{Object.entries(result.skillsSearched || {}).map(([skill, count]) => <span key={skill} className="rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]">{skill} · {count}</span>)}</div>
             <span className="ml-auto flex items-center gap-3 text-[11px] font-semibold text-[var(--muted)]">Scanned {timeAgo(result.generatedAt, now).toLowerCase()}
               <button type="button" onClick={start} disabled={!settings.skills.length} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-3 py-1.5 font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)] disabled:opacity-40"><ArrowClockwise size={12} weight="bold" />Rescan</button>
@@ -248,10 +287,23 @@ export default function LiveJobs() {
           </div>
 
           {jobs.length && !visibleJobs.length ? <section className="mt-4 rounded-[1.6rem] bg-[var(--surface)] px-6 py-12 text-center ring-1 ring-[var(--line)]/70">
-            <h3 className="text-lg font-semibold">No jobs match these filters</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">{jobs.length} jobs were found in this scan, but none match the job type or client location filter.</p>
+            <h3 className="text-lg font-semibold">
+              {reactionFilter === 'favorites' ? 'No favorited jobs in this scan' : reactionFilter === 'liked' ? 'No liked jobs in this scan' : 'No jobs match these filters'}
+            </h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">
+              {reactionFilter === 'favorites'
+                ? 'Star any live job card to add it to your favorites.'
+                : reactionFilter === 'liked'
+                ? 'Click the heart on any live job card to add it to your liked jobs.'
+                : `${jobs.length} jobs were found in this scan, but none match the job type or client location filter.`}
+            </p>
+            {reactionFilter !== 'all' && (
+              <button type="button" onClick={() => setReactionFilter('all')} className="mt-4 inline-flex items-center rounded-full bg-[var(--paper)] px-4 py-2 text-xs font-bold ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)]">
+                Show all {jobs.length} jobs
+              </button>
+            )}
           </section>
-            : jobs.length ? <section className="mt-4 space-y-4">{visibleJobs.map((job, index) => <LiveJobCard key={job.id} job={job} index={index} now={now} windowMinutes={resultWindow} justIn={justIn.includes(job.id)} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id)} onFavorite={() => reactions.toggleFavorite(job.id)} applied={reactions.isApplied(job.id)} dismissed={reactions.isDismissed(job.id)} onOpen={() => setPreview(job)} />)}</section>
+            : jobs.length ? <section className="mt-4 space-y-4">{visibleJobs.map((job, index) => <LiveJobCard key={job.id} job={job} index={index} now={now} windowMinutes={resultWindow} justIn={justIn.includes(job.id)} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} applied={reactions.isApplied(job.id)} dismissed={reactions.isDismissed(job.id)} onOpen={() => setPreview(job)} />)}</section>
             : <section className="mt-4 rounded-[1.6rem] bg-[var(--surface)] px-6 py-16 text-center ring-1 ring-[var(--line)]/70">
               <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--lime)]/30 text-[var(--accent-strong)]"><Crosshair size={24} weight="duotone" /></div>
               <h3 className="mt-5 text-xl font-semibold">Quiet out there</h3>

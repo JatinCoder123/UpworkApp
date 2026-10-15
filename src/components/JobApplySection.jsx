@@ -19,7 +19,7 @@ export function Chips({ job }) {
   return <div className="flex flex-wrap gap-1.5">{chips.map((chip) => <span key={chip} className="rounded-full bg-[var(--frame)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)]">{chip}</span>)}</div>
 }
 
-const squareButton = (active) => `grid h-11 min-w-11 place-items-center rounded-2xl ring-1 transition-all duration-300 active:scale-90 ${active ? 'bg-[var(--ink)] text-white ring-[var(--ink)]' : 'bg-[var(--raised)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`
+const squareButton = (active, activeStyle) => `grid h-11 min-w-11 place-items-center rounded-2xl ring-1 transition-all duration-300 active:scale-90 ${active ? (activeStyle || 'bg-[var(--ink)] text-white ring-[var(--ink)]') : 'bg-[var(--raised)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`
 
 /** Price, apply, status and sharing controls for the job detail page and preview drawer. */
 export default function JobApplySection({ job, statusLabel, applied, dismissed, onApplied, onDismiss, liked, favorite, onLike, onFavorite, onShare }) {
@@ -46,8 +46,26 @@ export default function JobApplySection({ job, statusLabel, applied, dismissed, 
     </div>
 
     <div className="mt-2 grid grid-cols-5 gap-2">
-      <button type="button" onClick={onLike} aria-pressed={liked} aria-label={liked ? 'Unlike job' : 'Like job'} title={liked ? 'Unlike' : 'Like'} className={squareButton(liked)}><Heart size={16} weight={liked ? 'fill' : 'regular'} /></button>
-      <button type="button" onClick={onFavorite} aria-pressed={favorite} aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'} title={favorite ? 'Remove from favorites' : 'Add to favorites'} className={squareButton(favorite)}><Star size={16} weight={favorite ? 'fill' : 'regular'} /></button>
+      <button
+        type="button"
+        onClick={onLike}
+        aria-pressed={liked}
+        aria-label={liked ? 'Unlike job' : 'Like job'}
+        title={liked ? 'Unlike' : 'Like'}
+        className={squareButton(liked, 'bg-[#fff1f2] text-[#e11d48] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/30')}
+      >
+        <Heart size={18} weight={liked ? 'fill' : 'regular'} className={liked ? 'text-[#fb7185] dark:text-[#fda4af]' : ''} />
+      </button>
+      <button
+        type="button"
+        onClick={onFavorite}
+        aria-pressed={favorite}
+        aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
+        title={favorite ? 'Remove from favorites' : 'Add to favorites'}
+        className={squareButton(favorite, 'bg-[#fef9c3] text-[#b45309] ring-1 ring-[#fde047] dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/30')}
+      >
+        <Star size={18} weight={favorite ? 'fill' : 'regular'} className={favorite ? 'text-[#f59e0b] dark:text-[#fde047]' : ''} />
+      </button>
       <button type="button" onClick={() => copy('link', jobShareLink(job))} aria-label="Copy job link" title={copied === 'link' ? 'Copied' : 'Copy link'} className={squareButton(false)}>{copied === 'link' ? <Check size={16} weight="bold" className="text-[var(--accent-strong)]" /> : <LinkSimple size={16} />}</button>
       <button type="button" onClick={() => onShare('teams')} aria-label="Share in Teams" title="Share in Teams" className={squareButton(false)}><MicrosoftTeamsLogo size={17} weight="fill" className="text-[#4b53bc]" /></button>
       <button type="button" onClick={() => onShare('notify')} aria-label="Notify team" title="Notify team" className={squareButton(false)}><UsersThree size={16} weight="bold" /></button>

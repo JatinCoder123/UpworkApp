@@ -43,6 +43,16 @@ export default function LiveJobCard({ job, index, now, windowMinutes, justIn, li
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {index != null && <span className="font-mono text-[11px] font-bold text-[var(--muted)]">{String(index + 1).padStart(2, '0')}</span>}
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-[#c8e875]"><span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#c8e875] opacity-70" /><span className="relative size-1.5 rounded-full bg-[#c8e875]" /></span>Live</span>
+          {favorite && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#fef9c3] px-2.5 py-0.5 text-[10px] font-bold text-[#92400e] ring-1 ring-[#fde047]/60 dark:bg-[#fef08a]/15 dark:text-[#fde047] dark:ring-[#fde047]/30">
+              <Star size={11} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" /> Favorited
+            </span>
+          )}
+          {liked && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#ffe4e6] px-2.5 py-0.5 text-[10px] font-bold text-[#be123c] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/15 dark:text-[#fda4af] dark:ring-[#fda4af]/30">
+              <Heart size={11} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" /> Liked
+            </span>
+          )}
           {justIn && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--lime)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-[#26320b]"><Sparkle size={11} weight="fill" />Just in</span>}
           {earlyBird && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-bg)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-[var(--warn)]"><Lightning size={11} weight="fill" />Early bird</span>}
           {job.renewedAt && <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-[var(--muted)]">Renewed</span>}

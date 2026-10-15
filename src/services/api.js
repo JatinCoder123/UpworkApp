@@ -16,7 +16,7 @@ const COVER_LETTER_EDIT_URL = import.meta.env?.VITE_COVER_LETTER_EDIT_URL || COV
 
 const apiClient = axios.create({
   baseURL: SMART_GATEWAY_URL,
-  timeout: 20_000,
+  timeout: 600_000,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -738,10 +738,23 @@ export function mapGatewayTechNews(record) {
   };
 }
 
+const TECH_NEWS_SEARCH_FIELDS = [
+  "name",
+  "summary",
+  "description",
+  "category",
+  "source_note",
+  "tag",
+  "source",
+];
+
 export async function fetchTechNews({
   page = 1,
   perPage = DEFAULT_TECH_NEWS_PER_PAGE,
   category,
+  tag,
+  sourceType,
+  priority,
   search,
   filters = {},
   dateFilter,
@@ -749,6 +762,9 @@ export async function fetchTechNews({
   const gatewayFilters = { ...filters };
   if (category && category !== "All") {
     gatewayFilters.category = category;
+  }
+  if (priority && priority !== "All") {
+    gatewayFilters.priority = priority;
   }
 
   const queryPayload = {
@@ -764,9 +780,16 @@ export async function fetchTechNews({
     queryPayload.filters = gatewayFilters;
   }
 
-  if (search && search.trim()) {
-    queryPayload.search = search.trim();
-    queryPayload.search_fields = ["name", "summary", "description"];
+  const cleanSearch = search && search.trim();
+  const activeTag = tag || sourceType;
+  const hasTag = activeTag && activeTag !== "All";
+
+  if (cleanSearch) {
+    queryPayload.search = cleanSearch;
+    queryPayload.search_fields = TECH_NEWS_SEARCH_FIELDS;
+  } else if (hasTag) {
+    queryPayload.search = activeTag.replace(/^#/, "");
+    queryPayload.search_fields = ["tag"];
   }
 
   const data = await smartGateway(addGatewayDateFilter(queryPayload, dateFilter));
@@ -779,6 +802,46 @@ export async function fetchTechNews({
     perPage: Number(data.per_page) || perPage,
     totalPages: Number(data.total_pages) || Math.ceil((Number(data.total) || records.length) / perPage),
   };
+}
+
+export async function fetchTechNewsStats({ dateFilter } = {}) {
+  const categories = [
+    "Other Tech (Cloud)",
+    "AI",
+    "Other Tech (Security)",
+    "Tech Product",
+    "Other Tech (Hardware)",
+    "Other Tech (Dev Tools)",
+    "Other Tech (Business)",
+  ];
+
+  const queries = [
+    { key: "total", module: TECH_NEWS_MODULE },
+    { key: "FirstParty", module: TECH_NEWS_MODULE, search: "FirstParty", search_fields: ["tag"] },
+    { key: "ThirdParty", module: TECH_NEWS_MODULE, search: "ThirdParty", search_fields: ["tag"] },
+    { key: "YouBlogging", module: TECH_NEWS_MODULE, search: "YouBlogging", search_fields: ["tag"] },
+    { key: "HurryUp", module: TECH_NEWS_MODULE, search: "HurryUp", search_fields: ["tag"] },
+    ...categories.map((cat) => ({
+      key: `cat_${cat}`,
+      module: TECH_NEWS_MODULE,
+      filters: { category: cat },
+    })),
+  ];
+
+  const data = await smartGateway({
+    action: "get_stats",
+    date_range: "",
+    date_field: dateFilter?.date_field || "",
+    date_from: dateFilter?.date_from || "",
+    date_to: dateFilter?.date_to || "",
+    queries,
+  });
+
+  const stats = {};
+  for (const [key, val] of Object.entries(data.stats || {})) {
+    stats[key] = Number(val?.count) || 0;
+  }
+  return stats;
 }
 
 export async function fetchTechNewsById(id) {
@@ -799,9 +862,10 @@ export async function fetchTechNewsById(id) {
 const techNewsCache = new Map();
 const inFlightTechNewsRequests = new Map();
 
-export async function fetchAllTechNews({ forceRefresh = false, dateFilter = null } = {}) {
+export async function fetchAllTechNews({ forceRefresh = false, dateFilter = null, search = "" } = {}) {
   const now = Date.now();
-  const cacheKey = JSON.stringify(dateFilter || {});
+  const cleanSearch = String(search || "").trim();
+  const cacheKey = JSON.stringify({ dateFilter: dateFilter || {}, search: cleanSearch });
   const cached = techNewsCache.get(cacheKey);
   if (!forceRefresh && cached && now - cached.timestamp < 120_000) {
     return cached.data;
@@ -813,15 +877,15 @@ export async function fetchAllTechNews({ forceRefresh = false, dateFilter = null
 
   const request = (async () => {
     try {
-      const first = await fetchTechNews({ page: 1, perPage: 50, dateFilter });
+      const first = await fetchTechNews({ page: 1, perPage: 50, dateFilter, search: cleanSearch });
       const total = Number(first.total) || first.records.length;
       const computedTotalPages = Math.max(Number(first.totalPages) || 1, Math.ceil(total / 50));
       let allRecords = [...first.records];
 
       if (computedTotalPages > 1) {
-        for (let p = 2; p <= computedTotalPages; p++) {
+        for (let p = 2; p <= Math.min(computedTotalPages, 10); p++) {
           try {
-            const nextPage = await fetchTechNews({ page: p, perPage: 50, dateFilter });
+            const nextPage = await fetchTechNews({ page: p, perPage: 50, dateFilter, search: cleanSearch });
             allRecords = allRecords.concat(nextPage.records || []);
           } catch (pageErr) {
             console.warn(`Failed to fetch tech news page ${p}:`, pageErr);
@@ -940,9 +1004,48 @@ export function mapSiteContent(record) {
     done: flag(record.is_done),
     itemNumber: Number(record.item_number) || null,
     publishedUrl: record.published_url || "",
+    notesId: record.notes_id || "",
     posted: record.date_entered_time_ago || record.date_entered_uni_format || "Recently",
     postedAt: parseEnteredAt(record),
   };
+}
+
+export async function fetchNote(noteId, { timeout = 600_000 } = {}) {
+  if (!noteId) return null;
+  const data = await smartGateway(
+    {
+      action: "fetch",
+      module: "Notes",
+      page: 1,
+      per_page: 1,
+      filters: { id: noteId },
+    },
+    { timeout }
+  );
+  const rec = data.records?.[0];
+  if (!rec) return null;
+  return {
+    id: rec.id,
+    name: decodeHtml(rec.name || ""),
+    status: (rec.status || "queued").toLowerCase(),
+    filename: rec.filename || "",
+    fileMimeType: rec.file_mime_type || "",
+    documentUrl: rec.document_url || `https://upwork.outrightcrm.in/index.php?entryPoint=download&type=Notes&id=${rec.id}`,
+    viewUrl: rec.view_url || `https://upwork.outrightcrm.in/index.php?entryPoint=viewdoc&id=${rec.id}`,
+    dateEntered: rec.date_entered_time_ago || rec.date_entered_uni_format || rec.date_entered || "",
+    dateModified: rec.date_modified_time_ago || rec.date_modified_uni_format || rec.date_modified || "",
+  };
+}
+
+export async function generateTechContentDoc(contentId) {
+  if (!contentId) throw createAppError("INVALID_ID", "Content ID is required");
+  const url = `https://upwork.outrightcrm.in/index.php?entryPoint=TechContentDocx&id=${encodeURIComponent(contentId)}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw createAppError("DOC_GEN_FAILED", `Failed to initiate document generation (${response.status})`);
+  }
+  const result = await response.json();
+  return result;
 }
 
 export async function fetchVideoFeeds() {
@@ -965,11 +1068,15 @@ export const api = {
   getLiveJobs: (params) => fetchLiveUpworkJobs(params),
   getVideoFeeds: (options) => fetchVideoFeeds(options),
   getSiteContent: (options) => fetchSiteContent(options),
+  getNote: (id) => fetchNote(id),
+  generateTechContentDoc: (contentId) => generateTechContentDoc(contentId),
   getSkills: (params) => fetchSkills(params),
   createSkill,
   updateSkill,
   deleteSkill,
   getTechNews: (params) => fetchTechNews(params),
+  getTechNewsPage: (params) => fetchTechNews(params),
+  getTechNewsStats: (params) => fetchTechNewsStats(params),
   getTechNewsItem: (id) => fetchTechNewsById(id),
   getAllTechNews: (options) => fetchAllTechNews(options),
   async updateStatus({ id, status, reason, coverLetter }) {
