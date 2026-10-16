@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Briefcase, Clock, Heart, Hourglass, Lightning, MapPin, SealCheck, Sparkle, Star, Users } from '@phosphor-icons/react'
+import { Briefcase, CheckCircle, Clock, Database, Heart, Hourglass, Lightning, MapPin, SealCheck, Sparkle, Star, Users } from '@phosphor-icons/react'
 import { JobCardActions, JobCardAside } from './JobCard'
 import { previewClick } from '../lib/jobSignals'
 import { timeAgo } from '../lib/time'
@@ -28,7 +28,8 @@ function Fact({ icon: Icon, children }) {
   return <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)]"><Icon size={13} weight="bold" className="shrink-0 opacity-70" />{children}</span>
 }
 
-export default function LiveJobCard({ job, index, now, windowMinutes, justIn, liked, favorite, onLike, onFavorite, applied, dismissed, onOpen }) {
+// `onSaveToCrm` adds a Save to CRM button; `crmSaved` swaps it for a "Saved to CRM" badge.
+export default function LiveJobCard({ job, index, now, windowMinutes, justIn, liked, favorite, onLike, onFavorite, applied, dismissed, onOpen, onSaveToCrm, crmSaved = false, crmSaving = false, crmError = '' }) {
   const minutes = minutesSince(job.postedAt, now)
   const tone = freshnessTone(minutes, windowMinutes)
   const matched = new Set(asArray(job.matchedSkills).map((skill) => asText(skill).toLowerCase()))
@@ -78,7 +79,18 @@ export default function LiveJobCard({ job, index, now, windowMinutes, justIn, li
       <JobCardActions job={job} liked={liked} favorite={favorite} onLike={onLike} onFavorite={onFavorite} />
       </div>
 
-      <JobCardAside job={job} extra={(applied || dismissed) && <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] ${applied ? 'bg-[var(--lime)]/45 text-[#26320b]' : 'bg-[var(--bad-bg)] text-[var(--bad)]'}`}>{applied ? 'Applied' : 'Not a fit'}</span>} />
+      <JobCardAside job={job} extra={<>
+        {(applied || dismissed) && <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] ${applied ? 'bg-[var(--lime)]/45 text-[#26320b]' : 'bg-[var(--bad-bg)] text-[var(--bad)]'}`}>{applied ? 'Applied' : 'Not a fit'}</span>}
+        {onSaveToCrm && <div>
+          {crmSaved
+            ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ok-bg)] px-3 py-1.5 text-[11px] font-bold text-[var(--ok)] ring-1 ring-[var(--ok)]/30"><CheckCircle size={13} weight="fill" />Saved to CRM</span>
+            : <button type="button" onClick={onSaveToCrm} disabled={crmSaving} title="Save this job to the CRM so it shows in the Jobs section" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-3 py-1.5 text-[11px] font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)] disabled:opacity-60">
+              {crmSaving ? <span className="size-3 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" /> : <Database size={13} weight="bold" />}
+              {crmSaving ? 'Saving…' : 'Save to CRM'}
+            </button>}
+          {crmError && <p role="alert" className="mt-1.5 text-[11px] font-semibold text-[var(--bad)]">{crmError}</p>}
+        </div>}
+      </>} />
     </div>
   </article>
 }

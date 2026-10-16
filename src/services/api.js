@@ -711,6 +711,71 @@ export async function fetchLiveUpworkJobs({ skills = [], minutes = 60, includeRe
   };
 }
 
+// Upwork posting time in the CRM's own format, "Fri, 16 Oct 2026 16:12 IST", so parsePostedAt reads it back.
+function istPosted(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date).map((part) => [part.type, part.value]));
+  return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year} ${parts.hour}:${parts.minute} IST`;
+}
+
+// A mapped live job as a CRM jobs record, in the same text formats the importer writes
+// (budget "Budget, workload, duration, level"; client "Country; hires, rating, payment; proposals").
+function liveJobToCrmRecord(input) {
+  const job = asObject(input);
+  const raw = asObject(job.raw);
+  const client = asObject(job.clientStats);
+  const key = asText(job.jobId).replace(/^~/, "");
+  const skills = asArray(job.skills).map(asText).filter(Boolean);
+  const matched = asArray(job.matchedSkills).map(asText).filter(Boolean);
+  const description = asText(job.description) === "No description provided." ? "" : asText(job.description);
+  const budget = [job.budget, job.workload, job.duration !== "Duration not set" && job.duration, job.level !== "Not specified" && job.level].filter(Boolean).join(", ");
+  const clientFacts = [
+    client.hires != null && `${client.hires} hires`,
+    client.rating != null && `★${client.rating}${client.reviews ? ` (${client.reviews} reviews)` : ""}`,
+    client.totalSpent && `${client.totalSpent} spent`,
+    client.paymentVerified ? "payment verified" : "payment not verified",
+  ].filter(Boolean).join(", ");
+  const clientText = [client.country, clientFacts, client.proposals != null && `${client.proposals} proposals`].filter(Boolean).join("; ");
+  return {
+    name: asText(job.title),
+    job_title: asText(job.title),
+    job_id: key,
+    upwork_url: asText(job.url),
+    skills: skills.join(", "),
+    matched_skills: matched.join(", "),
+    category: asText(raw.category),
+    budget,
+    posted: istPosted(job.postedAt),
+    client: clientText,
+    status: "New",
+    ai_processed: 1,
+    description: [
+      `Upwork link: ${asText(job.url)}`,
+      `Upwork key: ${key}`,
+      "Status: New",
+      "",
+      `Found with: ${matched.join(", ")}`,
+      `Skills: ${skills.join(", ")}`,
+      "",
+      "--- Upwork job description ---",
+      description,
+    ].join("\n"),
+  };
+}
+
+// Saves a live Upwork job as a CRM job so it shows in the Jobs section.
+// A job already in the CRM (same Upwork key) is not created twice; its id is returned instead.
+export async function saveLiveJobToCrm(job) {
+  const record = liveJobToCrmRecord(job);
+  if (!record.job_id) throw createAppError("LIVE_JOB_INVALID", "This job has no Upwork id, so it cannot be saved.");
+  const existing = await smartGateway({ action: "fetch", module: JOBS_MODULE, filters: { job_id: record.job_id }, page: 1, per_page: 1 });
+  const found = asArray(existing.records).find((item) => item && item.deleted !== "1");
+  if (found?.id) return { id: found.id, existed: true };
+  const data = await smartGateway({ action: "create", module: JOBS_MODULE, data: record });
+  return { id: data.id ?? data.record?.id ?? data.data?.id ?? "", existed: false };
+}
+
 export async function fetchSkills({ page = 1, perPage = 20 } = {}) {
   const data = await smartGateway({ action: "fetch", module: SKILLS_MODULE, page, per_page: perPage });
   return {
@@ -1221,6 +1286,7 @@ export const api = {
   editCoverLetter: editCoverLetterWithAi,
   getStrategy: (job) => fetchStrategy(job),  getTeamMembers: () => fetchTeamMembers(),
   getLiveJobs: (params) => fetchLiveUpworkJobs(params),
+  saveLiveJobToCrm,
   getVideoFeeds: (options) => fetchVideoFeeds(options),
   getSiteContent: (options) => fetchSiteContent(options),
   getNote: (id) => fetchNote(id),
