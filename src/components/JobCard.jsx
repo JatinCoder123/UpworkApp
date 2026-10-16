@@ -7,6 +7,7 @@ import ShareJobDialog from './ShareJobDialog'
 import { scoreJob } from '../lib/scoring'
 import { timeAgo } from '../lib/time'
 import { previewClick, skillStyle } from '../lib/jobSignals'
+import { asArray, asObject } from '../lib/safe'
 
 function matchTone(score) {
   if (score >= 75) return 'var(--lime-dark)'
@@ -67,9 +68,9 @@ export default function JobCard({ job, index, now, liked, favorite, onLike, onFa
   const fit = job.match > 0 ? null : scoreJob(job)
   const score = fit ? fit.score : job.match
   const matchLabel = fit ? fit.verdict : job.fitLabel
-  const skills = job.skills?.length ? job.skills : job.tags
+  const skills = asArray(job.skills).length ? job.skills : asArray(job.tags)
   const visibleSkills = skills.slice(0, 5)
-  const client = job.clientStats
+  const client = asObject(job.clientStats)
   const isNew = job.status === 'New'
   const summary = job.summary || job.description
 
@@ -92,14 +93,12 @@ export default function JobCard({ job, index, now, liked, favorite, onLike, onFa
             </span>
           )}
           {isNew && <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--accent)] opacity-60" /><span className="relative size-2 rounded-full bg-[var(--accent)]" /></span>}
-          <time dateTime={job.postedAt} title={job.posted} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-strong)]"><Clock size={12} weight="bold" />{timeAgo(job.postedAt, now) || job.posted}</time>
-          <span className="truncate text-[11px] font-medium text-[var(--muted)]">{job.jobId}</span>
-        </div>
+          <time dateTime={job.postedAt} title={job.posted} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-strong)]"><Clock size={12} weight="bold" />{timeAgo(job.postedAt, now) || job.posted}</time>        </div>
         <h3 className="mt-3 text-lg font-semibold leading-snug tracking-[-.025em] transition-colors duration-300 group-hover:text-[var(--accent-strong)] sm:text-[1.2rem]">{job.title}</h3>
         {summary && <p className="mt-2 line-clamp-2 max-w-3xl text-[13px] leading-6 text-[var(--muted)]">{summary}</p>}
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
           <Fact icon={MapPin}>{client.country || 'Location not shared'}</Fact>
-          {client.rating != null && <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--muted)]"><Star size={13} weight="fill" className="text-[#e6a817]" /><span className="font-semibold text-[var(--text)]">{client.rating.toFixed(1)}</span>{client.reviews != null && `(${client.reviews})`}</span>}
+          {client.rating != null && <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--muted)]"><Star size={13} weight="fill" className="text-[#e6a817]" /><span className="font-semibold text-[var(--text)]">{Number(client.rating).toFixed(1)}</span>{client.reviews != null && `(${client.reviews})`}</span>}
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${client.paymentVerified ? 'bg-[var(--ok-bg)] text-[var(--ok)]' : 'bg-[var(--bad-bg)] text-[var(--bad)]'}`}><SealCheck size={11} weight="fill" />{client.paymentVerified ? 'Payment verified' : 'Payment unverified'}</span>
           <Fact icon={Briefcase}>{[client.hires != null && `${client.hires} hires`, client.proposals != null && `${client.proposals} proposals`].filter(Boolean).join(' · ')}</Fact>
           <Fact icon={Hourglass}>{job.workload}</Fact>

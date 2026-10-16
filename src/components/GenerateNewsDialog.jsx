@@ -11,6 +11,7 @@ import {
   PencilSimple,
 } from '@phosphor-icons/react'
 import { DialogHeader, Modal } from './ui'
+import { asText } from '../lib/safe'
 
 const GENERATION_STEPS = [
   'Reading the selected news story',
@@ -21,7 +22,7 @@ const GENERATION_STEPS = [
 
 export default function GenerateNewsDialog({ storyTitle, onClose }) {
   const [mode, setMode] = useState('update')
-  const [title, setTitle] = useState(storyTitle || '')
+  const [title, setTitle] = useState(asText(storyTitle))
   const [documentUrl, setDocumentUrl] = useState('')
   const [changes, setChanges] = useState('')
   const [status, setStatus] = useState('idle')

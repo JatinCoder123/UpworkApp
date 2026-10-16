@@ -8,6 +8,7 @@ import LogoLoader from '../components/LogoLoader'
 import HScroll from '../components/HScroll'
 import { primaryButton, stickyBand } from '../components/ui'
 import { api } from '../services/api'
+import { asArray } from '../lib/safe'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -29,7 +30,8 @@ function useCopy() {
 }
 
 export default function Video() {
-  const { data: briefs = [], isLoading, isError, error, refetch, isFetching } = useQuery({ queryKey: ['video-feeds'], queryFn: () => api.getVideoFeeds(), staleTime: 120_000 })
+  const { data: briefsData, isLoading, isError, error, refetch, isFetching } = useQuery({ queryKey: ['video-feeds'], queryFn: () => api.getVideoFeeds(), staleTime: 120_000 })
+  const briefs = useMemo(() => asArray(briefsData), [briefsData])
   const [category, setCategory] = useState('All')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('newest')
@@ -41,7 +43,7 @@ export default function Video() {
     const query = search.trim().toLowerCase()
     const list = briefs.filter((brief) =>
       (category === 'All' || brief.category === category) &&
-      (!query || `${brief.title} ${brief.category} ${brief.whyChosen} ${brief.targetSearchTerm} ${brief.hashtags.join(' ')}`.toLowerCase().includes(query)))
+      (!query || `${brief.title} ${brief.category} ${brief.whyChosen} ${brief.targetSearchTerm} ${asArray(brief.hashtags).join(' ')}`.toLowerCase().includes(query)))
     if (sort === 'match') return [...list].sort((a, b) => b.match - a.match)
     if (sort === 'rating') return [...list].sort((a, b) => b.rating - a.rating)
     return [...list].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt))
@@ -52,7 +54,7 @@ export default function Video() {
     p1: briefs.filter((brief) => brief.priority === 'P1').length,
     match: briefs.length ? Math.round(briefs.reduce((sum, brief) => sum + brief.match, 0) / briefs.length) : 0,
   }), [briefs])
-  const hashtags = useMemo(() => [...new Set(briefs.flatMap((brief) => brief.hashtags))].slice(0, 28), [briefs])
+  const hashtags = useMemo(() => [...new Set(briefs.flatMap((brief) => asArray(brief.hashtags)))].slice(0, 28), [briefs])
 
   // Hero entrance and counters.
   useEffect(() => {
@@ -169,7 +171,9 @@ function Fact({ icon: Icon, label, value }) {
 function BriefCard({ brief, index }) {
   const [copied, copy] = useCopy()
   const [showCheck, setShowCheck] = useState(false)
-  const outlineText = brief.outline.map((beat) => [beat.time, beat.label && `${beat.label}:`, beat.text].filter(Boolean).join(' ')).join('\n')
+  const outline = asArray(brief.outline)
+  const hashtags = asArray(brief.hashtags)
+  const outlineText = outline.map((beat) => [beat.time, beat.label && `${beat.label}:`, beat.text].filter(Boolean).join(' ')).join('\n')
 
   return <article id={`brief-${brief.id}`} data-brief className="scroll-mt-[calc(var(--shell-h)+5.5rem)] origin-top rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70 will-change-transform">
     <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 sm:p-8">
@@ -202,9 +206,9 @@ function BriefCard({ brief, index }) {
             <button type="button" onClick={() => setShowCheck((open) => !open)} aria-expanded={showCheck} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-xs font-bold"><span className="flex items-center gap-2"><Check size={14} weight="bold" className="text-[var(--ok)]" />Duplicate check</span><span className={`text-base leading-none text-[var(--muted)] transition-transform duration-300 ${showCheck ? 'rotate-45' : ''}`}>+</span></button>
             <div className={`grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${showCheck ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}><p className="overflow-hidden px-4 text-xs leading-5 text-[var(--muted)]"><span className="block pb-4">{brief.duplicateCheck}</span></p></div>
           </section>}
-          {brief.hashtags.length > 0 && <section>
-            <div className="flex items-center justify-between"><p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]"><Hash size={12} weight="bold" />Hashtags</p><button type="button" onClick={() => copy('tags', brief.hashtags.join(' '))} className="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">{copied === 'tags' ? <Check size={12} weight="bold" /> : <Copy size={12} />}{copied === 'tags' ? 'Copied' : 'Copy'}</button></div>
-            <div className="mt-2.5 flex flex-wrap gap-1.5">{brief.hashtags.map((tag) => <span key={tag} className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[11px] font-medium text-[var(--muted)]">{tag}</span>)}</div>
+          {hashtags.length > 0 && <section>
+            <div className="flex items-center justify-between"><p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]"><Hash size={12} weight="bold" />Hashtags</p><button type="button" onClick={() => copy('tags', hashtags.join(' '))} className="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">{copied === 'tags' ? <Check size={12} weight="bold" /> : <Copy size={12} />}{copied === 'tags' ? 'Copied' : 'Copy'}</button></div>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">{hashtags.map((tag) => <span key={tag} className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[11px] font-medium text-[var(--muted)]">{tag}</span>)}</div>
           </section>}
           <div className="flex flex-wrap gap-2 pt-1">
             {brief.sourceUrl && <a href={brief.sourceUrl} target="_blank" rel="noopener noreferrer" className="upwork-view-button inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-bold">Source<ArrowSquareOut size={13} /></a>}
@@ -217,7 +221,7 @@ function BriefCard({ brief, index }) {
           <ol data-beats className="relative mt-4 space-y-1">
             <span aria-hidden="true" className="absolute bottom-3 left-[1.6rem] top-3 w-px bg-[var(--line)]" />
             <span data-beat-line aria-hidden="true" className="absolute bottom-3 left-[1.6rem] top-3 w-px origin-top bg-[var(--lime-dark)]" />
-            {brief.outline.map((beat, beatIndex) => <li key={`${beat.time}-${beatIndex}`} data-beat className="relative grid grid-cols-[3.2rem_1fr] gap-3 rounded-2xl py-2.5 pr-2 transition-colors hover:bg-[var(--paper)]">
+            {outline.map((beat, beatIndex) => <li key={`${beat.time}-${beatIndex}`} data-beat className="relative grid grid-cols-[3.2rem_1fr] gap-3 rounded-2xl py-2.5 pr-2 transition-colors hover:bg-[var(--paper)]">
               <span className="relative z-10 mx-auto h-fit rounded-lg bg-[var(--surface)] px-1.5 py-1 text-center font-mono text-[10px] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--line)]">{beat.time || '•'}</span>
               <p className="text-sm leading-6">{beat.label && <strong className="font-semibold">{beat.label}. </strong>}<span className="text-[var(--muted)]">{beat.text}</span></p>
             </li>)}

@@ -19,8 +19,10 @@ import { EMPTY_EXTRA_FILTERS, EMPTY_REACTION_FILTER, JOB_SORTS, loadDateFilter, 
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from "../lib/dateRange";
 import { clientLocation, countExtraFilters, forgetSearch, loadRecentSearches, matchesExtraFilters, rememberSearch, skillStyle, useJobReactions, usePreviewParam } from "../lib/jobSignals";
 import { useJobStatus } from "../lib/jobStatus";
+import ErrorBoundary, { CardError } from "../components/ErrorBoundary";
 import { timeAgo, useNow } from "../lib/time";
 import { useAuth } from "../contexts/AuthContext";
+import { asArray, asObject, asText } from "../lib/safe";
 
 const scopes = ["My Jobs", "All Jobs"];
 const pipeline = ["New", "Applied", "Rejected"];
@@ -82,15 +84,16 @@ export default function Jobs() {
     placeholderData: (previous) => previous,
   });
   const jobs = useMemo(
-    () => (jobPages?.pages || []).flatMap((page) => page.records).filter((job, index, records) => records.findIndex((item) => item.id === job.id) === index),
+    () => asArray(jobPages?.pages).flatMap((page) => asArray(page?.records)).filter((job, index, records) => records.findIndex((item) => item.id === job.id) === index),
     [jobPages],
   );
   const totalMatches = jobPages?.pages?.[0]?.total;
-  const { data: jobStats = {}, isFetching: isFetchingStats, refetch: refetchStats } = useQuery({
+  const { data: jobStatsData, isFetching: isFetchingStats, refetch: refetchStats } = useQuery({
     queryKey: ["job-stats", user?.email, gatewayDateFilter],
     queryFn: () => api.getJobStats({ dateFilter: gatewayDateFilter, userEmail: user.email }),
     enabled: Boolean(user?.email),
   });
+  const jobStats = asObject(jobStatsData);
   const scopePrefix = showAllJobs ? "all" : "my";
   const scopeCounts = { "My Jobs": jobStats.my_total, "All Jobs": jobStats.all_total };
   const pipelineCounts = {
@@ -114,20 +117,21 @@ export default function Jobs() {
     if (hasMoreSkills && !isFetchingMoreSkills) fetchMoreSkills();
   }, [fetchMoreSkills, hasMoreSkills, isFetchingMoreSkills]);
   const skillRecords = useMemo(
-    () => (skillPages?.pages || []).flatMap((page) => page.records).filter((record, index, records) => records.findIndex((item) => item.id === record.id) === index).sort((a, b) => a.name.localeCompare(b.name)),
+    () => asArray(skillPages?.pages).flatMap((page) => asArray(page?.records)).filter((record, index, records) => records.findIndex((item) => item.id === record.id) === index).sort((a, b) => asText(a.name).localeCompare(asText(b.name))),
     [skillPages],
   );
   // Job counts per skill follow the scope and date window, like the pipeline counts; fetched once every skill page is in.
   const skillNames = useMemo(() => skillRecords.map((record) => record.name), [skillRecords]);
-  const { data: skillCounts = {}, isFetching: isFetchingSkillCounts, refetch: refetchSkillCounts } = useQuery({
+  const { data: skillCountsData, isFetching: isFetchingSkillCounts, refetch: refetchSkillCounts } = useQuery({
     queryKey: ["skill-counts", showAllJobs ? "all" : user?.email, gatewayDateFilter, skillNames],
     queryFn: () => api.getSkillCounts({ skills: skillNames, dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs }),
     enabled: Boolean(user?.email) && skillNames.length > 0 && !hasMoreSkills,
     placeholderData: (previous) => previous,
   });
+  const skillCounts = asObject(skillCountsData);
   // Most jobs first; ties and not-yet-counted skills stay alphabetical.
   const rankedSkillRecords = useMemo(
-    () => [...skillRecords].sort((a, b) => (skillCounts[b.name] ?? -1) - (skillCounts[a.name] ?? -1) || a.name.localeCompare(b.name)),
+    () => [...skillRecords].sort((a, b) => (skillCounts[b.name] ?? -1) - (skillCounts[a.name] ?? -1) || asText(a.name).localeCompare(asText(b.name))),
     [skillRecords, skillCounts],
   );
   // The toolbar shows the top skills plus any selected one outside them; the rest sit behind "+N more".
@@ -138,7 +142,7 @@ export default function Jobs() {
   const hiddenSkillCount = rankedSkillRecords.length - shownSkillRecords.length;
 
   const allDisplayJobs = useMemo(() => {
-    const baseJobs = (jobPages?.pages || []).flatMap((page) => page.records).filter((job, index, records) => records.findIndex((item) => item.id === job.id) === index);
+    const baseJobs = asArray(jobPages?.pages).flatMap((page) => asArray(page?.records)).filter((job, index, records) => records.findIndex((item) => item.id === job.id) === index);
     const baseIds = new Set(baseJobs.map((j) => j.id));
     const extraFromReactions = [];
     const relevantIds = favoritesOnly || likedOnly
@@ -176,7 +180,7 @@ export default function Jobs() {
       if (favoritesOnly && !reactions.favorites.includes(job.id)) return false;
       if (likedOnly && !reactions.liked.includes(job.id)) return false;
       return matchesExtraFilters(job, extraFilters) &&
-        (!skills.length || skills.some((skill) => (job.skills || []).some((jobSkill) => jobSkill.toLowerCase() === skill.toLowerCase()) || `${job.title} ${job.description}`.toLowerCase().includes(skill.toLowerCase())));
+        (!skills.length || skills.some((skill) => asArray(job.skills).some((jobSkill) => asText(jobSkill).toLowerCase() === skill.toLowerCase()) || `${job.title} ${job.description}`.toLowerCase().includes(skill.toLowerCase())));
     }),
     [allDisplayJobs, tab, favoritesOnly, likedOnly, skills, extraFilters, reactions.favorites, reactions.liked],
   );
@@ -210,7 +214,7 @@ export default function Jobs() {
   const commitSearch = (value = searchInput) => setRecentSearches(rememberSearch(user?.email, value));
   const applySearch = (value) => { setSearchInput(value); commitSearch(value); setSearchFocused(false); };
   const historyTerm = searchInput.trim().toLowerCase();
-  const searchHistory = recentSearches.filter((term) => !historyTerm || (term.toLowerCase().includes(historyTerm) && term.toLowerCase() !== historyTerm));
+  const searchHistory = recentSearches.filter((term) => !historyTerm || (asText(term).toLowerCase().includes(historyTerm) && asText(term).toLowerCase() !== historyTerm));
   const changeSort = (value) => { setSort(value); saveJobSort(value); };
   const toggleSkill = (skill) => setSkills((current) => (current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill]));
   const changeTab = (item) => { const next = tab === item ? "All" : item; setTab(next); saveJobStatus(next); };
@@ -382,10 +386,10 @@ export default function Jobs() {
                   </div>
                 </nav>
                 <div className="min-w-0">
-                  <section className="space-y-4">{filtered.map((job, index) => <JobCard key={job.id} job={job} index={index} now={now} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} onOpen={() => openPreview(job.id)}
-                    onUndo={(tab === "Applied" || tab === "Rejected") && job.status === tab ? () => jobStatus.undo(job) : undefined}
+                  <section className="space-y-4">{filtered.map((job, index) => <ErrorBoundary key={job.id} name="job-card" fallback={CardError} resetKey={job}><JobCard job={job} index={index} now={now} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} onOpen={() => openPreview(job.id)}
+                    onUndo={job.status === "Applied" || job.status === "Rejected" ? () => jobStatus.undo(job) : undefined}
                     undoing={jobStatus.pendingId === job.id}
-                    undoError={jobStatus.errorId === job.id ? jobStatus.error?.message || "Could not undo. Try again." : ""} />)}</section>
+                    undoError={jobStatus.errorId === job.id ? jobStatus.error?.message || "Could not undo. Try again." : ""} /></ErrorBoundary>)}</section>
                   <div ref={loadMoreRef} className="flex min-h-24 items-center justify-center py-8" aria-live="polite">
                     {isFetchingNextPage ? <div className="flex items-center gap-3 text-xs font-semibold text-[var(--muted)]"><span className="size-4 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />Loading more jobs</div>
                       : <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--muted)]">{hasNextPage ? "Scroll for more jobs" : "All jobs loaded"}</span>}
@@ -422,7 +426,7 @@ export default function Jobs() {
                 </section>}
         </div>
 
-        {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={jobStatus.markApplied} undoTab={tab === "Applied" || tab === "Rejected" ? tab : null} applyError={jobStatus.errorId === preview.id ? `Could not mark this job as applied: ${jobStatus.error?.message || "please try again."}` : ""} />}
+        {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={jobStatus.markApplied} applyError={jobStatus.errorId === preview.id ? `Could not mark this job as applied: ${jobStatus.error?.message || "please try again."}` : ""} />}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}
         {skillDialog && <OpportunityFilterDialog skills={skills} extraFilters={extraFilters} skillRecords={skillRecords} isLoading={skillsLoading || isFetchingMoreSkills} error={skillsError ? skillsQueryError : null} onClose={() => setSkillDialog(false)} onApply={({ skills: nextSkills, extraFilters: nextFilters }) => { setSkills(nextSkills); setExtraFilters(nextFilters); setSkillDialog(false); }} onRemove={({ skills: nextSkills, extraFilters: nextFilters }) => { setSkills(nextSkills); setExtraFilters(nextFilters); }} />}

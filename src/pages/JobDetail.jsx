@@ -8,6 +8,7 @@ import NotFound from './NotFound'
 import ExpandableText from '../components/ExpandableText'
 import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, Tips, card } from '../components/JobDetailParts'
 import JobApplySection from '../components/JobApplySection'
+import ErrorBoundary from '../components/ErrorBoundary'
 import ShareJobDialog from '../components/ShareJobDialog'
 import JobActivity from '../components/JobActivity'
 import { StatusPill } from '../components/ui'
@@ -17,6 +18,7 @@ import { timeAgo, useNow } from '../lib/time'
 import { skillStyle, useJobReactions } from '../lib/jobSignals'
 import { useJobStatus } from '../lib/jobStatus'
 import { useAuth } from '../contexts/AuthContext'
+import { asArray, asObject } from '../lib/safe'
 
 function MatchRing({ value }) {
   const tone = value >= 75 ? 'var(--lime-dark)' : value >= 55 ? '#d9a53a' : 'var(--danger)'
@@ -26,13 +28,23 @@ function MatchRing({ value }) {
   </div>
 }
 
+// Sidebar cards are components (not inline JSX) so each one's ErrorBoundary catches its own render errors.
+function SkillsCard({ skills = [] }) {
+  return <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
+    <div className="flex items-center justify-between gap-2">
+      <p className="flex items-center gap-2 text-sm font-semibold"><Target size={16} />Skills and expertise</p>
+      <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[var(--muted)]" title={`${skills.length} skill${skills.length === 1 ? '' : 's'} requested`}>{skills.length}</span>
+    </div>
+    <div className="mt-4 flex flex-wrap gap-1.5">{skills.map((skill) => <span key={skill} style={skillStyle(skill)} className="skill-chip rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}</div>
+  </div>
+}
+
 /**
  * The full CRM job detail. Rendered as a page at /jobs/:id and, with `embedded`,
  * inside the job preview drawer as a single column.
  */
-// `undoTab` ('Applied' | 'Rejected') is set only when the drawer was opened from that tab; a job still in
-// that status then shows Undo instead of Not a fit.
-export function JobDetailView({ id, initialJob, embedded = false, undoTab = null }) {
+// An Applied or Rejected job shows its status with Undo instead of Not a fit, wherever it is opened from.
+export function JobDetailView({ id, initialJob, embedded = false }) {
   const [share, setShare] = useState(null), root = useRef(null), seenJob = useRef(null), queryClient = useQueryClient()
   const { user } = useAuth()
   const status = useJobStatus()
@@ -47,7 +59,7 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
       queryClient.setQueriesData({ queryKey: ['jobs'] }, (data) => {
         if (Array.isArray(data)) return data.map((item) => item.id === id ? { ...item, status: 'Seen' } : item)
         if (!data?.pages) return data
-        return { ...data, pages: data.pages.map((page) => ({ ...page, records: page.records.map((item) => item.id === id ? { ...item, status: 'Seen' } : item) })) }
+        return { ...data, pages: asArray(data.pages).map((page) => ({ ...page, records: asArray(page?.records).map((item) => item.id === id ? { ...item, status: 'Seen' } : item) })) }
       })
     },
   })
@@ -74,17 +86,18 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
     return <div role="alert" className="m-5 flex items-start gap-2 rounded-2xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" /><span className="flex-1">{error?.message || 'Could not load this job.'}</span><button type="button" onClick={() => refetch()} className="font-bold underline underline-offset-4">Try again</button></div>
   }
 
-  const skills = job.skills?.length ? job.skills : job.tags
+  const tags = asArray(job.tags), clientStats = asObject(job.clientStats)
+  const skills = asArray(job.skills).length ? job.skills : tags
   const setLetter = (coverLetter) => queryClient.setQueryData(['job', job.id], (current) => (current ? { ...current, coverLetter } : current))
   const setTips = (pitch) => queryClient.setQueryData(['job', job.id], (current) => (current ? { ...current, pitch } : current))
-  const actions = <JobApplySection
+  const actions = <ErrorBoundary name="apply-box" resetKey={job.id}><JobApplySection
     job={job}
     statusLabel={job.status}
     dismissed={job.status === 'Rejected'}
     onApplied={() => status.markApplied(job)}
     onDismiss={() => status.markNotFit(job)}
     statusError={status.errorId === job.id ? status.error?.message || 'Could not update this job.' : ''}
-    resolved={undoTab && job.status === undoTab ? (undoTab === 'Applied' ? 'applied' : 'rejected') : null}
+    resolved={job.status === 'Applied' ? 'applied' : job.status === 'Rejected' ? 'rejected' : null}
     onUndo={() => status.undo(job)}
     undoing={status.pendingId === job.id}
     liked={reactions.isLiked(job.id)}
@@ -92,16 +105,10 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
     onLike={() => reactions.toggleLike(job.id, job)}
     onFavorite={() => reactions.toggleFavorite(job.id, job)}
     onShare={setShare}
-    showApply={!embedded}
-  />
-  const skillsCard = <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
-    <div className="flex items-center justify-between gap-2">
-      <p className="flex items-center gap-2 text-sm font-semibold"><Target size={16} />Skills and expertise</p>
-      <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[var(--muted)]" title={`${skills.length} skill${skills.length === 1 ? '' : 's'} requested`}>{skills.length}</span>
-    </div>
-    <div className="mt-4 flex flex-wrap gap-1.5">{skills.map((skill) => <span key={skill} style={skillStyle(skill)} className="skill-chip rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}</div>
-  </div>
-  const activity = <JobActivity job={job} />
+    showApply={!embedded && job.status !== 'Applied'}
+  /></ErrorBoundary>
+  const skillsCard = <ErrorBoundary name="skills" resetKey={job.id}><SkillsCard skills={skills} /></ErrorBoundary>
+  const activity = <ErrorBoundary name="activity" resetKey={job.id}><JobActivity job={job} /></ErrorBoundary>
 
   const content = <div ref={root} className={embedded ? 'space-y-5 p-4 sm:p-6' : 'mx-auto w-full max-w-[1320px] px-4 pb-20 pt-6 sm:px-6 md:pt-8'}>
     {!embedded && <Link data-detail to="/jobs" className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--muted)] transition-colors hover:text-[var(--ink)]"><span className="grid size-8 place-items-center rounded-full bg-[var(--surface)] ring-1 ring-[var(--line)]"><ArrowLeft size={14} /></span>All jobs</Link>}
@@ -122,13 +129,11 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#ffe4e6] px-2.5 py-1 text-[11px] font-bold text-[#be123c] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/15 dark:text-[#fda4af] dark:ring-[#fda4af]/30">
                   <Heart size={12} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" /> Liked
                 </span>
-              )}
-              <span className="rounded-full bg-[var(--surface)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]">{job.jobId}</span>
-              {job.tags[0] && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]"><Tag size={12} weight="bold" />{job.tags[0]}</span>}
+              )}              {tags[0] && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]"><Tag size={12} weight="bold" />{tags[0]}</span>}
               <time dateTime={job.postedAt} title={job.posted} className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent-strong)]"><Clock size={13} weight="bold" />Posted {timeAgo(job.postedAt, now) || job.posted}</time>
             </div>
             <h1 className="job-detail-title mt-5">{job.title}</h1>
-            {job.clientStats.country && <p className="mt-3 flex items-center gap-1.5 text-sm text-[var(--muted)]"><MapPin size={15} weight="bold" />{job.clientStats.country}{job.clientStats.rating != null && <><span aria-hidden="true">·</span><Star size={14} weight="fill" className="text-[#e6a817]" />{job.clientStats.rating.toFixed(1)}</>}{job.clientStats.paymentVerified && <><span aria-hidden="true">·</span><SealCheck size={14} weight="fill" className="text-[var(--ok)]" />Payment verified</>}</p>}
+            {clientStats.country && <p className="mt-3 flex items-center gap-1.5 text-sm text-[var(--muted)]"><MapPin size={15} weight="bold" />{clientStats.country}{clientStats.rating != null && <><span aria-hidden="true">·</span><Star size={14} weight="fill" className="text-[#e6a817]" />{Number(clientStats.rating).toFixed(1)}</>}{clientStats.paymentVerified && <><span aria-hidden="true">·</span><SealCheck size={14} weight="fill" className="text-[var(--ok)]" />Payment verified</>}</p>}
             {job.summary && <ExpandableText className="mt-5 max-w-3xl" collapsedHeight="3.6rem"><p className="text-[15px] leading-7">{job.summary}</p></ExpandableText>}
             <div className="mt-6 grid gap-3 grid-cols-2 sm:grid-cols-4">
               <FactTile icon={CurrencyDollar} label="Budget" value={job.budget} note={job.type} />
@@ -141,7 +146,7 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
 
         {embedded && <div data-detail className="xl:hidden">{actions}</div>}
 
-        <AboutClient stats={job.clientStats} now={now} />
+        <ErrorBoundary name="about-client" resetKey={job.id}><AboutClient stats={clientStats} now={now} /></ErrorBoundary>
 
         {job.match > 0 && <section data-detail className={`${card} flex flex-col gap-5 sm:flex-row sm:items-start`}>
           <MatchRing value={job.match} />
@@ -159,9 +164,9 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
         {/* Skills live in the right sidebar; the drawer hides that sidebar below xl, so show them here instead. */}
         {embedded && <div data-detail className="xl:hidden">{skillsCard}</div>}
 
-        <Tips job={job} onTips={setTips} />
+        <ErrorBoundary name="tips" resetKey={job.id}><Tips job={job} onTips={setTips} /></ErrorBoundary>
 
-        <CoverLetter job={job} onLetter={setLetter} />
+        <ErrorBoundary name="cover-letter" resetKey={job.id}><CoverLetter job={job} onLetter={setLetter} /></ErrorBoundary>
 
         {embedded && <div data-detail className="xl:hidden">{activity}</div>}
       </div>

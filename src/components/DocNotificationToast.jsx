@@ -13,6 +13,7 @@ import {
 } from '@phosphor-icons/react'
 import { subscribeDocStatus } from '../services/docSocket'
 import { getDocumentViewUrl } from '../services/api'
+import { asText } from '../lib/safe'
 
 // Plays a gentle subtle audio chime via Web Audio API on completion
 function playSuccessChime() {
@@ -171,7 +172,7 @@ export default function DocNotificationToast() {
   const handleDownloadFromToast = async (toast) => {
     if (!toast.noteId && !toast.viewUrl) return
     const viewUrl = toast.viewUrl || getDocumentViewUrl(toast.noteId)
-    const baseName = (toast.title || 'document').slice(0, 48).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const baseName = (asText(toast.title) || 'document').slice(0, 48).toLowerCase().replace(/[^a-z0-9]+/g, '-')
     const downloadFilename = `${baseName}.doc`
 
     setDownloadingToastId(toast.id)

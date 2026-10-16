@@ -25,6 +25,7 @@ import {
   SCORE_TIER_THRESHOLDS,
 } from '../lib/newsClassification'
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from '../lib/dateRange'
+import { asArray, asObject, asText } from '../lib/safe'
 import {
   loadCustomTechNewsCategories,
   loadDateFilter,
@@ -122,19 +123,21 @@ export default function TechNews() {
       }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
-      lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
+      lastPage?.page < lastPage?.totalPages ? lastPage.page + 1 : undefined,
     placeholderData: (previous) => previous,
   })
 
   // Fast lightweight stats query for accurate total and badge counts from Smart Gateway
   const {
-    data: newsStats = {},
+    data: newsStatsData,
     isFetching: isFetchingStats,
     refetch: refetchStats,
   } = useQuery({
     queryKey: ['tech-news-stats', gatewayDateFilter],
     queryFn: () => api.getTechNewsStats({ dateFilter: gatewayDateFilter }),
   })
+
+  const newsStats = asObject(newsStatsData)
 
   const searching = isFetching && !isFetchingNextPage && searchInput.trim() === debouncedSearch
 
@@ -157,15 +160,15 @@ export default function TechNews() {
   }
   const historyTerm = searchInput.trim().toLowerCase()
   const searchHistory = recentSearches.filter(
-    (term) => !historyTerm || (term.toLowerCase().includes(historyTerm) && term.toLowerCase() !== historyTerm)
+    (term) => !historyTerm || (asText(term).toLowerCase().includes(historyTerm) && asText(term).toLowerCase() !== historyTerm)
   )
 
   // All records gathered across all loaded pages — strictly deduplicated by unique ID (zero duplication, zero repetition)
   const rawNews = useMemo(() => {
     const seen = new Set()
     const unique = []
-    for (const page of newsPages?.pages || []) {
-      for (const item of page.records || []) {
+    for (const page of asArray(newsPages?.pages)) {
+      for (const item of asArray(page?.records)) {
         if (item?.id && !seen.has(item.id)) {
           seen.add(item.id)
           unique.push(item)
@@ -178,7 +181,7 @@ export default function TechNews() {
   // Dynamically extract categories from Smart Gateway module and user's saved custom categories
   const categoryList = useMemo(() => {
     const presentCategories = new Set(
-      rawNews.map((item) => item.category?.trim()).filter(Boolean)
+      rawNews.map((item) => asText(item.category).trim()).filter(Boolean)
     )
 
     presentCategories.delete('Web Architecture')
@@ -217,9 +220,9 @@ export default function TechNews() {
         selectedCategories.some(
           (cat) =>
             item.category === cat ||
-            `${item.category || ''} ${item.title || ''} ${item.summary || ''} ${(item.tags || []).join(' ')}`
+            `${item.category || ''} ${item.title || ''} ${item.summary || ''} ${asArray(item.tags).join(' ')}`
               .toLowerCase()
-              .includes(cat.toLowerCase())
+              .includes(asText(cat).toLowerCase())
         )
 
       const matchesTier =
@@ -244,8 +247,8 @@ export default function TechNews() {
         selectedSourceTypes.includes('All') ||
         selectedSourceTypes.length === 0 ||
         selectedSourceTypes.some((src) => {
-          if (src === 'HurryUp') return item.hurryUp === true || (item.tags || []).some((t) => /hurryup/i.test(t))
-          return item.sourceType === src || (item.tags || []).some((t) => t.toLowerCase() === src.toLowerCase())
+          if (src === 'HurryUp') return item.hurryUp === true || asArray(item.tags).some((t) => /hurryup/i.test(t))
+          return item.sourceType === src || asArray(item.tags).some((t) => asText(t).toLowerCase() === asText(src).toLowerCase())
         })
 
       return matchesCategory && matchesTier && matchesSource
@@ -805,11 +808,12 @@ export default function TechNews() {
 
         {/* Category Modal Dialog (Triggered by + More categories) */}
         {categoryDialog && (
+          // The dialog picks one category (like the chips above); "Reset to All" sends 'All', which clears the filter.
           <CategoryFilterDialog
             categories={categoryList}
-            selectedCategories={selectedCategories}
-            onAddCustomCategory={setCustomCategories}
-            onApply={(cats) => setSelectedCategories(cats)}
+            categoryCounts={Object.fromEntries(categoryList.map((cat) => [cat, newsStats[`cat_${cat}`] ?? 0]))}
+            selectedCategory={selectedCategories.length === 1 ? selectedCategories[0] : 'All'}
+            onSelect={(cat) => setSelectedCategories(cat === 'All' ? [] : [cat])}
             onClose={() => setCategoryDialog(false)}
           />
         )}

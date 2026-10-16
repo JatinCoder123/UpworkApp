@@ -1,5 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { asArray, asObject, asText } from './safe'
 
 const SKILL_HUES = [88, 142, 172, 198, 222, 256, 288, 322, 12, 34, 52]
 
@@ -19,18 +20,34 @@ const listeners = new Set()
 const cache = new Map()
 const reactionKey = (email) => `outright-job-reactions:${String(email || 'guest').toLowerCase()}`
 
+// Saved job copies can predate fields the list reads; fill them so a liked or favorite job always renders.
+const normalizeSavedJob = (job) => ({
+  ...job,
+  title: asText(job.title) || 'Untitled job',
+  status: asText(job.status) || 'Seen',
+  budget: asText(job.budget) || 'Budget not specified',
+  description: asText(job.description),
+  tags: asArray(job.tags),
+  skills: asArray(job.skills),
+  activity: asArray(job.activity),
+  clientStats: asObject(job.clientStats),
+})
+
 function readReactions(email) {
   const key = reactionKey(email)
   if (!cache.has(key)) {
     let stored = {}
-    try { stored = JSON.parse(localStorage.getItem(key) || '{}') } catch { stored = {} }
+    try { stored = asObject(JSON.parse(localStorage.getItem(key) || '{}')) } catch { stored = {} }
+    const records = Object.entries(asObject(stored.jobRecords))
+      .filter(([, job]) => job && typeof job === 'object')
+      .map(([id, job]) => [id, normalizeSavedJob(job)])
     // applied/dismissed only track live Upwork jobs, which have no CRM status to update.
     cache.set(key, {
-      liked: stored.liked || [],
-      favorites: stored.favorites || [],
-      applied: stored.applied || [],
-      dismissed: stored.dismissed || [],
-      jobRecords: stored.jobRecords || {},
+      liked: asArray(stored.liked),
+      favorites: asArray(stored.favorites),
+      applied: asArray(stored.applied),
+      dismissed: asArray(stored.dismissed),
+      jobRecords: Object.fromEntries(records),
     })
   }
   return cache.get(key)
@@ -54,7 +71,7 @@ export function useJobReactions(email) {
     const jobRecords = { ...(current.jobRecords || {}) }
 
     if (!exists && job) {
-      jobRecords[id] = {
+      jobRecords[id] = normalizeSavedJob({
         id: job.id,
         jobId: job.jobId || job.id,
         title: job.title || 'Untitled job',
@@ -80,7 +97,7 @@ export function useJobReactions(email) {
         clientStats: job.clientStats,
         applicants: job.applicants,
         raw: job.raw,
-      }
+      })
     } else if (exists) {
       const otherField = field === 'favorites' ? 'liked' : 'favorites'
       if (!current[otherField]?.includes(id) && !current.applied?.includes(id) && !current.dismissed?.includes(id)) {
@@ -183,9 +200,9 @@ export const countExtraFilters = ({ jobType = 'any', location = 'any' } = {}) =>
 
 const STOP_WORDS = new Set(['and', 'the', 'for', 'with', 'need', 'needed', 'looking', 'expert', 'developer', 'build', 'help', 'from', 'into', 'your', 'our'])
 const terms = (job) => new Set([
-  ...(job.skills || []).map((skill) => `s:${skill.toLowerCase()}`),
-  ...(job.tags || []).map((tag) => `t:${tag.toLowerCase()}`),
-  ...String(job.title || '').toLowerCase().split(/[^a-z0-9+#.]+/).filter((word) => word.length > 2 && !STOP_WORDS.has(word)).map((word) => `w:${word}`),
+  ...asArray(job?.skills).map((skill) => `s:${asText(skill).toLowerCase()}`),
+  ...asArray(job?.tags).map((tag) => `t:${asText(tag).toLowerCase()}`),
+  ...asText(job?.title).toLowerCase().split(/[^a-z0-9+#.]+/).filter((word) => word.length > 2 && !STOP_WORDS.has(word)).map((word) => `w:${word}`),
 ])
 
 // Weighted overlap: shared skills count most, then category tags, then title words.
@@ -197,9 +214,9 @@ export function similarity(a, b) {
 }
 
 export function nextSimilarJob(current, jobs, skipIds = []) {
-  const skip = new Set([current.id, ...skipIds])
-  return jobs
-    .filter((job) => !skip.has(job.id))
+  const skip = new Set([current?.id, ...asArray(skipIds)])
+  return asArray(jobs)
+    .filter((job) => job && !skip.has(job.id))
     .map((job, index) => ({ job, index, score: similarity(current, job) }))
     .sort((a, b) => b.score - a.score || a.index - b.index)[0]?.job || null
 }

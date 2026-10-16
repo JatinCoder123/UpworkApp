@@ -8,11 +8,13 @@ import ExpandableText from '../components/ExpandableText'
 import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, card } from '../components/JobDetailParts'
 import { CompetitionMeter, freshnessTone } from '../components/LiveJobCard'
 import JobApplySection from '../components/JobApplySection'
+import ErrorBoundary from '../components/ErrorBoundary'
 import ShareJobDialog from '../components/ShareJobDialog'
 import { findLiveJob, isEarlyBird, minutesSince } from '../lib/liveJobs'
 import { timeAgo, useNow } from '../lib/time'
 import { useJobReactions } from '../lib/jobSignals'
 import { useAuth } from '../contexts/AuthContext'
+import { asArray, asObject, asText } from '../lib/safe'
 
 const clock = (value) => (value ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value)) : '')
 
@@ -32,7 +34,10 @@ function ActionPanel({ job, reactions, onShare, showApply }) {
     job={job}
     statusLabel={applied ? 'Applied' : dismissed ? 'Not a fit' : 'Live'}
     dismissed={dismissed}
-    onApplied={() => { if (!applied) reactions.toggleApplied(job.id) }}    onDismiss={() => reactions.toggleDismissed(job.id)}
+    onApplied={() => { if (!applied) reactions.toggleApplied(job.id) }}
+    onDismiss={() => reactions.toggleDismissed(job.id)}
+    resolved={applied ? 'applied' : dismissed ? 'rejected' : null}
+    onUndo={() => (applied ? reactions.toggleApplied(job.id) : reactions.toggleDismissed(job.id))}
     liked={reactions.isLiked(job.id)}
     favorite={reactions.isFavorite(job.id)}
     onLike={() => reactions.toggleLike(job.id, job)}
@@ -65,24 +70,25 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
   const job = { ...stored, coverLetter }
   const minutes = minutesSince(job.postedAt, now)
   const tone = freshnessTone(minutes, 60)
-  const matched = new Set(job.matchedSkills.map((skill) => skill.toLowerCase()))
+  const skills = asArray(job.skills), matchedSkills = asArray(job.matchedSkills), tags = asArray(job.tags), preferredLocations = asArray(job.preferredLocations), clientStats = asObject(job.clientStats)
+  const matched = new Set(matchedSkills.map((skill) => asText(skill).toLowerCase()))
   const earlyBird = isEarlyBird(job, now)
   const timeline = [
     job.renewedAt && ['Renewed on Upwork', job.renewedAt],
     ['Published on Upwork', job.postedAt],
-    job.raw?.createdDateTime && ['Draft created', job.raw.createdDateTime.replace(/([+-]\d{2})(\d{2})$/, '$1:$2')],
+    job.raw?.createdDateTime && ['Draft created', asText(job.raw.createdDateTime).replace(/([+-]\d{2})(\d{2})$/, '$1:$2')],
   ].filter(Boolean)
   const sidebar = <>
     <ActionPanel job={job} reactions={reactions} onShare={setShare} showApply={!embedded} />
-    {job.preferredLocations.length > 0 && <div className="flex items-start gap-3 rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70"><GlobeHemisphereWest size={18} className="mt-0.5 shrink-0 text-[var(--accent-strong)]" /><div><p className="text-sm font-semibold">Preferred location</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">{job.preferredLocations.join(', ')} · {job.preferredLocationMandatory ? 'required by the client' : 'not required'}</p></div></div>}
+    {preferredLocations.length > 0 && <div className="flex items-start gap-3 rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70"><GlobeHemisphereWest size={18} className="mt-0.5 shrink-0 text-[var(--accent-strong)]" /><div><p className="text-sm font-semibold">Preferred location</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">{preferredLocations.join(', ')} · {job.preferredLocationMandatory ? 'required by the client' : 'not required'}</p></div></div>}
   </>
   const skillsCard = <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
     <div className="flex items-center justify-between gap-2">
       <p className="flex items-center gap-2 text-sm font-semibold"><Target size={16} />Skills and expertise</p>
-      <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[var(--muted)]" title={`${job.skills.length} skill${job.skills.length === 1 ? '' : 's'} requested`}>{job.skills.length}</span>
+      <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[var(--muted)]" title={`${skills.length} skill${skills.length === 1 ? '' : 's'} requested`}>{skills.length}</span>
     </div>
-    {matched.size > 0 && <p className="mt-1 text-[11px] text-[var(--muted)]">{job.matchedSkills.join(', ')} matched your scan</p>}
-    <div className="mt-4 flex flex-wrap gap-1.5">{job.skills.map((skill) => <span key={skill} aria-pressed={matched.has(skill.toLowerCase())} className="skill-tag rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}</div>
+    {matched.size > 0 && <p className="mt-1 text-[11px] text-[var(--muted)]">{matchedSkills.join(', ')} matched your scan</p>}
+    <div className="mt-4 flex flex-wrap gap-1.5">{skills.map((skill) => <span key={skill} aria-pressed={matched.has(asText(skill).toLowerCase())} className="skill-tag rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}</div>
   </div>
   const timelineCard = <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
     <p className="flex items-center gap-2 text-sm font-semibold"><ClockCounterClockwise size={16} />Timeline</p>
@@ -109,13 +115,11 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
                   <Heart size={12} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" /> Liked
                 </span>
               )}
-              {earlyBird && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--warn)]"><Lightning size={12} weight="fill" />Early bird</span>}
-              <span className="rounded-full bg-[var(--surface)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]">{job.raw?.recordNumber || job.jobId}</span>
-              {job.tags[0] && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]"><Tag size={12} weight="bold" />{job.tags[0]}</span>}
+              {earlyBird && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--warn)]"><Lightning size={12} weight="fill" />Early bird</span>}              {tags[0] && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]"><Tag size={12} weight="bold" />{tags[0]}</span>}
               <time dateTime={job.postedAt} title={clock(job.postedAt)} className="ml-auto inline-flex items-center gap-1 text-xs font-semibold" style={{ color: tone }}><Clock size={13} weight="bold" />Posted {timeAgo(job.postedAt, now)}</time>
             </div>
             <h1 className="job-detail-title mt-5">{job.title}</h1>
-            <p className="mt-3 flex flex-wrap items-center gap-1.5 text-sm text-[var(--muted)]"><MapPin size={15} weight="bold" />{job.clientStats.country || 'Location not shared'}{job.clientStats.paymentVerified && <><span aria-hidden="true">·</span><SealCheck size={14} weight="fill" className="text-[var(--ok)]" />Payment verified</>}{job.tags[1] && <><span aria-hidden="true">·</span>{job.tags[1]}</>}</p>
+            <p className="mt-3 flex flex-wrap items-center gap-1.5 text-sm text-[var(--muted)]"><MapPin size={15} weight="bold" />{clientStats.country || 'Location not shared'}{clientStats.paymentVerified && <><span aria-hidden="true">·</span><SealCheck size={14} weight="fill" className="text-[var(--ok)]" />Payment verified</>}{tags[1] && <><span aria-hidden="true">·</span>{tags[1]}</>}</p>
             <div className="mt-6 grid gap-3 grid-cols-2 sm:grid-cols-4">
               <FactTile icon={CurrencyDollar} label="Budget" value={job.budget} note={job.type} />
               <FactTile icon={ChartBar} label="Experience" value={job.level} />
@@ -127,14 +131,14 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
 
         {embedded && <div data-detail className="xl:hidden space-y-4">{sidebar}</div>}
 
-        <AboutClient stats={job.clientStats} now={now} />
+        <ErrorBoundary name="about-client" resetKey={job.id}><AboutClient stats={clientStats} now={now} /></ErrorBoundary>
 
         <section data-detail className={`${card} flex flex-col gap-5 sm:flex-row sm:items-center`}>
           <FreshnessRing minutes={minutes} tone={tone} />
           <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-3">
             <div className="min-w-0"><p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-strong)]"><Broadcast size={14} weight="fill" />Live signal</p><p className="mt-1 text-sm font-semibold">{minutes <= 20 ? 'Brand new post' : minutes <= 60 ? 'Still fresh' : 'Aging post'}</p><p className="mt-0.5 text-[11px] text-[var(--muted)]">{clock(job.postedAt)}</p></div>
             <CompetitionMeter applicants={job.applicants} compact />
-            <div className="min-w-0"><p className="flex items-center gap-1 text-[11px] font-bold text-[var(--muted)]"><UsersThree size={12} weight="bold" />Hiring</p><p className="mt-1 text-sm font-semibold">{job.freelancersToHire > 1 ? `${job.freelancersToHire} freelancers` : '1 freelancer'}</p><p className="mt-0.5 truncate text-[11px] text-[var(--muted)]">{job.preferredLocations.length ? `Prefers ${job.preferredLocations.join(', ')}${job.preferredLocationMandatory ? ' only' : ''}` : 'Open worldwide'}</p></div>
+            <div className="min-w-0"><p className="flex items-center gap-1 text-[11px] font-bold text-[var(--muted)]"><UsersThree size={12} weight="bold" />Hiring</p><p className="mt-1 text-sm font-semibold">{job.freelancersToHire > 1 ? `${job.freelancersToHire} freelancers` : '1 freelancer'}</p><p className="mt-0.5 truncate text-[11px] text-[var(--muted)]">{preferredLocations.length ? `Prefers ${preferredLocations.join(', ')}${job.preferredLocationMandatory ? ' only' : ''}` : 'Open worldwide'}</p></div>
           </div>
         </section>
 
@@ -145,7 +149,7 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
         {/* Skills live in the right sidebar; the drawer hides that sidebar below xl, so show them here instead. */}
         {embedded && <div data-detail className="xl:hidden">{skillsCard}</div>}
 
-        <CoverLetter job={job} onLetter={setCoverLetter} />
+        <ErrorBoundary name="cover-letter" resetKey={job.id}><CoverLetter job={job} onLetter={setCoverLetter} /></ErrorBoundary>
 
         {embedded && <div data-detail className="xl:hidden">{timelineCard}</div>}
       </div>

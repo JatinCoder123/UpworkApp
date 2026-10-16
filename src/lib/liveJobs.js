@@ -1,5 +1,7 @@
 // Live Upwork jobs never reach the CRM, so the last scan is kept in the browser
 // to let /live-jobs/:id open a job and to survive a page refresh.
+import { asArray, asObject, asText } from './safe'
+
 const RESULT_KEY = 'outrightfeedportal-live-jobs'
 const SETTINGS_KEY = 'outrightfeedportal-live-settings'
 
@@ -31,18 +33,42 @@ export const windowLabel = (minutes) => LIVE_WINDOWS.find((item) => item.minutes
 // Ids in the new scan that the previous scan did not have.
 export const newSince = (previous, next) => {
   if (!previous) return []
-  const seen = new Set((previous.jobs || []).map((job) => job.id))
-  return next.jobs.filter((job) => !seen.has(job.id)).map((job) => job.id)
+  const seen = new Set(asArray(previous.jobs).map((job) => job?.id))
+  return asArray(next?.jobs).filter((job) => !seen.has(job.id)).map((job) => job.id)
 }
 
-export const loadLiveResult = () => read(sessionStorage, RESULT_KEY)
+// A saved scan can come from an older version of the app; give every job the fields the UI reads.
+const normalizeLiveJob = (job) => ({
+  ...job,
+  title: asText(job.title) || 'Untitled job',
+  description: asText(job.description),
+  tags: asArray(job.tags),
+  skills: asArray(job.skills),
+  highlightedSkills: asArray(job.highlightedSkills),
+  matchedSkills: asArray(job.matchedSkills),
+  preferredLocations: asArray(job.preferredLocations),
+  clientStats: asObject(job.clientStats),
+  applicants: Number(job.applicants) || 0,
+})
+
+export function loadLiveResult() {
+  const saved = read(sessionStorage, RESULT_KEY)
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null
+  return {
+    ...saved,
+    jobs: asArray(saved.jobs).filter((job) => job && typeof job === 'object' && job.id != null).map(normalizeLiveJob),
+    skillsSearched: asObject(saved.skillsSearched),
+    errors: asArray(saved.errors),
+    skills: asArray(saved.skills),
+  }
+}
 export const saveLiveResult = (result) => write(sessionStorage, RESULT_KEY, result)
 export const findLiveJob = (id) => loadLiveResult()?.jobs?.find((job) => job.id === id) || null
 
 export function loadLiveSettings() {
   const saved = read(localStorage, SETTINGS_KEY) || {}
   return {
-    skills: Array.isArray(saved.skills) ? saved.skills : [],
+    skills: asArray(saved.skills).filter((skill) => typeof skill === 'string' && skill.trim()),
     minutes: LIVE_WINDOWS.some((item) => item.minutes === saved.minutes) ? saved.minutes : 60,
     includeRenewed: saved.includeRenewed ?? true,
   }

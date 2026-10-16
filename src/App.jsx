@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Login from './pages/Login'
 import Jobs from './pages/Jobs'
 import JobDetail from './pages/JobDetail'
@@ -20,7 +20,11 @@ import SessionLoader from './components/SessionLoader'
 import LoginIntro from './components/LoginIntro'
 import ScrollToTop from './components/ScrollToTop'
 import DocNotificationToast from './components/DocNotificationToast'
+import GlobalErrorToast from './components/GlobalErrorToast'
+import ErrorBoundary, { PageError } from './components/ErrorBoundary'
 import { useAuth } from './contexts/AuthContext'
+
+const NoFallback = () => null
 
 function ProtectedRoute({ children }) {
   const { status } = useAuth()
@@ -30,6 +34,7 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   const { status, showLoginIntro, completeLoginIntro } = useAuth()
+  const location = useLocation()
   const [showWelcomeIntro, setShowWelcomeIntro] = useState(() => sessionStorage.getItem('outrightfeedportal-welcome-intro') !== 'seen')
 
   const completeWelcomeIntro = () => {
@@ -42,7 +47,11 @@ export default function App() {
 
   return <>
     <ScrollToTop />
-    <DocNotificationToast />
+    {/* Toasts are extras: if one fails it disappears instead of taking the app down. */}
+    <ErrorBoundary name="doc-toast" fallback={NoFallback}><DocNotificationToast /></ErrorBoundary>
+    <ErrorBoundary name="error-toast" fallback={NoFallback}><GlobalErrorToast /></ErrorBoundary>
+    {/* A page that fails to render shows an error inside the normal header; changing route clears it. */}
+    <ErrorBoundary name="page" fallback={PageError} resetKey={location.pathname}>
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
@@ -71,5 +80,6 @@ export default function App() {
       <Route path="/404" element={<NotFound />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </ErrorBoundary>
   </>
 }

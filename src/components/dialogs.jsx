@@ -5,6 +5,7 @@ import { ArrowSquareOut, ArrowUpRight, CalendarBlank, CheckCircle, Copy, LinkSim
 import { api } from '../services/api'
 import { DialogHeader, Modal, primaryButton } from './ui'
 import { useAuth } from '../contexts/AuthContext'
+import { asArray } from '../lib/safe'
 
 export function AddJobDialog({ onClose }) {
   const { user } = useAuth()
@@ -67,7 +68,7 @@ export function StatusConfirmDialog({ job, status, onClose }) {
       queryClient.setQueriesData({ queryKey: ['jobs'] }, (data) => {
         if (Array.isArray(data)) return data.map((item) => item.id === job.id ? { ...item, status } : item)
         if (!data?.pages) return data
-        return { ...data, pages: data.pages.map((page) => ({ ...page, records: page.records.map((item) => item.id === job.id ? { ...item, status } : item) })) }
+        return { ...data, pages: asArray(data.pages).map((page) => ({ ...page, records: asArray(page?.records).map((item) => item.id === job.id ? { ...item, status } : item) })) }
       })
       onClose()
     },

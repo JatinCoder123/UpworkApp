@@ -1,4 +1,5 @@
 import { AUTH_ORIGIN } from "../lib/auth";
+import { asArray, asObject } from "../lib/safe";
 
 /*
  * Domain Intelligence client. GoDaddy, NameSilo, Moz, Azure AI Foundry, RDAP and
@@ -201,6 +202,9 @@ async function send(path, { method = "GET", body, signal, timeout = 60_000, head
   }
 }
 
+/** Backend lists keep only object entries, so the UI can read fields off each one. */
+const asRecords = (value) => asArray(value).filter((item) => item && typeof item === "object");
+
 async function request(path, options) {
   const response = await send(path, options);
   return response.status === 204 ? null : response.json();
@@ -210,7 +214,7 @@ let configPromise = null;
 
 /** { integrations, defaultTlds, batchSize, maxSuggestions } from the backend, cached for the session. */
 export function getDomainConfig() {
-  configPromise ||= request("/config", { timeout: 20_000 }).catch((error) => {
+  configPromise ||= request("/config", { timeout: 20_000 }).then((config) => ({ ...asObject(config), integrations: asObject(config?.integrations) })).catch((error) => {
     configPromise = null;
     throw error;
   });
@@ -225,13 +229,13 @@ const rdapCache = new Map();
 
 export async function checkRdap(domain, { signal } = {}) {
   if (rdapCache.has(domain)) return rdapCache.get(domain);
-  const result = await request(`/rdap?domain=${encodeURIComponent(domain)}`, { signal, timeout: 20_000 });
-  if (typeof result?.available === "boolean") rdapCache.set(domain, result);
+  const result = asObject(await request(`/rdap?domain=${encodeURIComponent(domain)}`, { signal, timeout: 20_000 }));
+  if (typeof result.available === "boolean") rdapCache.set(domain, result);
   return result;
 }
 
 export function checkDomainAvailability(domain, { signal } = {}) {
-  return request("/availability", { method: "POST", body: { domain }, signal, timeout: 90_000 });
+  return request("/availability", { method: "POST", body: { domain }, signal, timeout: 90_000 }).then(asObject);
 }
 
 export function checkNameSiloDomain(domain, { signal } = {}) {
@@ -239,7 +243,7 @@ export function checkNameSiloDomain(domain, { signal } = {}) {
 }
 
 export function requestMozMetrics(domain, { signal } = {}) {
-  return request("/moz", { method: "POST", body: { domain }, signal, timeout: 60_000 });
+  return request("/moz", { method: "POST", body: { domain }, signal, timeout: 60_000 }).then(asObject);
 }
 
 /* ------------------------------------------------------------------ */
@@ -259,14 +263,14 @@ export async function collectAvailableSuggestions({ sourceDomain = null, brief =
     timeout: 300_000,
   });
   if (!response.body || !/ndjson/i.test(response.headers.get("content-type") || "")) {
-    const data = await response.json();
-    return { suggestions: data.suggestions || [], candidatesChecked: data.candidatesChecked || 0 };
+    const data = asObject(await response.json());
+    return { suggestions: asRecords(data.suggestions), candidatesChecked: data.candidatesChecked || 0 };
   }
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   const handle = (line) => {
     if (!line.trim()) return null;
-    const event = JSON.parse(line);
-    if (event.type === "done") return { suggestions: event.suggestions || [], candidatesChecked: event.candidatesChecked || 0 };
+    const event = asObject(JSON.parse(line));
+    if (event.type === "done") return { suggestions: asRecords(event.suggestions), candidatesChecked: event.candidatesChecked || 0 };
     if (event.type === "error") throw new Error(event.message || "Domain suggestions failed.");
     onEvent(event);
     return null;
@@ -294,7 +298,7 @@ export async function collectAvailableSuggestions({ sourceDomain = null, brief =
 
 /** Deep 43-point screening with live web research (up to four minutes). */
 export function analyzeDomains({ sourceDomain = null, brief = "", candidates, signal }) {
-  return request("/analyze", { method: "POST", body: { sourceDomain, brief, candidates }, signal, timeout: 300_000 });
+  return request("/analyze", { method: "POST", body: { sourceDomain, brief, candidates }, signal, timeout: 300_000 }).then((data) => ({ ...asObject(data), suggestions: asRecords(data?.suggestions) }));
 }
 
 /* ------------------------------------------------------------------ */
@@ -302,13 +306,13 @@ export function analyzeDomains({ sourceDomain = null, brief = "", candidates, si
 /* ------------------------------------------------------------------ */
 
 export async function crmBeginSearch({ sessionKey, requestKey, inputText, selectedMode, detectedMode, sourceDomain, tlds }) {
-  const { id } = await request("/searches", { method: "POST", body: { sessionKey, requestKey, inputText, selectedMode, detectedMode, sourceDomain, tlds } });
+  const { id } = asObject(await request("/searches", { method: "POST", body: { sessionKey, requestKey, inputText, selectedMode, detectedMode, sourceDomain, tlds } }));
   if (!id) throw new Error("CRM did not return a search ID.");
   return String(id);
 }
 
 export async function crmSaveDomainResult(searchId, item, { resultType, state, batch, rank }) {
-  const { id } = await request(`/searches/${encodeURIComponent(searchId)}/results`, { method: "POST", body: { item, resultType, state, batch, rank } });
+  const { id } = asObject(await request(`/searches/${encodeURIComponent(searchId)}/results`, { method: "POST", body: { item, resultType, state, batch, rank } }));
   if (!id) throw new Error("CRM did not return a domain result ID.");
   return String(id);
 }
@@ -319,17 +323,17 @@ export async function crmUpdateSearch(searchId, { status, resultCount, batchCoun
 }
 
 export function crmHistory(page = 1) {
-  return request(`/searches?page=${encodeURIComponent(page)}`);
+  return request(`/searches?page=${encodeURIComponent(page)}`).then((data) => ({ ...asObject(data), history: asRecords(data?.history) }));
 }
 
 export async function crmSearchResults(searchId) {
-  const { results } = await request(`/searches/${encodeURIComponent(searchId)}/results`);
-  return results || [];
+  const { results } = asObject(await request(`/searches/${encodeURIComponent(searchId)}/results`));
+  return asRecords(results);
 }
 
 export async function crmFavorites() {
-  const { favorites } = await request("/favorites", { timeout: 90_000 });
-  return favorites || [];
+  const { favorites } = asObject(await request("/favorites", { timeout: 90_000 }));
+  return asRecords(favorites);
 }
 
 export async function crmSetFavorite(resultId, favorite) {
@@ -337,7 +341,7 @@ export async function crmSetFavorite(resultId, favorite) {
 }
 
 export async function crmRecordCopy(resultId) {
-  const { copyCount } = await request(`/results/${encodeURIComponent(resultId)}/copy`, { method: "POST", body: {} });
+  const { copyCount } = asObject(await request(`/results/${encodeURIComponent(resultId)}/copy`, { method: "POST", body: {} }));
   return copyCount;
 }
 

@@ -1,4 +1,5 @@
 import { loadPreferences, preferenceDefaults } from './preferences'
+import { asArray, asObject, asText } from './safe'
 
 export const defaultPreferences = preferenceDefaults
 
@@ -9,9 +10,9 @@ const numberFrom = (value) => {
 }
 
 function budgetScore(job, preferences) {
-  const values = job.budget.match(/[\d,.]+\s*k?/gi)?.map((value) => numberFrom(value.replace(',', ''))) || [0]
+  const values = asText(job.budget).match(/[\d,.]+\s*k?/gi)?.map((value) => numberFrom(value.replace(',', ''))) || [0]
   const highest = Math.max(...values)
-  const target = job.type === 'Hourly' ? preferences.minimumHourlyRate : preferences.minimumFixedBudget
+  const target = (job.type === 'Hourly' ? Number(preferences.minimumHourlyRate) : Number(preferences.minimumFixedBudget)) || 1
   const ratio = highest / target
   if (ratio >= 1.5) return { points: 22, max: 22, label: 'Budget', detail: 'Comfortably above your target', tone: 'positive' }
   if (ratio >= 1) return { points: 18, max: 22, label: 'Budget', detail: 'Meets your target', tone: 'positive' }
@@ -19,9 +20,18 @@ function budgetScore(job, preferences) {
   return { points: 3, max: 22, label: 'Budget', detail: 'Below your minimum threshold', tone: 'warning' }
 }
 
-export function scoreJob(job, preferences = loadPreferences()) {
-  const skillMatches = job.tags.filter((tag) => preferences.skills.includes(tag))
-  const skillRatio = skillMatches.length / Math.max(job.tags.length, 1)
+export function scoreJob(input, savedPreferences = loadPreferences()) {
+  // Jobs can come from saved browser copies and preferences from storage, so neither is trusted to be complete.
+  const job = asObject(input)
+  const tags = asArray(job.tags)
+  const preferences = {
+    ...asObject(savedPreferences),
+    skills: asArray(savedPreferences?.skills),
+    preferredLevels: asArray(savedPreferences?.preferredLevels),
+    blockedKeywords: asArray(savedPreferences?.blockedKeywords).map(asText).filter(Boolean),
+  }
+  const skillMatches = tags.filter((tag) => preferences.skills.includes(tag))
+  const skillRatio = skillMatches.length / Math.max(tags.length, 1)
   const skillPoints = Math.round(skillRatio * 35)
   const parsedRating = Number(job.clientStats?.rating)
   const rating = Number.isFinite(parsedRating) ? parsedRating : 0
@@ -35,7 +45,7 @@ export function scoreJob(job, preferences = loadPreferences()) {
   const searchable = `${job.title} ${job.description}`.toLowerCase()
   const blockedMatches = preferences.blockedKeywords.filter((keyword) => searchable.includes(keyword.toLowerCase()))
   const riskPenalty = blockedMatches.length ? 15 : 0
-  const score = Math.max(0, Math.min(100, skillPoints + clientPoints + historyPoints + levelPoints + freshnessPoints + budget.points - riskPenalty))
+  const score = Math.max(0, Math.min(100, skillPoints + clientPoints + historyPoints + levelPoints + freshnessPoints + budget.points - riskPenalty)) || 0
   const factors = [
     { label: 'Skill alignment', points: skillPoints, max: 35, detail: skillMatches.length ? `${skillMatches.join(', ')} match your profile` : 'No direct profile skill matches', tone: skillRatio >= .6 ? 'positive' : skillRatio ? 'neutral' : 'warning' },
     budget,

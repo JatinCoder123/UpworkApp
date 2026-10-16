@@ -1,4 +1,5 @@
 import { CLIENT_LOCATIONS } from './jobSignals'
+import { asObject } from './safe'
 
 export const preferenceDefaults = {
   skills: ['React', 'TypeScript', 'GSAP', 'Product design', 'Figma', 'Design systems', 'QA'],
@@ -10,7 +11,16 @@ export const preferenceDefaults = {
 }
 
 export function loadPreferences() {
-  try { return { ...preferenceDefaults, ...JSON.parse(localStorage.getItem('pitchflow-preferences') || '{}') } } catch { return preferenceDefaults }
+  let saved = {}
+  try { saved = asObject(JSON.parse(localStorage.getItem('pitchflow-preferences') || '{}')) } catch { saved = {} }
+  const merged = { ...preferenceDefaults, ...saved }
+  // The list fields are read with .includes / .join, so a damaged save falls back to the defaults.
+  return {
+    ...merged,
+    skills: Array.isArray(merged.skills) ? merged.skills : preferenceDefaults.skills,
+    preferredLevels: Array.isArray(merged.preferredLevels) ? merged.preferredLevels : preferenceDefaults.preferredLevels,
+    blockedKeywords: Array.isArray(merged.blockedKeywords) ? merged.blockedKeywords : preferenceDefaults.blockedKeywords,
+  }
 }
 
 export function savePreferences(preferences) {

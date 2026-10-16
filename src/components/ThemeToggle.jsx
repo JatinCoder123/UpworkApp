@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "@phosphor-icons/react";
 
+const storedTheme = () => {
+  try {
+    return localStorage.getItem("pitchflow-theme");
+  } catch {
+    return null;
+  }
+};
+
 const initialTheme = () =>
-  localStorage.getItem("pitchflow-theme") ||
+  storedTheme() ||
   (window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"
     : "light");
@@ -22,7 +30,11 @@ export default function ThemeToggle({ inverted = false }) {
     const apply = () => {
       document.documentElement.dataset.theme = next;
       document.documentElement.style.colorScheme = next;
-      localStorage.setItem("pitchflow-theme", next);
+      try {
+        localStorage.setItem("pitchflow-theme", next);
+      } catch {
+        /* storage blocked: theme still applies for this page */
+      }
       setTheme(next);
     };
     if (

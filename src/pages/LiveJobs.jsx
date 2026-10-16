@@ -13,6 +13,8 @@ import { loadExtraFilters, saveExtraFilters } from '../lib/preferences'
 import { matchesExtraFilters, useJobReactions, usePreviewParam } from '../lib/jobSignals'
 import { timeAgo, useNow } from '../lib/time'
 import { useAuth } from '../contexts/AuthContext'
+import ErrorBoundary, { CardError } from '../components/ErrorBoundary'
+import { asArray, asObject, asText } from '../lib/safe'
 
 const AUTO_SCAN_MS = 5 * 60_000
 // Brighter versions of the card freshness tones, readable on the dark radar.
@@ -56,8 +58,8 @@ function LiveScope({ jobs, windowMinutes, scanning, now, onOpen }) {
 
 function SkillPicker({ skillRecords, loading, selected, onToggle, onAdd, onClear, disabled }) {
   const [draft, setDraft] = useState('')
-  const known = new Set(skillRecords.map((record) => record.name.toLowerCase()))
-  const custom = selected.filter((skill) => !known.has(skill.toLowerCase()))
+  const known = new Set(skillRecords.map((record) => asText(record.name).toLowerCase()))
+  const custom = selected.filter((skill) => !known.has(asText(skill).toLowerCase()))
   const add = () => { const value = draft.trim(); if (value) onAdd(value); setDraft('') }
   const chip = (name, active) => `shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all duration-300 disabled:opacity-50 ${active ? 'bg-[#c8e875] text-[#1d2810] shadow-[0_6px_20px_rgba(200,232,117,.28)]' : 'bg-white/[.07] text-white/70 ring-1 ring-white/10 hover:bg-white/[.12] hover:text-white'}`
 
@@ -95,7 +97,7 @@ export default function LiveJobs() {
   const reactions = useJobReactions(user?.email)
   const [settings, setSettings] = useState(loadLiveSettings)
   const [result, setResult] = useState(loadLiveResult)
-  const [justIn, setJustIn] = useState(() => location.state?.justIn || [])
+  const [justIn, setJustIn] = useState(() => asArray(location.state?.justIn))
   const [step, setStep] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [autoScan, setAutoScan] = useState(false)
@@ -116,7 +118,7 @@ export default function LiveJobs() {
   })
   useEffect(() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage() }, [fetchNextPage, hasNextPage, isFetchingNextPage])
   const skillRecords = useMemo(
-    () => (skillPages?.pages || []).flatMap((page) => page.records).filter((record, index, records) => records.findIndex((item) => item.id === record.id) === index).sort((a, b) => a.name.localeCompare(b.name)),
+    () => asArray(skillPages?.pages).flatMap((page) => asArray(page?.records)).filter((record, index, records) => records.findIndex((item) => item.id === record.id) === index).sort((a, b) => asText(a.name).localeCompare(asText(b.name))),
     [skillPages],
   )
 
@@ -139,7 +141,7 @@ export default function LiveJobs() {
 
   const update = (patch) => setSettings((current) => { const next = { ...current, ...patch }; saveLiveSettings(next); return next })
   const toggleSkill = (name) => update({ skills: settings.skills.includes(name) ? settings.skills.filter((item) => item !== name) : [...settings.skills, name] })
-  const addSkill = (name) => { if (!settings.skills.some((item) => item.toLowerCase() === name.toLowerCase())) update({ skills: [...settings.skills, name] }) }
+  const addSkill = (name) => { if (!settings.skills.some((item) => asText(item).toLowerCase() === name.toLowerCase())) update({ skills: [...settings.skills, name] }) }
   const start = () => { if (!settings.skills.length || scanning) return; setStep(0); setElapsed(0); scan.mutate(settings) }
 
   useEffect(() => {
@@ -165,7 +167,8 @@ export default function LiveJobs() {
     return () => window.clearInterval(timer)
   }, [autoScan])
 
-  const jobs = useMemo(() => result?.jobs || [], [result])
+  const jobs = useMemo(() => asArray(result?.jobs), [result])
+  const scanErrors = asArray(result?.errors)
   // Live jobs only exist in this browser's last scan; a ?job= link to one that is gone is dropped.
   const preview = previewId ? jobs.find((job) => job.id === previewId) || null : null
   useEffect(() => { if (previewId && !preview) closePreview() }, [previewId, preview, closePreview])
@@ -235,7 +238,7 @@ export default function LiveJobs() {
     </section>
 
     {scan.isError && scan.error?.code !== 'ABORTED' && <p role="alert" className="mt-5 flex items-start gap-2 rounded-2xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" /><span className="flex-1">{scan.error?.message || 'The live scan failed.'}</span><button type="button" onClick={start} className="font-bold underline underline-offset-4">Try again</button></p>}
-    {result?.errors?.length > 0 && <p className="mt-5 flex items-start gap-2 rounded-2xl bg-[var(--warn-bg)] px-4 py-3 text-xs font-semibold text-[var(--warn)]"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" />Some skills could not be scanned: {result.errors.map((item) => (typeof item === 'string' ? item : item?.message || item?.skill || JSON.stringify(item))).join(' · ')}</p>}
+    {scanErrors.length > 0 && <p className="mt-5 flex items-start gap-2 rounded-2xl bg-[var(--warn-bg)] px-4 py-3 text-xs font-semibold text-[var(--warn)]"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" />Some skills could not be scanned: {scanErrors.map((item) => (typeof item === 'string' ? item : item?.message || item?.skill || JSON.stringify(item))).join(' · ')}</p>}
 
     <div ref={resultsRef} className="scroll-mt-[calc(var(--shell-h)+1rem)]">
       {scanning ? <div className="mt-8 space-y-4" aria-hidden="true">{[0, 1, 2].map((item) => <div key={item} className="rounded-[1.6rem] bg-[var(--frame)] p-1"><div className="grid gap-4 rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] p-6 md:grid-cols-[1fr_14rem]"><div className="space-y-3"><span className="skeleton-bone block h-3 w-40 rounded-full" /><span className="skeleton-bone block h-5 w-3/4 rounded-full" /><span className="skeleton-bone block h-3 w-full rounded-full" /><span className="skeleton-bone block h-3 w-2/3 rounded-full" /></div><div className="space-y-3"><span className="skeleton-bone block h-3 w-24 rounded-full" /><span className="skeleton-bone block h-2 w-full rounded-full" /><span className="skeleton-bone block h-9 w-full rounded-xl" /></div></div></div>)}</div>
@@ -283,7 +286,7 @@ export default function LiveJobs() {
                 )}
               </button>
             </div>
-            <div className="flex flex-wrap gap-1.5">{Object.entries(result.skillsSearched || {}).map(([skill, count]) => <span key={skill} className="rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]">{skill} · {count}</span>)}</div>
+            <div className="flex flex-wrap gap-1.5">{Object.entries(asObject(result.skillsSearched)).map(([skill, count]) => <span key={skill} className="rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]">{skill} · {count}</span>)}</div>
             <span className="ml-auto flex items-center gap-3 text-[11px] font-semibold text-[var(--muted)]">Scanned {timeAgo(result.generatedAt, now).toLowerCase()}
               <button type="button" onClick={start} disabled={!settings.skills.length} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-3 py-1.5 font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)] disabled:opacity-40"><ArrowClockwise size={12} weight="bold" />Rescan</button>
             </span>
@@ -306,11 +309,11 @@ export default function LiveJobs() {
               </button>
             )}
           </section>
-            : jobs.length ? <section className="mt-4 space-y-4">{visibleJobs.map((job, index) => <LiveJobCard key={job.id} job={job} index={index} now={now} windowMinutes={resultWindow} justIn={justIn.includes(job.id)} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} applied={reactions.isApplied(job.id)} dismissed={reactions.isDismissed(job.id)} onOpen={() => openPreview(job.id)} />)}</section>
+            : jobs.length ? <section className="mt-4 space-y-4">{visibleJobs.map((job, index) => <ErrorBoundary key={job.id} name="live-job-card" fallback={CardError} resetKey={job}><LiveJobCard job={job} index={index} now={now} windowMinutes={resultWindow} justIn={justIn.includes(job.id)} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} applied={reactions.isApplied(job.id)} dismissed={reactions.isDismissed(job.id)} onOpen={() => openPreview(job.id)} /></ErrorBoundary>)}</section>
             : <section className="mt-4 rounded-[1.6rem] bg-[var(--surface)] px-6 py-16 text-center ring-1 ring-[var(--line)]/70">
               <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--lime)]/30 text-[var(--accent-strong)]"><Crosshair size={24} weight="duotone" /></div>
               <h3 className="mt-5 text-xl font-semibold">Quiet out there</h3>
-              <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">No new posts for {result.skills?.join(', ')} in the last {LIVE_WINDOWS.find((item) => item.minutes === resultWindow)?.label || `${resultWindow} min`}. Try a wider window or add more skills.</p>
+              <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">No new posts for {asArray(result.skills).join(', ')} in the last {LIVE_WINDOWS.find((item) => item.minutes === resultWindow)?.label || `${resultWindow} min`}. Try a wider window or add more skills.</p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">{LIVE_WINDOWS.filter((item) => item.minutes > resultWindow).slice(0, 3).map((item) => <button key={item.minutes} type="button" onClick={() => { update({ minutes: item.minutes }); setStep(0); setElapsed(0); scan.mutate({ ...settings, minutes: item.minutes }) }} className="rounded-full bg-[var(--paper)] px-4 py-2 text-xs font-bold ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)]">Scan last {item.label}</button>)}</div>
             </section>}
         </>

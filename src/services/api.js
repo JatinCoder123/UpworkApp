@@ -1,5 +1,6 @@
 import axios from "axios";
 import CryptoJS from "crypto-js";
+import { asArray, asObject, asText } from "../lib/safe";
 
 export const CRM_BASE_URL = (import.meta.env?.VITE_CRM_BASE_URL || "https://upwork.outrightcrm.in").replace(/\/$/, "");
 export const SMART_GATEWAY_URL = import.meta.env?.VITE_SMART_GATEWAY_URL || `${CRM_BASE_URL}/index.php?entryPoint=smart_gateway`;
@@ -134,6 +135,8 @@ function parsePostedAt(record) {
 
 const flag = (value) => value === true || /^(1|true|yes|verified)$/i.test(String(value ?? "").trim());
 const present = (value) => value !== undefined && value !== null && String(value).trim() !== "";
+// A client stat that is not a real number ("N/A", "") becomes null instead of NaN on screen.
+const numberOrNull = (value) => (present(value) && Number.isFinite(Number(value)) ? Number(value) : null);
 
 // The client field is "Country; 31 hires, ★5 (16 reviews), payment verified; 22 proposals".
 // Structured client_* fields (or a JSON client value) win when the backend provides them.
@@ -158,14 +161,14 @@ function parseClient(record) {
     country,
     city: pick("city") || "",
     timezone: pick("timezone", "tz") || "",
-    rating: present(rating) ? Number(rating) : null,
-    reviews: present(reviews) ? Number(reviews) : null,
-    hires: present(hires) ? Number(hires) : null,
-    activeHires: present(pick("active_hires", "active")) ? Number(pick("active_hires", "active")) : null,
-    proposals: present(proposals) ? Number(proposals) : null,
-    jobsPosted: present(pick("jobs_posted")) ? Number(pick("jobs_posted")) : null,
+    rating: numberOrNull(rating),
+    reviews: numberOrNull(reviews),
+    hires: numberOrNull(hires),
+    activeHires: numberOrNull(pick("active_hires", "active")),
+    proposals: numberOrNull(proposals),
+    jobsPosted: numberOrNull(pick("jobs_posted")),
     hireRate: pick("hire_rate") || "",
-    openJobs: present(pick("open_jobs")) ? Number(pick("open_jobs")) : null,
+    openJobs: numberOrNull(pick("open_jobs")),
     totalSpent,
     avgHourlyRate: pick("avg_hourly_rate", "avg_rate") || "",
     totalHours: pick("total_hours", "hours") || "",
@@ -238,11 +241,12 @@ function parseJobSkills(value) {
     .filter(Boolean))];
 }
 
-export function mapGatewayJob(record) {
+export function mapGatewayJob(input) {
+  const record = asObject(input);
   const clientStats = parseClient(record);
   const changes = localChanges.get(record.id) || {};
-  const category = humanize(record.category?.trim());
-  const built = record.already_built?.trim();
+  const category = humanize(asText(record.category).trim());
+  const built = asText(record.already_built).trim();
   const tags = [...new Set([category, built].filter((value) => value && value !== "–" && value !== "—"))];
   const skills = parseJobSkills(record.skills || descriptionValue(record.description, "Skills"));
   const owner = descriptionValue(record.description, "Lead");
@@ -262,7 +266,7 @@ export function mapGatewayJob(record) {
     level: budget.level || "Not specified",
     duration: budget.duration || "Duration not set",
     workload: budget.workload,
-    status: changes.status || record.status?.trim() || descriptionValue(record.description, "Status") || "New",
+    status: changes.status || asText(record.status).trim() || descriptionValue(record.description, "Status") || "New",
     match: Number(record.match_score) || 0,
     fitLabel: decodeHtml(record.fit || ""),
     matchReason: decodeHtml(record.match_reason || ""),
@@ -276,7 +280,7 @@ export function mapGatewayJob(record) {
     pitch: decodeHtml(record.pitch || ""),
     coverLetter: decodeCoverLetter(record.cover_letter),
     clientStats,
-    activity: changes.activity || [`Job imported as ${record.job_id || record.name}`, `Last updated ${record.date_modified_time_ago || "recently"}`],
+    activity: Array.isArray(changes.activity) ? changes.activity : [`Job imported as ${record.job_id || record.name}`, `Last updated ${record.date_modified_time_ago || "recently"}`],
     raw: record,
     ...changes,
   };
@@ -290,15 +294,15 @@ export async function findGatewayUserIdByEmail(email) {
   const request = (async () => {
     const perPage = 100;
     const firstPage = await smartGateway({ action: "fetch", module: USERS_MODULE, page: 1, per_page: perPage });
-    let users = [...(firstPage.records || [])];
+    let users = [...asArray(firstPage.records)];
     const totalPages = Math.max(Number(firstPage.total_pages) || 1, Math.ceil((Number(firstPage.total) || users.length) / perPage));
 
     for (let page = 2; page <= totalPages; page += 1) {
       const nextPage = await smartGateway({ action: "fetch", module: USERS_MODULE, page, per_page: perPage });
-      users = users.concat(nextPage.records || []);
+      users = users.concat(asArray(nextPage.records));
     }
 
-    const matchedUser = users.find((record) => String(record.email1 || "").trim().toLowerCase() === normalizedEmail);
+    const matchedUser = users.find((record) => asText(record?.email1).trim().toLowerCase() === normalizedEmail);
     if (!matchedUser?.id) throw createAppError("CRM_USER_NOT_FOUND", `No CRM user was found for ${email}.`);
     return matchedUser.id;
   })();
@@ -331,13 +335,14 @@ export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEm
   if (assignedUserId) filters.assigned_user_id = assignedUserId;
   if (status) filters.status = status;
   if (Object.keys(filters).length) query.filters = filters;
-  if (search.trim()) {
-    query.search = search.trim();
+  const searchText = asText(search).trim();
+  if (searchText) {
+    query.search = searchText;
     query.search_fields = JOB_SEARCH_FIELDS;
   }
   const payload = addGatewayDateFilter(query, dateFilter);
   const data = await smartGateway(payload);
-  const records = (data.records || []).map(mapGatewayJob);
+  const records = asArray(data.records).map(mapGatewayJob);
   return {
     records,
     page: Number(data.page) || page,
@@ -370,14 +375,14 @@ export async function fetchJobStats({ dateFilter, userEmail } = {}) {
     queries,
   });
   return Object.fromEntries(
-    Object.entries(data.stats || {}).map(([key, value]) => [key, Number(value?.count) || 0]),
+    Object.entries(asObject(data.stats)).map(([key, value]) => [key, Number(value?.count) || 0]),
   );
 }
 
 // Jobs per skill for the current scope and date window, as { [skillName]: count }.
 // Each get_stats query searches the jobs' skills field, the same search the jobs list uses.
 export async function fetchSkillCounts({ skills = [], dateFilter, userEmail, allJobs = false } = {}) {
-  const names = [...new Set(skills.map((skill) => String(skill).trim()).filter(Boolean))];
+  const names = [...new Set(asArray(skills).map((skill) => asText(skill).trim()).filter(Boolean))];
   if (!names.length) return {};
   const filters = { ai_processed: 1 };
   if (!allJobs) filters.assigned_user_id = await findGatewayUserIdByEmail(userEmail);
@@ -402,7 +407,7 @@ export async function fetchJobs(options = {}) {
 export async function fetchJobById(id) {
   if (!id || !String(id).trim()) throw createAppError("JOB_NOT_FOUND", "Job not found");
   const data = await smartGateway({ action: "fetch", module: JOBS_MODULE, filters: { id }, page: 1, per_page: 1 });
-  const record = data.records?.find((item) => item.id === id);
+  const record = asArray(data.records).find((item) => item?.id === id);
   if (!record) throw createAppError("JOB_NOT_FOUND", "Job not found");
   return mapGatewayJob(record);
 }
@@ -503,11 +508,11 @@ export async function fetchTeamMembers() {
     const totalPages = Math.max(Number(first.total_pages) || 1, Math.ceil((Number(first.total) || 0) / perPage));
     const rest = await Promise.all(Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) => smartGateway({ action: "fetch", module: USERS_MODULE, page: index + 2, per_page: perPage })));
     return [first, ...rest]
-      .flatMap((page) => page.records || [])
-      .filter((record) => record.deleted !== "1" && String(record.status || "Active") === "Active" && /@/.test(record.email1 || ""))
+      .flatMap((page) => asArray(page?.records))
+      .filter((record) => record && record.deleted !== "1" && String(record.status || "Active") === "Active" && /@/.test(asText(record.email1)))
       .map((record) => ({
         id: record.id,
-        email: String(record.email1).trim(),
+        email: asText(record.email1).trim(),
         name: decodeHtml([record.first_name, record.last_name].filter(Boolean).join(" ") || record.user_name || record.email1),
         title: decodeHtml(record.title || record.department || ""),
       }))
@@ -612,9 +617,13 @@ function liveBudget(record) {
   return { amount: "Budget not specified", type: hourly ? "Hourly" : "Fixed price" };
 }
 
-export function mapLiveJob(record) {
-  const client = record.client || {};
-  const location = client.location || {};
+// Upwork skills arrive as { prettyName, name, highlighted } objects; plain strings are accepted too.
+const liveSkillName = (skill) => (typeof skill === "string" ? skill : skill?.prettyName || skill?.name || "");
+
+export function mapLiveJob(input) {
+  const record = asObject(input);
+  const client = asObject(record.client);
+  const location = asObject(client.location);
   const budget = liveBudget(record);
   const category = record.occupations?.category?.prefLabel || humanize(record.category);
   const subcategory = record.occupations?.subCategories?.[0]?.prefLabel || humanize(record.subcategory);
@@ -640,15 +649,15 @@ export function mapLiveJob(record) {
     match: 0,
     summary: "",
     tags: [category, subcategory].filter(Boolean),
-    skills: [...new Set((record.skills || []).map((skill) => skill.prettyName || skill.name).filter(Boolean))],
-    highlightedSkills: (record.skills || []).filter((skill) => skill.highlighted).map((skill) => skill.prettyName || skill.name),
-    matchedSkills: record.matched_skills || [],
+    skills: [...new Set(asArray(record.skills).map(liveSkillName).filter(Boolean))],
+    highlightedSkills: asArray(record.skills).filter((skill) => skill?.highlighted).map(liveSkillName).filter(Boolean),
+    matchedSkills: asArray(record.matched_skills).map(asText).filter(Boolean),
     url,
     applyUrl: buildUpworkApplyUrl(url),
     description: decodeHtml(record.description || "") || "No description provided.",
     applicants: Number(record.totalApplicants) || 0,
     freelancersToHire: Number(record.freelancersToHire) || Number(record.totalFreelancersToHire) || 0,
-    preferredLocations: record.preferredFreelancerLocation || [],
+    preferredLocations: asArray(record.preferredFreelancerLocation).map(asText).filter(Boolean),
     preferredLocationMandatory: Boolean(record.preferredFreelancerLocationMandatory),
     enterprise: Boolean(record.enterprise),
     premium: Boolean(record.premium),
@@ -679,12 +688,12 @@ export function mapLiveJob(record) {
 
 // Upwork is queried live, which can take a while, so this call gets a longer timeout than the CRM fetches.
 export async function fetchLiveUpworkJobs({ skills = [], minutes = 60, includeRenewed = true, signal } = {}) {
-  const cleaned = [...new Set(skills.map((skill) => String(skill).trim()).filter(Boolean))];
+  const cleaned = [...new Set(asArray(skills).map((skill) => asText(skill).trim()).filter(Boolean))];
   if (!cleaned.length) throw createAppError("LIVE_SKILLS_REQUIRED", "Pick at least one skill to search.");
   const data = await smartGateway({ action: "fetch_live_upwork_jobs", skills: cleaned, minutes, include_renewed: includeRenewed ? 1 : 0 }, { timeout: 90_000, signal });
   // A job matching several skills can come back once per skill; merge those into one entry.
   const byId = new Map();
-  (data.jobs || []).map(mapLiveJob).forEach((job) => {
+  asArray(data.jobs).map(mapLiveJob).filter((job) => job.id != null).forEach((job) => {
     const seen = byId.get(job.id);
     byId.set(job.id, seen ? { ...seen, matchedSkills: [...new Set([...seen.matchedSkills, ...job.matchedSkills])] } : job);
   });
@@ -692,12 +701,12 @@ export async function fetchLiveUpworkJobs({ skills = [], minutes = 60, includeRe
   return {
     jobs,
     total: Number(data.total_jobs) || jobs.length,
-    skillsSearched: data.skills_searched || {},
+    skillsSearched: asObject(data.skills_searched),
     windowMinutes: Number(data.window_minutes) || minutes,
     includeRenewed: Boolean(data.include_renewed ?? includeRenewed),
     generatedAt: data.generated_at || new Date().toISOString(),
     cutoff: data.cutoff_utc || "",
-    errors: data.errors || [],
+    errors: asArray(data.errors),
     skills: cleaned,
   };
 }
@@ -705,7 +714,8 @@ export async function fetchLiveUpworkJobs({ skills = [], minutes = 60, includeRe
 export async function fetchSkills({ page = 1, perPage = 20 } = {}) {
   const data = await smartGateway({ action: "fetch", module: SKILLS_MODULE, page, per_page: perPage });
   return {
-    records: (data.records || []).filter((record) => record.deleted !== "1"),
+    // Skill names are sorted and compared as text in the UI, so every record gets a string name.
+    records: asArray(data.records).filter((record) => record && record.deleted !== "1").map((record) => ({ ...record, name: asText(record.name).trim() })).filter((record) => record.name),
     page: Number(data.page) || page,
     perPage: Number(data.per_page) || perPage,
     total: Number(data.total) || 0,
@@ -732,7 +742,9 @@ export async function deleteSkill(id) {
 }
 
 export const cleanJobUrl = (value) => {
-  const url = new URL(value);
+  let url;
+  // A malformed URL (typed by the user or stored on a job) compares as plain text instead of throwing.
+  try { url = new URL(asText(value).trim()); } catch { return asText(value).trim().replace(/\/$/, ""); }
   ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "source", "ref"].forEach((key) => url.searchParams.delete(key));
   url.hash = "";
   return url.toString().replace(/\/$/, "");
@@ -778,7 +790,7 @@ function parseHurryUp(tagString) {
 
 function parseSourceName(record) {
   if (record.source_note) {
-    const matched = record.source_note.split(/·|\(|,/)[0]?.trim();
+    const matched = asText(record.source_note).split(/·|\(|,/)[0]?.trim();
     if (matched) return decodeHtml(matched);
   }
   if (record.source) {
@@ -837,7 +849,8 @@ function calculateReadTime(record) {
   return `${minutes} min read`;
 }
 
-export function mapGatewayTechNews(record) {
+export function mapGatewayTechNews(input) {
+  const record = asObject(input);
   const score = parseScore(record.score);
   const tier = parsePriorityTier(record.priority, score);
   const sourceType = parseSourceType(record.tag);
@@ -914,8 +927,8 @@ export async function fetchTechNews({
     queryPayload.filters = gatewayFilters;
   }
 
-  const cleanSearch = search && search.trim();
-  const activeTag = tag || sourceType;
+  const cleanSearch = asText(search).trim();
+  const activeTag = asText(tag || sourceType);
   const hasTag = activeTag && activeTag !== "All";
 
   if (cleanSearch) {
@@ -927,7 +940,7 @@ export async function fetchTechNews({
   }
 
   const data = await smartGateway(addGatewayDateFilter(queryPayload, dateFilter));
-  const records = (data.records || []).map(mapGatewayTechNews);
+  const records = asArray(data.records).map(mapGatewayTechNews);
 
   return {
     records,
@@ -972,7 +985,7 @@ export async function fetchTechNewsStats({ dateFilter } = {}) {
   });
 
   const stats = {};
-  for (const [key, val] of Object.entries(data.stats || {})) {
+  for (const [key, val] of Object.entries(asObject(data.stats))) {
     stats[key] = Number(val?.count) || 0;
   }
   return stats;
@@ -988,7 +1001,7 @@ export async function fetchTechNewsById(id) {
     per_page: 1,
   });
 
-  const record = data.records?.find((item) => item.id === id);
+  const record = asArray(data.records).find((item) => item?.id === id);
   if (!record) throw createAppError("STORY_NOT_FOUND", "Story not found");
   return mapGatewayTechNews(record);
 }
@@ -1049,10 +1062,10 @@ export async function fetchAllTechNews({ forceRefresh = false, dateFilter = null
 async function fetchAllRecords(module, perPage = 50) {
   const query = (page) => smartGateway({ action: "fetch", module, order_by: "date_entered", order_dir: "DESC", page, per_page: perPage });
   const first = await query(1);
-  const total = Number(first.total) || (first.records || []).length;
+  const total = Number(first.total) || asArray(first.records).length;
   const totalPages = Math.max(Number(first.total_pages) || 1, Math.ceil(total / perPage));
   const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => query(index + 2)));
-  return [first, ...rest].flatMap((page) => page.records || []).filter((record) => record.deleted !== "1");
+  return [first, ...rest].flatMap((page) => asArray(page?.records)).filter((record) => record && typeof record === "object" && record.deleted !== "1");
 }
 
 const splitTags = (value) => decodeHtml(value || "").split(/\s+/).map((tag) => tag.trim()).filter((tag) => tag.startsWith("#"));
@@ -1068,7 +1081,8 @@ function parseOutline(description) {
   });
 }
 
-export function mapVideoFeed(record) {
+export function mapVideoFeed(input) {
+  const record = asObject(input);
   const flags = splitTags(record.flags);
   return {
     id: record.id,
@@ -1085,7 +1099,7 @@ export function mapVideoFeed(record) {
     format: decodeHtml(record.video_format || ""),
     whyChosen: decodeHtml(record.why_chosen || ""),
     duplicateCheck: decodeHtml(record.duplicate_check || ""),
-    priority: (record.priority || "").toUpperCase(),
+    priority: asText(record.priority).toUpperCase(),
     category: decodeHtml(record.category || "General"),
     targetSearchTerm: decodeHtml(record.target_search_term || ""),
     hashtags: splitTags(record.hashtags),
@@ -1113,7 +1127,8 @@ function parseKeywords(value) {
   };
 }
 
-export function mapSiteContent(record) {
+export function mapSiteContent(input) {
+  const record = asObject(input);
   const brief = parseBrief(record.description);
   const keywords = parseKeywords(brief.find((section) => /^keywords?$/i.test(section.label))?.value);
   const references = Array.from({ length: 8 }, (_, index) => record[`reference_link_${index + 1}`])
@@ -1131,9 +1146,9 @@ export function mapSiteContent(record) {
     sourceUrl: record.source_url || "",
     sourceNote: decodeHtml(record.source_note || ""),
     references,
-    partyType: (record.party_type || "").replace("#", ""),
+    partyType: asText(record.party_type).replace("#", ""),
     priority: Number(record.priority) || 99,
-    importance: (record.importance || "").toUpperCase(),
+    importance: asText(record.importance).toUpperCase(),
     category: decodeHtml(record.category || "General"),
     done: flag(record.is_done),
     itemNumber: Number(record.item_number) || null,
@@ -1156,12 +1171,12 @@ export async function fetchNote(noteId, { timeout = 600_000 } = {}) {
     },
     { timeout }
   );
-  const rec = data.records?.[0];
-  if (!rec) return null;
+  const rec = asArray(data.records)[0];
+  if (!rec || typeof rec !== "object") return null;
   return {
     id: rec.id,
     name: decodeHtml(rec.name || ""),
-    status: (rec.status || "queued").toLowerCase(),
+    status: asText(rec.status || "queued").toLowerCase(),
     filename: rec.filename || "",
     fileMimeType: rec.file_mime_type || "",
     documentUrl: rec.document_url || getDocumentDownloadUrl(rec.id),

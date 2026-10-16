@@ -15,6 +15,7 @@ import {
 import Shell from '../components/Shell'
 import { primaryButton } from '../components/ui'
 import { api } from '../services/api'
+import { asArray } from './safe'
 import {
   classifyScoreTier,
   classifySourceType,
@@ -42,7 +43,7 @@ export default function TechNewsDetail() {
 
   // 2-3 Up Next / Latest News items excluding the current story
   const upNextStories = useMemo(() => {
-    return allNews
+    return asArray(allNews)
       .filter((item) => item.id !== id)
       .sort((a, b) => new Date(b.postedAt || 0) - new Date(a.postedAt || 0))
       .slice(0, 3)

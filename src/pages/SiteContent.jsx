@@ -44,6 +44,7 @@ import {
 import { recordDocNotification } from '../services/docNotifications'
 import { useAuth } from '../contexts/AuthContext'
 import { forgetSearch, loadRecentSearches, rememberSearch } from '../lib/jobSignals'
+import { asArray, asText } from '../lib/safe'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -51,7 +52,7 @@ const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)')
 const SITE_TONES = ['#c8e875', '#cbc6ef', '#f6c9a8', '#b8e0d2', '#f2d27a', '#a9c8f0', '#f0b5c4']
 
 function siteTone(site) {
-  const hash = [...site].reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  const hash = [...asText(site)].reduce((sum, char) => sum + char.charCodeAt(0), 0)
   return SITE_TONES[hash % SITE_TONES.length]
 }
 
@@ -90,7 +91,7 @@ function SiteMark({ site, size = 'size-9' }) {
       className={`${size} grid shrink-0 place-items-center rounded-xl text-xs font-bold uppercase text-[#26320b]`}
       style={{ background: siteTone(site) }}
     >
-      {site.replace(/^www\./, '').slice(0, 2)}
+      {asText(site).replace(/^www\./, '').slice(0, 2)}
     </span>
   )
 }
@@ -99,7 +100,7 @@ export default function SiteContent() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const {
-    data: items = [],
+    data: itemsData,
     isLoading,
     isError,
     error,
@@ -110,6 +111,7 @@ export default function SiteContent() {
     queryFn: () => api.getSiteContent(),
     staleTime: 120_000,
   })
+  const items = useMemo(() => asArray(itemsData), [itemsData])
 
   const [site, setSite] = useState('All')
   const [category, setCategory] = useState('All')
@@ -142,7 +144,7 @@ export default function SiteContent() {
   const searchHistory = recentSearches.filter(
     (term) =>
       !historyTerm ||
-      (term.toLowerCase().includes(historyTerm) && term.toLowerCase() !== historyTerm)
+      (asText(term).toLowerCase().includes(historyTerm) && asText(term).toLowerCase() !== historyTerm)
   )
 
   const searching = isFetching || (searchInput.trim() !== debouncedSearch)
@@ -196,7 +198,7 @@ export default function SiteContent() {
       .filter(
         (item) =>
           !query ||
-          `${item.headline} ${item.site} ${item.summary} ${item.angle} ${item.keywords.primary} ${item.keywords.secondary.join(' ')}`
+          `${item.headline} ${item.site} ${item.summary} ${item.angle} ${item.keywords?.primary} ${asArray(item.keywords?.secondary).join(' ')}`
             .toLowerCase()
             .includes(query)
       )
@@ -792,10 +794,10 @@ function IdeaCard({ item, selected, onSelect }) {
           </span>
           {item.partyType && (
             <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[9px] font-semibold text-[var(--muted)]">
-              {item.partyType.replace(/([a-z])([A-Z])/g, '$1 $2')}
+              {asText(item.partyType).replace(/([a-z])([A-Z])/g, '$1 $2')}
             </span>
           )}
-          {item.keywords.primary && (
+          {item.keywords?.primary && (
             <span className="max-w-[11rem] truncate rounded-full bg-[var(--lime)]/30 px-2 py-0.5 text-[9px] font-semibold text-[var(--accent-strong)]">
               {item.keywords.primary}
             </span>
@@ -1007,7 +1009,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
     return () => ctx.revert()
   }, [])
 
-  const keywordText = [item.keywords.primary, ...item.keywords.secondary].filter(Boolean).join(', ')
+  const keywordText = [item.keywords?.primary, ...asArray(item.keywords?.secondary)].filter(Boolean).join(', ')
 
   const body = (
     <div
@@ -1138,13 +1140,13 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
             </button>
           </div>
           <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {item.keywords.primary && (
+            {item.keywords?.primary && (
               <span className="inline-flex items-center gap-1 rounded-full bg-[var(--ink)] px-3 py-1.5 text-[11px] font-semibold text-white">
                 <Target size={11} weight="bold" />
                 {item.keywords.primary}
               </span>
             )}
-            {item.keywords.secondary.map((keyword) => (
+            {asArray(item.keywords?.secondary).map((keyword) => (
               <span
                 key={keyword}
                 className="rounded-full bg-[var(--paper)] px-3 py-1.5 text-[11px] font-medium text-[var(--muted)]"
@@ -1157,11 +1159,11 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
       )}
 
       {/* Outline Brief */}
-      {item.brief.length > 0 && (
+      {asArray(item.brief).length > 0 && (
         <section data-detail-part className="mt-6">
           <p className="text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">Brief</p>
           <dl className="mt-3 divide-y divide-[var(--line)]/70 rounded-2xl bg-[var(--paper)] px-4">
-            {item.brief.map((section, index) => (
+            {asArray(item.brief).map((section, index) => (
               <div
                 key={`${section.label}-${index}`}
                 className="grid gap-1 py-3 sm:grid-cols-[7.5rem_1fr] sm:gap-3"
@@ -1177,7 +1179,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
       )}
 
       {/* Grounding References */}
-      {(item.references.length > 0 || item.source) && (
+      {(asArray(item.references).length > 0 || item.source) && (
         <section data-detail-part className="mt-6">
           <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">
             <LinkSimple size={12} weight="bold" />
@@ -1190,7 +1192,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
             </p>
           )}
           <ul className="mt-3 grid gap-1.5">
-            {item.references.map((link, index) => (
+            {asArray(item.references).map((link, index) => (
               <li key={link}>
                 <a
                   href={link}
@@ -1238,7 +1240,7 @@ function DocSection({
   onRegenerateDoc,
   onRefresh,
 }) {
-  const currentStatus = (note?.status || (isTriggering ? 'queued' : '')).toLowerCase()
+  const currentStatus = asText(note?.status || (isTriggering ? 'queued' : '')).toLowerCase()
   const isQueued = currentStatus === 'queued'
   const isProcessing = currentStatus === 'processing'
   const isCompiling = currentStatus === 'compiling' || currentStatus === 'compiliing'
@@ -1264,7 +1266,7 @@ function DocSection({
   const handleDownload = async () => {
     const noteId = activeNoteId || note?.id || item.notesId
     const viewUrl = note?.viewUrl || getDocumentViewUrl(noteId)
-    const rawFilename = note?.filename || `${item.headline.slice(0, 48)}.doc`
+    const rawFilename = asText(note?.filename) || `${asText(item.headline).slice(0, 48)}.doc`
     const downloadFilename = rawFilename.endsWith('.docx')
       ? rawFilename.replace(/\.docx$/, '.doc')
       : rawFilename.endsWith('.doc')
@@ -1363,7 +1365,7 @@ function DocSection({
                   className="mt-1 truncate text-xs sm:text-sm font-bold text-[var(--ink)]"
                   title={note?.filename}
                 >
-                  {note?.filename || `${item.headline.slice(0, 48)}.docx`}
+                  {note?.filename || `${asText(item.headline).slice(0, 48)}.docx`}
                 </p>
               </div>
             </div>
