@@ -711,11 +711,19 @@ export async function fetchLiveUpworkJobs({ skills = [], minutes = 60, includeRe
   };
 }
 
+// Skill category dropdown (e.g. "Digital Marketing", "Development"). The field name can be set in .env.
+const SKILL_CATEGORY_FIELD = import.meta.env?.VITE_SKILL_CATEGORY_FIELD || "category";
+
+function skillCategory(record) {
+  const value = [record[SKILL_CATEGORY_FIELD], record.category, record.category_c, record.skill_category].map((item) => asText(item).trim()).find(Boolean) || "";
+  return /^none$/i.test(value) ? "" : humanize(value).replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export async function fetchSkills({ page = 1, perPage = 20 } = {}) {
   const data = await smartGateway({ action: "fetch", module: SKILLS_MODULE, page, per_page: perPage });
   return {
     // Skill names are sorted and compared as text in the UI, so every record gets a string name.
-    records: asArray(data.records).filter((record) => record && record.deleted !== "1").map((record) => ({ ...record, name: asText(record.name).trim() })).filter((record) => record.name),
+    records: asArray(data.records).filter((record) => record && record.deleted !== "1").map((record) => ({ ...record, name: asText(record.name).trim(), category: skillCategory(record) })).filter((record) => record.name),
     page: Number(data.page) || page,
     perPage: Number(data.per_page) || perPage,
     total: Number(data.total) || 0,

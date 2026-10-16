@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowUpRight, Check, CircleNotch, PencilSimple, Plus, Trash, X } from '@phosphor-icons/react'
-import { DialogHeader, Modal, primaryButton } from './ui'
+import { Check, CircleNotch, PencilSimple, Plus, Trash, X } from '@phosphor-icons/react'
+import { DialogHeader, Modal } from './ui'
 import { ExtraFilterFields } from './JobListControls'
 import { api } from '../services/api'
 import { EMPTY_EXTRA_FILTERS } from '../lib/preferences'
 import { countExtraFilters } from '../lib/jobSignals'
 import { asArray, asText } from '../lib/safe'
 
-// Skills plus job type and client location; everything applies together on "Apply filters".
-export default function OpportunityFilterDialog({ skills = [], extraFilters = EMPTY_EXTRA_FILTERS, skillRecords = [], isLoading, error, onApply, onRemove, onClose }) {
+// Tabs shown even before any skill is tagged, matching the CRM category dropdown.
+const SKILL_CATEGORIES = ['Development', 'Digital Marketing']
+const OTHER = 'Uncategorized'
+
+// Skills plus job type and client location; picks apply together when the dialog closes (outside click, X or Escape).
+export default function OpportunityFilterDialog({ skills = [], extraFilters = EMPTY_EXTRA_FILTERS, skillRecords = [], isLoading, error, onApply, onRemove }) {
   const queryClient = useQueryClient()
   const [selectedSkills, setSelectedSkills] = useState(skills)
   const [filters, setFilters] = useState(extraFilters)
@@ -17,6 +21,7 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
   const [newSkill, setNewSkill] = useState('')
   const [editing, setEditing] = useState(null)
   const [deleteCandidate, setDeleteCandidate] = useState(null)
+  const [category, setCategory] = useState('All')
 
   const updateSkillCache = (updater) => queryClient.setQueryData(['skills'], (current) => {
     if (!asArray(current?.pages).length) return current
@@ -73,6 +78,11 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
   })
 
   const allSkillNames = skillRecords.map((record) => record.name).filter(Boolean)
+  const categoryOf = (record) => record.category || OTHER
+  const categories = ['All', ...new Set([...SKILL_CATEGORIES, ...skillRecords.map((record) => record.category).filter(Boolean)]), ...(skillRecords.some((record) => !record.category) ? [OTHER] : [])]
+  const inTab = (record, tab) => tab === 'All' || categoryOf(record) === tab
+  const visibleSkills = skillRecords.filter((record) => inTab(record, category) || editing?.id === record.id)
+  const selectedIn = (tab) => skillRecords.filter((record) => inTab(record, tab) && selectedSkills.includes(record.name)).length
   // Removing a filter takes effect on the list straight away; new picks still wait for "Apply filters".
   const removeNow = (next) => onRemove({ skills, extraFilters, ...next })
   const toggleSkill = (skill) => {
@@ -108,13 +118,15 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
     if (!editing?.id || !name) return
     updateMutation.mutate({ id: editing.id, name, previousName: editing.previousName })
   }
+  // The page's onApply also closes the dialog.
+  const applyAndClose = () => onApply({ skills: selectedSkills, extraFilters: filters })
   const mutationError = createMutation.error || updateMutation.error || deleteMutation.error || error
 
   return (
-    <Modal onClose={onClose} wide>
-      <DialogHeader eyebrow="Refine jobs" title="Filter your job list" onClose={onClose} />
+    <Modal onClose={applyAndClose} wide>
+      <DialogHeader eyebrow="Refine jobs" title="Filter your job list" onClose={applyAndClose} />
       <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-        Narrow jobs by type and client location, and choose from the shared CRM skills. Skill changes here update the outr_skills module for everyone.
+        Narrow jobs by type and client location, and choose from the shared CRM skills. Skill changes here update the outr_skills module for everyone. Your picks apply when you close this panel.
       </p>
       <div className="mt-7 rounded-2xl bg-[var(--paper)] p-4">
         <p className="text-[10px] font-bold uppercase tracking-[.17em] text-[var(--muted)]">More filters</p>
@@ -134,20 +146,30 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
           </div>
         </div>
 
+        <div role="tablist" aria-label="Skill categories" className="mt-4 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
+          {categories.map((tab) => {
+            const active = category === tab, total = skillRecords.filter((record) => inTab(record, tab)).length, picked = selectedIn(tab)
+            return <button key={tab} type="button" role="tab" aria-selected={active} onClick={() => setCategory(tab)} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold ring-1 transition-colors ${active ? 'bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]' : 'bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`}>
+              {tab}
+              <span className={`rounded-full px-1.5 py-px text-[9px] tabular-nums ${active ? 'bg-white/15' : 'bg-[var(--paper)]'}`}>{picked ? `${picked}/${total}` : total}</span>
+            </button>
+          })}
+        </div>
+
         {mutationError && <p role="alert" className="mt-4 rounded-xl bg-[#f5d6cf] px-3 py-2 text-[10px] font-semibold text-[var(--danger)]">{mutationError.message || 'The skill change could not be saved.'}</p>}
 
         {isAdding && (
           <div className="mt-4 flex items-center gap-2 rounded-xl bg-[var(--raised)] p-2 ring-1 ring-[var(--lime-dark)]/40">
-            <input autoFocus value={newSkill} onChange={(event) => setNewSkill(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); handleAddSkill() } else if (event.key === 'Escape') { setIsAdding(false); setNewSkill('') } }} placeholder="Enter a skill name" className="min-w-0 flex-1 bg-transparent px-2 text-xs font-semibold text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" />
+            <input autoFocus value={newSkill} onChange={(event) => setNewSkill(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); handleAddSkill() } else if (event.key === 'Escape') { event.stopPropagation(); setIsAdding(false); setNewSkill('') } }} placeholder="Enter a skill name" className="min-w-0 flex-1 bg-transparent px-2 text-xs font-semibold text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" />
             <button type="button" disabled={!newSkill.trim() || createMutation.isPending} onClick={handleAddSkill} className="grid size-7 place-items-center rounded-lg bg-[var(--lime)] text-[#26320b] disabled:opacity-40" aria-label="Create skill">{createMutation.isPending ? <CircleNotch size={13} className="animate-spin" /> : <Check size={13} weight="bold" />}</button>
             <button type="button" onClick={() => { setIsAdding(false); setNewSkill('') }} className="grid size-7 place-items-center rounded-lg bg-[var(--paper)] text-[var(--muted)]" aria-label="Cancel"><X size={12} weight="bold" /></button>
           </div>
         )}
 
         <div className="mt-4 flex max-h-[42dvh] flex-wrap content-start gap-2 overflow-y-auto pr-1">
-          {skillRecords.map((record) => editing?.id === record.id ? (
+          {visibleSkills.map((record) => editing?.id === record.id ? (
             <div key={record.id} className="flex items-center gap-1 rounded-full bg-[var(--raised)] p-1 ring-1 ring-[var(--lime-dark)]">
-              <input autoFocus value={editing.name} onChange={(event) => setEditing((current) => ({ ...current, name: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') handleUpdateSkill(); if (event.key === 'Escape') setEditing(null) }} className="w-32 bg-transparent px-2 text-[10px] font-semibold outline-none" />
+              <input autoFocus value={editing.name} onChange={(event) => setEditing((current) => ({ ...current, name: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') handleUpdateSkill(); if (event.key === 'Escape') { event.stopPropagation(); setEditing(null) } }} className="w-32 bg-transparent px-2 text-[10px] font-semibold outline-none" />
               <button type="button" onClick={handleUpdateSkill} disabled={!editing.name.trim() || updateMutation.isPending} className="grid size-6 place-items-center rounded-full bg-[var(--lime)] text-[#26320b] disabled:opacity-40" aria-label="Save skill">{updateMutation.isPending ? <CircleNotch size={11} className="animate-spin" /> : <Check size={11} weight="bold" />}</button>
               <button type="button" onClick={() => setEditing(null)} className="grid size-6 place-items-center rounded-full text-[var(--muted)]" aria-label="Cancel editing"><X size={10} weight="bold" /></button>
             </div>
@@ -164,15 +186,12 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
           ))}
           {isLoading && <span className="rounded-full bg-[var(--surface)] px-3 py-2 text-[10px] font-semibold text-[var(--muted)]">Loading skills…</span>}
           {!isLoading && skillRecords.length === 0 && !mutationError && <p className="py-6 text-xs text-[var(--muted)]">No CRM skills have been created yet.</p>}
+          {!isLoading && skillRecords.length > 0 && visibleSkills.length === 0 && <p className="py-6 text-xs text-[var(--muted)]">No skills in {category} yet. Set a skill's category in the CRM to show it here.</p>}
         </div>
       </div>
-      <div className="mt-7 flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
-        {hasFilters && <button type="button" onClick={clearFilters} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)] transition-colors hover:text-[var(--ink)]">Clear filters</button>}
-        <button type="button" onClick={() => onApply({ skills: selectedSkills, extraFilters: filters })} className={`${primaryButton} flex-1`}>
-          <span>Apply filters</span>
-          <span className="ml-auto grid size-8 place-items-center rounded-full bg-white/10"><ArrowUpRight size={15} /></span>
-        </button>
-      </div>
+      {hasFilters && <div className="mt-5 flex justify-end">
+        <button type="button" onClick={clearFilters} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)] transition-colors hover:text-[var(--ink)]">Clear filters</button>
+      </div>}
     </Modal>
   )
 }

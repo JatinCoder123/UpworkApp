@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { ArrowSquareOut, CaretDown, ChartBar, Check, Copy, Crown, Info, MagnifyingGlass, Sparkle, Star } from '@phosphor-icons/react'
 import { CATEGORY_ICONS, STATUS_META } from './meta'
@@ -130,6 +130,31 @@ function ScreeningScanner({ index }) {
   </div>
 }
 
+// Premium names are dressed as a wrapped gift: gold paper pattern, a satin band along the top and a bow on it.
+function GiftWrap() {
+  const id = `gift${useId().replace(/[^\w-]/g, '')}`
+  const gold = `${id}-gold`, tail = `${id}-tail`
+  return <>
+    <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[1.75rem]">
+      <span className="gift-paper absolute inset-0" />
+      <span className="gift-ribbon absolute inset-x-0 top-0 h-2" />
+    </span>
+    <svg aria-hidden="true" viewBox="0 0 64 40" className="gift-bow pointer-events-none absolute -top-[23px] left-1/2 h-12 w-[4.75rem] -translate-x-1/2 drop-shadow-[0_3px_4px_rgba(120,84,10,.28)]">
+      <defs>
+        <linearGradient id={gold} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f6dc82" /><stop offset=".55" stopColor="#dcae45" /><stop offset="1" stopColor="#b4841f" /></linearGradient>
+        <linearGradient id={tail} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#d4a43c" /><stop offset="1" stopColor="#a8791c" /></linearGradient>
+      </defs>
+      <path d="M29 21 19 37l5-1.6 3 3.6L32 23Z" fill={`url(#${tail})`} />
+      <path d="M35 21 45 37l-5-1.6-3 3.6L32 23Z" fill={`url(#${tail})`} />
+      <path d="M32 20C23 5 5 4 7.5 15.5 9.6 25 23 24 32 20Z" fill={`url(#${gold})`} />
+      <path d="M32 20C41 5 59 4 56.5 15.5 54.4 25 41 24 32 20Z" fill={`url(#${gold})`} />
+      <path d="M30 18.5C23 10 13 9 12.5 15M34 18.5C41 10 51 9 51.5 15" fill="none" stroke="#9c7016" strokeOpacity=".45" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M14 11.5C16 9.6 19.5 9.4 22 10.6M50 11.5C48 9.6 44.5 9.4 42 10.6" fill="none" stroke="#fff6cf" strokeOpacity=".8" strokeWidth="1.3" strokeLinecap="round" />
+      <rect x="27" y="14.5" width="10" height="11" rx="3.2" fill={`url(#${gold})`} stroke="#a8791c" strokeOpacity=".5" />
+    </svg>
+  </>
+}
+
 export function SuggestionCard({ item, rank, onCopy, onFavorite, onMoz, onUseName, mozBusy }) {
   const premium = isPremiumDomain(item.availability)
   const ref = useRef(null)
@@ -140,9 +165,10 @@ export function SuggestionCard({ item, rank, onCopy, onFavorite, onMoz, onUseNam
   }, [rank])
   const complete = item.stage === 'complete' && Array.isArray(item.checks)
 
-  return <article ref={ref} className={`group relative grid grid-cols-[2rem_minmax(0,1fr)] gap-3 rounded-[1.75rem] bg-[var(--surface)] p-4 ring-1 transition-shadow duration-500 hover:shadow-[0_24px_60px_var(--new-shadow)] sm:grid-cols-[2.75rem_minmax(0,1fr)] sm:p-6 ${premium ? 'ring-[#d9b44a]/70' : 'ring-[var(--line)]'}`}>
-    <span className="pt-1 font-mono text-sm text-[var(--muted)] sm:text-base">#{rank + 1}</span>
-    <div className="min-w-0">
+  return <article ref={ref} className={`group relative grid grid-cols-[2rem_minmax(0,1fr)] gap-3 rounded-[1.75rem] bg-[var(--surface)] p-4 ring-1 transition-shadow duration-500 hover:shadow-[0_24px_60px_var(--new-shadow)] sm:grid-cols-[2.75rem_minmax(0,1fr)] sm:p-6 ${premium ? 'gift-card mt-6 ring-[#d9b44a]/70' : 'ring-[var(--line)]'}`}>
+    {premium && <GiftWrap />}
+    <span className="relative pt-1 font-mono text-sm text-[var(--muted)] sm:text-base">#{rank + 1}</span>
+    <div className="relative min-w-0">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
