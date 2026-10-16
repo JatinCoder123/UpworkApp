@@ -128,13 +128,8 @@ export default function Seo() {
 
   return (
     <Shell>
-      <main className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-9 sm:px-6 md:pt-12">
-        <header className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div>
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.17em] text-[var(--muted)]"><Newspaper size={15} weight="duotone" />SEO journal</p>
-            <h1 className="mt-4 max-w-4xl text-[clamp(3rem,6.4vw,6.4rem)] font-semibold leading-[.88] tracking-[-.075em]">Search intelligence,<br /><span className="inline-block pb-1 font-serif font-medium italic leading-[1.1]">without the noise.</span></h1>
-            <p className="mt-5 max-w-xl text-sm leading-6 text-[var(--muted)]">Research, practical guides, and sharp analysis for modern search teams.</p>
-          </div>
+      <main className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
+        <header className="flex justify-end">
           <label className="flex items-center gap-2 rounded-full bg-[var(--surface)] p-1.5 pl-4 ring-1 ring-[var(--line)] shadow-[0_12px_36px_rgba(36,49,38,.08)] focus-within:ring-[var(--lime-dark)]">
             <MagnifyingGlass className="shrink-0 text-[var(--muted)]" size={16} />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search the journal" className="min-w-0 flex-1 bg-transparent px-1 text-xs outline-none sm:w-56" />
@@ -142,7 +137,7 @@ export default function Seo() {
           </label>
         </header>
 
-        <nav className="mt-10 border-y border-[var(--line)] py-3" aria-label="SEO article topics"><HScroll innerClassName="gap-1" fade="var(--paper)" label="topics">
+        <nav className="mt-6 border-y border-[var(--line)] py-3" aria-label="SEO article topics"><HScroll innerClassName="gap-1" fade="var(--paper)" label="topics">
           {topics.map((item) => <button type="button" key={item} onClick={() => setTopic(item)} className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-bold transition-all ${topic === item ? 'bg-[var(--ink)] text-white' : 'text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]'}`}>{item}</button>)}
         </HScroll></nav>
 

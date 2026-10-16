@@ -332,29 +332,9 @@ export default function TechNews() {
 
   return (
     <Shell>
-      <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-10 sm:px-6 md:pt-14">
-        {/* Top Hero Section */}
-        <section className="grid items-end gap-8 lg:grid-cols-[1fr_auto]">
-          <div>
-            <div className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">
-              <span className="h-px w-7 bg-[var(--ink)]/25" />
-              Daily AI Digest
-            </div>
-            <h1 className="max-w-4xl text-[clamp(2.8rem,5.5vw,5.5rem)] font-semibold leading-[.88] tracking-[-.075em] text-[var(--ink)]">
-              AI News,
-              <br />
-              <span className="font-serif font-medium italic">classified & curated.</span>
-            </h1>
-          </div>
-          <div className="lg:pb-2">
-            <p className="max-w-xs text-xs sm:text-sm leading-6 text-[var(--muted)]">
-              Real-time intelligence feed categorized by source provenance and evaluated score tiers.
-            </p>
-          </div>
-        </section>
-
+      <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
         {/* Top Horizontal Navigation & Search/Filter Toolbar */}
-        <section className="mt-10 rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+        <section className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
           <div className="space-y-4 rounded-[calc(2rem-.375rem)] bg-[var(--surface)] px-4 py-4 sm:px-6">
             {/* Top Row: Source Types (Left) + Search & Filter (Right) */}
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">

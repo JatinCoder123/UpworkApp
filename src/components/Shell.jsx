@@ -23,6 +23,7 @@ const navigationItems = [
   ['/cloud', 'Cloud'],
   ['/social', 'Social'],
   ['/email-to-blog', 'Email to Blog'],
+  ['/guest-post', 'Guest Post'],
 ]
 
 export default function Shell({ children }) {

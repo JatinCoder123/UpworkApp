@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowClockwise, Brain, ClockCounterClockwise, GameController, Globe, Info, MagnifyingGlass, Plus, ShieldCheck, Star, Warning } from '@phosphor-icons/react'
+import { ArrowClockwise, Brain, ClockCounterClockwise, GameController, Info, MagnifyingGlass, Plus, ShieldCheck, Star, Warning } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import SearchConsole from '../components/domain/SearchConsole'
 import SavedDrawer from '../components/domain/SavedDrawer'
@@ -404,13 +404,8 @@ export default function Domain() {
 
   return (
     <Shell>
-      <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-9 sm:px-6 md:pt-12">
-        <header className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div>
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.17em] text-[var(--muted)]"><Globe size={15} weight="duotone" />Domain intelligence</p>
-            <h1 className="mt-4 max-w-4xl text-[clamp(3rem,6.4vw,6rem)] font-semibold leading-[.88] tracking-[-.075em]">Find a name,<br /><span className="inline-block pb-1 font-serif font-medium italic leading-[1.1]">worth owning.</span></h1>
-            <p className="mt-5 max-w-xl text-sm leading-6 text-[var(--muted)]">Check any domain instantly, or describe your idea and let AI coin names, confirm they are free, and screen each one across 43 brand, legal and SEO checks.</p>
-          </div>
+      <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
+        <header className="flex justify-end">
           <div className="flex gap-2">
             <button type="button" onClick={() => setSaved('history')} className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-4 py-2.5 text-xs font-bold ring-1 ring-[var(--line)] transition-all hover:-translate-y-0.5"><ClockCounterClockwise size={15} />Recent</button>
             <button type="button" onClick={() => setSaved('favorites')} className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-4 py-2.5 text-xs font-bold ring-1 ring-[var(--line)] transition-all hover:-translate-y-0.5"><Star size={15} />Favorites</button>
@@ -423,7 +418,7 @@ export default function Domain() {
           <ul className="mt-2 list-disc space-y-1 pl-5">{missingKeys.map((key) => <li key={key}>{key}</li>)}</ul>
         </details>}
 
-        <section className="mt-8">
+        <section className="mt-4">
           <SearchConsole value={input} onChange={setInput} mode={mode} onModeChange={setMode} tlds={tlds} onTldsChange={setTlds} onSubmit={() => startSearch()} busy={busy} inputRef={inputRef} onPeekCheck={checkExact} />
         </section>
 

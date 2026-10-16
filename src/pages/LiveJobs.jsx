@@ -12,6 +12,7 @@ import { LIVE_WINDOWS, isEarlyBird, loadLiveResult, loadLiveSettings, minutesSin
 import { loadExtraFilters, saveExtraFilters } from '../lib/preferences'
 import { matchesExtraFilters, useJobReactions, usePreviewParam } from '../lib/jobSignals'
 import { timeAgo, useNow } from '../lib/time'
+import { useSaveToCrm } from '../lib/crmSave'
 import { useAuth } from '../contexts/AuthContext'
 import ErrorBoundary, { CardError } from '../components/ErrorBoundary'
 import { asArray, asObject, asText } from '../lib/safe'
@@ -95,6 +96,7 @@ export default function LiveJobs() {
   const location = useLocation()
   const now = useNow(30_000)
   const reactions = useJobReactions(user?.email)
+  const crm = useSaveToCrm()
   const [settings, setSettings] = useState(loadLiveSettings)
   const [result, setResult] = useState(loadLiveResult)
   const [justIn, setJustIn] = useState(() => asArray(location.state?.justIn))
@@ -309,7 +311,7 @@ export default function LiveJobs() {
               </button>
             )}
           </section>
-            : jobs.length ? <section className="mt-4 space-y-4">{visibleJobs.map((job, index) => <ErrorBoundary key={job.id} name="live-job-card" fallback={CardError} resetKey={job}><LiveJobCard job={job} index={index} now={now} windowMinutes={resultWindow} justIn={justIn.includes(job.id)} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} applied={reactions.isApplied(job.id)} dismissed={reactions.isDismissed(job.id)} onOpen={() => openPreview(job.id)} /></ErrorBoundary>)}</section>
+            : jobs.length ? <section className="mt-4 space-y-4">{visibleJobs.map((job, index) => <ErrorBoundary key={job.id} name="live-job-card" fallback={CardError} resetKey={job}><LiveJobCard job={job} index={index} now={now} windowMinutes={resultWindow} justIn={justIn.includes(job.id)} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} applied={reactions.isApplied(job.id)} dismissed={reactions.isDismissed(job.id)} onOpen={() => openPreview(job.id)} onSaveToCrm={() => crm.save(job)} crmSaved={crm.isSaved(job.id)} crmSaving={crm.pendingId === job.id} crmError={crm.errorId === job.id ? crm.error?.message || 'Could not save this job to the CRM.' : ''} /></ErrorBoundary>)}</section>
             : <section className="mt-4 rounded-[1.6rem] bg-[var(--surface)] px-6 py-16 text-center ring-1 ring-[var(--line)]/70">
               <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--lime)]/30 text-[var(--accent-strong)]"><Crosshair size={24} weight="duotone" /></div>
               <h3 className="mt-5 text-xl font-semibold">Quiet out there</h3>

@@ -252,11 +252,6 @@ export default function SiteContent() {
     const ctx = gsap.context(() => {
       if (reduceMotion()) return
       gsap.fromTo(
-        '[data-hero-word]',
-        { yPercent: 110 },
-        { yPercent: 0, duration: 1.05, stagger: 0.08, ease: 'expo.out' }
-      )
-      gsap.fromTo(
         '[data-hero-fade]',
         { y: 16, autoAlpha: 0 },
         { y: 0, autoAlpha: 1, duration: 0.75, stagger: 0.07, delay: 0.3, ease: 'power3.out' }
@@ -301,32 +296,8 @@ export default function SiteContent() {
 
   return (
     <Shell>
-      <main ref={root} className="mx-auto w-full max-w-[1560px] px-4 pb-28 pt-8 sm:px-6 md:pt-10">
-        <header className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div>
-            <p
-              data-hero-fade
-              className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.17em] text-[var(--muted)]"
-            >
-              <Newspaper size={15} weight="duotone" />
-              Site content
-            </p>
-            <h1 className="mt-4 text-[clamp(2.7rem,6.2vw,5.8rem)] font-semibold leading-[.92] tracking-[-.07em]">
-              <span className="block overflow-hidden pb-1">
-                <span data-hero-word className="inline-block">Stories&nbsp;</span>
-                <span data-hero-word className="inline-block">your&nbsp;</span>
-                <span data-hero-word className="inline-block">sites</span>
-              </span>
-              <span className="block overflow-hidden pb-2">
-                <span data-hero-word className="inline-block font-serif font-medium italic">
-                  should publish.
-                </span>
-              </span>
-            </h1>
-            <p data-hero-fade className="mt-5 max-w-xl text-sm leading-6 text-[var(--muted)]">
-              Fresh, sourced content ideas for every site, with the angle, keywords and AI document generator to build each post.
-            </p>
-          </div>
+      <main ref={root} className="mx-auto w-full max-w-[1560px] px-4 pb-28 pt-6 sm:px-6 md:pt-8">
+        <header className="flex justify-end">
           <dl
             data-hero-fade
             className="grid grid-cols-4 gap-px overflow-hidden rounded-[1.4rem] bg-[var(--line)]/70 ring-1 ring-[var(--line)]/70"
@@ -353,7 +324,7 @@ export default function SiteContent() {
         </header>
 
         {sites.length > 0 && (
-          <HScroll data-hero-fade className="mt-9" innerClassName="gap-2 py-1" fade="var(--paper)" label="sites">
+          <HScroll data-hero-fade className="mt-6" innerClassName="gap-2 py-1" fade="var(--paper)" label="sites">
             <SiteTab active={site === 'All'} onClick={() => setSite('All')} label="All sites" count={items.length} />
             {sites.map(([name, count]) => (
               <SiteTab

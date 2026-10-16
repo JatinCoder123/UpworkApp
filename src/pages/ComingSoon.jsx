@@ -1,12 +1,10 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Brain, Cloud, Code, EnvelopeSimple, Globe, MagnifyingGlass, Newspaper, ShareNetwork, Sparkle, VideoCamera } from '@phosphor-icons/react'
+import { ArrowRight, Brain, Cloud, Code, EnvelopeSimple, Globe, MagnifyingGlass, Newspaper, PencilSimpleLine, ShareNetwork, Sparkle, VideoCamera } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import { primaryButton } from '../components/ui'
 
 export default function ComingSoon({
-  eyebrow = 'Workspace Module',
   title = 'Daily News',
-  subtitle = 'curated & incoming.',
   description = 'This module is currently being prepared and will be available in an upcoming release.',
   type = 'daily-news',
 }) {
@@ -20,39 +18,21 @@ export default function ComingSoon({
     cloud: Cloud,
     social: ShareNetwork,
     'email-to-blog': EnvelopeSimple,
+    'guest-post': PencilSimpleLine,
   }
   const Icon = icons[type] || Newspaper
 
   return (
     <Shell>
-      <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-14 sm:px-6 md:pt-20">
-        <div className="grid items-end gap-8 md:grid-cols-[1fr_auto]">
-          <div>
-            <div className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">
-              <span className="h-px w-7 bg-[var(--ink)]/25" />
-              {eyebrow}
-            </div>
-            <h1 className="mt-4 text-[clamp(3.2rem,6.5vw,6.2rem)] font-semibold leading-[.88] tracking-[-.075em] text-[var(--ink)]">
-              {title},
-              <br />
-              <span className="font-serif font-medium italic">{subtitle}</span>
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 pb-2">
-            <span className="inline-flex items-center gap-2 rounded-full bg-[var(--lime)] px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[.16em] text-[#26320b] ring-1 ring-[var(--lime-dark)]/30 shadow-xs">
-              <Sparkle size={13} weight="fill" />
-              <span>Coming Soon</span>
-            </span>
-          </div>
-        </div>
-
-        <section className="mt-14 rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+      <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
+        <section className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
           <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] px-6 py-16 text-center sm:px-12 sm:py-20">
             <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[var(--paper)] text-[var(--ink)] ring-1 ring-black/5">
               <Icon size={26} weight="duotone" />
             </div>
 
-            <span className="mt-6 inline-block text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">
+            <span className="mt-6 inline-flex items-center gap-2 rounded-full bg-[var(--lime)] px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[.16em] text-[#26320b] ring-1 ring-[var(--lime-dark)]/30 shadow-xs">
+              <Sparkle size={13} weight="fill" />
               Coming Soon
             </span>
 
