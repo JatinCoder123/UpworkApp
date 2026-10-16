@@ -29,7 +29,6 @@ const pipeline = ["New", "Applied", "Rejected"];
 // "New" covers New and Seen, which the gateway cannot OR together, so only the other tabs filter on the server.
 const serverStatus = (tab) => (tab === "Applied" || tab === "Rejected" ? tab : "");
 const label = "text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]";
-const TOOLBAR_SKILLS = 5;
 
 function useDebounced(value, delay) {
   const [debounced, setDebounced] = useState(value);
@@ -134,12 +133,6 @@ export default function Jobs() {
     () => [...skillRecords].sort((a, b) => (skillCounts[b.name] ?? -1) - (skillCounts[a.name] ?? -1) || asText(a.name).localeCompare(asText(b.name))),
     [skillRecords, skillCounts],
   );
-  // The toolbar shows the top skills plus any selected one outside them; the rest sit behind "+N more".
-  const shownSkillRecords = useMemo(
-    () => rankedSkillRecords.filter((record, index) => index < TOOLBAR_SKILLS || skills.includes(record.name)),
-    [rankedSkillRecords, skills],
-  );
-  const hiddenSkillCount = rankedSkillRecords.length - shownSkillRecords.length;
 
   const allDisplayJobs = useMemo(() => {
     const baseJobs = asArray(jobPages?.pages).flatMap((page) => asArray(page?.records)).filter((job, index, records) => records.findIndex((item) => item.id === job.id) === index);
@@ -272,8 +265,9 @@ export default function Jobs() {
 
             <div className="flex flex-wrap items-center gap-3 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
               <span className={`${label} shrink-0`}>Skills</span>
-              <HScroll className="min-w-0 max-w-full" innerClassName="gap-1.5" label="skills">
-                {shownSkillRecords.map(({ id, name }) => {
+              {/* Fixed width shows about five skills; the ‹ › arrows scroll through the rest, most jobs first. */}
+              <HScroll className="min-w-0 flex-[0_1_36rem]" innerClassName="gap-1.5" label="skills">
+                {rankedSkillRecords.map(({ id, name }) => {
                   const selected = skills.includes(name);
                   const count = skillCounts[name];
                   return <button key={id} type="button" onClick={() => toggleSkill(name)} aria-pressed={selected} style={skillStyle(name)} className="skill-chip inline-flex shrink-0 items-center gap-1 rounded-full py-1.5 pl-3 pr-1.5 text-[11px] font-semibold transition-transform duration-300 hover:-translate-y-0.5">
@@ -281,7 +275,6 @@ export default function Jobs() {
                     <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[9px] tabular-nums ${selected ? "bg-white/20 dark:bg-black/15" : "bg-black/5 dark:bg-white/10"}`}>{count == null ? "…" : count}</span>
                   </button>;
                 })}
-                {hiddenSkillCount > 0 && <button type="button" onClick={() => setSkillDialog(true)} title="Show all skills" className="shrink-0 rounded-full bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)] transition-colors hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]">+{hiddenSkillCount} more</button>}
                 {skillsLoading && <span className="skeleton-bone h-7 w-40 shrink-0 rounded-full" />}
               </HScroll>
               <button type="button" onClick={() => setSkillDialog(true)} aria-label="Skill settings" title="Skill settings" className="grid size-8 shrink-0 place-items-center rounded-full text-[var(--muted)] ring-1 ring-[var(--line)] transition-all duration-300 hover:rotate-45 hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]"><GearSix size={16} weight="bold" /></button>
