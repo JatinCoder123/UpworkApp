@@ -12,6 +12,7 @@ export const USERS_MODULE = import.meta.env?.VITE_USERS_MODULE || "Users";
 export const SKILLS_MODULE = import.meta.env?.VITE_SKILLS_MODULE || "outr_skills";
 export const TECH_NEWS_MODULE = import.meta.env?.VITE_TECH_NEWS_MODULE || "daily_tech_news";
 export const VIDEO_FEEDS_MODULE = import.meta.env?.VITE_VIDEO_FEEDS_MODULE || "video_feeds";
+export const JOB_ACTIVITY_MODULE = import.meta.env?.VITE_JOB_ACTIVITY_MODULE || "outr_job_activity";
 export const SITE_CONTENT_MODULE = import.meta.env?.VITE_SITE_CONTENT_MODULE || "sites_tech_content";
 export const DEFAULT_TECH_NEWS_PER_PAGE = Number(import.meta.env?.VITE_TECH_NEWS_PER_PAGE) || 10;
 
@@ -513,6 +514,75 @@ export async function fetchTeamMembers() {
       .sort((a, b) => a.name.localeCompare(b.name));
   })().catch((error) => { teamMembersRequest = null; throw error; });
   return teamMembersRequest;
+}
+
+// ----------------------------------------------------
+// Job activity (who did what on a job, stored in the job activity module)
+// ----------------------------------------------------
+
+const userNameCache = new Map();
+const pendingActivity = new Map();
+
+// CRM user's display name by id, fetched once per id.
+function fetchUserName(userId) {
+  if (!userId) return Promise.resolve("");
+  if (!userNameCache.has(userId)) {
+    const request = smartGateway({ action: "fetch", module: USERS_MODULE, filters: { id: userId }, page: 1, per_page: 1 })
+      .then((data) => {
+        const record = data.records?.find((item) => item.id === userId);
+        // Users without a first/last name have a blank full_name (" "), so skip blanks and fall back to the login or email.
+        const fullName = [record.first_name, record.last_name].map((part) => String(part || "").trim()).filter(Boolean).join(" ");
+        const name = record && [fullName, record.full_name, record.name, record.user_name, record.email1].map((value) => String(value || "").trim()).find(Boolean);
+        return name ? decodeHtml(name) : "";
+      })
+      .catch((error) => { userNameCache.delete(userId); throw error; });
+    userNameCache.set(userId, request);
+  }
+  return userNameCache.get(userId);
+}
+
+// Activity on a CRM job, newest first, each with the name of the user who did it.
+export async function fetchJobActivity(jobId) {
+  if (!jobId) return [];
+  const data = await smartGateway({ action: "fetch", module: JOB_ACTIVITY_MODULE, filters: { job_id: jobId }, order_by: "date_entered", order_dir: "DESC", page: 1, per_page: 100 });
+  const records = (data.records || []).filter((record) => record.deleted !== "1");
+  const names = await Promise.all(records.map((record) => fetchUserName(record.user_id).catch(() => "")));
+  return records.map((record, index) => ({
+    id: record.id,
+    userId: record.user_id,
+    userName: names[index] || "Someone",
+    description: decodeHtml(record.description || ""),
+    timeAgo: record.date_entered_time_ago || "",
+    date: record.date_entered_uni_format || record.date_entered || "",
+  }));
+}
+
+// Records one activity by the signed-in user. With `once`, nothing is created when the same
+// user already has this description on this job. Resolves to true when an entry was created.
+export function logJobActivity({ jobId, userEmail, description, once = false }) {
+  const key = `${userEmail}|${jobId}|${description}`;
+  if (once && pendingActivity.has(key)) return pendingActivity.get(key);
+  const request = (async () => {
+    const userId = await findGatewayUserIdByEmail(userEmail);
+    if (once) {
+      const existing = await smartGateway({ action: "fetch", module: JOB_ACTIVITY_MODULE, filters: { user_id: userId, job_id: jobId, description }, page: 1, per_page: 1 });
+      if ((existing.records || []).some((record) => record.deleted !== "1")) return false;
+    }
+    await smartGateway({ action: "create", module: JOB_ACTIVITY_MODULE, data: { name: description, user_id: userId, job_id: jobId, description, assigned_user_id: userId } });
+    return true;
+  })();
+  if (!once) return request;
+  pendingActivity.set(key, request);
+  // Keep successful "once" checks so reopening the job in this session skips the lookup.
+  request.catch(() => pendingActivity.delete(key));
+  return request;
+}
+
+// The activity entry for a status change; New -> Seen is covered by the "Seen" entry logged on open.
+function statusActivity(from, to) {
+  if (from === to || (from === "New" && to === "Seen")) return "";
+  if (to === "Seen" && (from === "Applied" || from === "Rejected")) return `Undo ${from}`;
+  return to;
 }
 
 // ----------------------------------------------------
@@ -1149,7 +1219,11 @@ export const api = {
   getTechNewsStats: (params) => fetchTechNewsStats(params),
   getTechNewsItem: (id) => fetchTechNewsById(id),
   getAllTechNews: (options) => fetchAllTechNews(options),
-  async updateStatus({ id, status, reason, coverLetter }) {
+  getJobActivity: (jobId) => fetchJobActivity(jobId),
+  logJobActivity,
+  // With `userEmail`, the change is also recorded in the job activity module. A failed
+  // activity entry is logged to the console and does not undo the status change.
+  async updateStatus({ id, status, reason, coverLetter, userEmail }) {
     const current = await fetchJobById(id);
     await smartGateway({
       action: "update",
@@ -1157,6 +1231,8 @@ export const api = {
       id,
       data: { status },
     });
+    const description = userEmail ? statusActivity(current.status, status) : "";
+    if (description) await logJobActivity({ jobId: id, userEmail, description }).catch((error) => console.warn("Could not record job activity", error));
     const changes = { status, reason, coverLetter, activity: [`Status changed from ${current.status} to ${status}`, ...current.activity] };
     localChanges.set(id, changes);
     return { ...current, ...changes };

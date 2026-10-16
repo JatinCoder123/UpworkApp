@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import gsap from 'gsap'
-import { ArrowLeft, Briefcase, CalendarBlank, ChartBar, Clock, ClockCounterClockwise, CurrencyDollar, Hourglass, MapPin, SealCheck, Sparkle, Star, Tag, Target, WarningCircle } from '@phosphor-icons/react'
+import { ArrowLeft, Briefcase, CalendarBlank, ChartBar, Clock, CurrencyDollar, Heart, Hourglass, MapPin, SealCheck, Sparkle, Star, Tag, Target, WarningCircle } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import NotFound from './NotFound'
 import ExpandableText from '../components/ExpandableText'
 import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, Tips, card } from '../components/JobDetailParts'
 import JobApplySection from '../components/JobApplySection'
 import ShareJobDialog from '../components/ShareJobDialog'
+import JobActivity from '../components/JobActivity'
 import { StatusPill } from '../components/ui'
 import { api } from '../services/api'
 import JobDetailSkeleton, { DrawerDetailSkeleton } from '../components/JobDetailSkeleton'
@@ -50,6 +51,14 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
       })
     },
   })
+  // Opening a job records one "Seen" activity per user; repeat visits create nothing.
+  const userEmail = user?.email
+  useEffect(() => {
+    if (!jobId || !userEmail) return
+    api.logJobActivity({ jobId, userEmail, description: 'Seen', once: true })
+      .then((created) => { if (created) queryClient.invalidateQueries({ queryKey: ['job-activity', jobId] }) })
+      .catch((error) => console.warn('Could not record job activity', error))
+  }, [jobId, userEmail, queryClient])
   useEffect(() => {
     if (job?.status !== 'New' || seenJob.current === id) return
     const timer = window.setTimeout(() => {
@@ -92,10 +101,7 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
     </div>
     <div className="mt-4 flex flex-wrap gap-1.5">{skills.map((skill) => <span key={skill} style={skillStyle(skill)} className="skill-chip rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}</div>
   </div>
-  const activity = <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
-    <p className="flex items-center gap-2 text-sm font-semibold"><ClockCounterClockwise size={16} />Activity</p>
-    <ol className="mt-4 space-y-3 border-l border-[var(--line)] pl-4">{job.activity.map((item, index) => <li key={`${item}-${index}`} className="relative text-xs leading-5"><span className={`absolute -left-[1.3rem] top-1.5 size-2 rounded-full ring-2 ring-[var(--surface)] ${index === 0 ? 'bg-[var(--lime-dark)]' : 'bg-[var(--line)]'}`} />{item}</li>)}</ol>
-  </div>
+  const activity = <JobActivity job={job} />
 
   const content = <div ref={root} className={embedded ? 'space-y-5 p-4 sm:p-6' : 'mx-auto w-full max-w-[1320px] px-4 pb-20 pt-6 sm:px-6 md:pt-8'}>
     {!embedded && <Link data-detail to="/jobs" className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--muted)] transition-colors hover:text-[var(--ink)]"><span className="grid size-8 place-items-center rounded-full bg-[var(--surface)] ring-1 ring-[var(--line)]"><ArrowLeft size={14} /></span>All jobs</Link>}

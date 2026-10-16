@@ -19,8 +19,9 @@ export function ActionDialog({ type, job, onClose, stay = false }) {
   const navigate = useNavigate()
   const [reason, setReason] = useState('')
   const [letter, setLetter] = useState(job.coverLetter || '')
+  const { user } = useAuth()
   const apply = type === 'apply'
-  const mutation = useMutation({ mutationFn: (payload) => api.updateStatus(payload), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['jobs'] }); queryClient.invalidateQueries({ queryKey: ['job', job.id] }); onClose(); if (!stay) navigate('/jobs') } })
+  const mutation = useMutation({ mutationFn: (payload) => api.updateStatus({ ...payload, userEmail: user?.email }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['jobs'] }); queryClient.invalidateQueries({ queryKey: ['job', job.id] }); queryClient.invalidateQueries({ queryKey: ['job-activity', job.id] }); onClose(); if (!stay) navigate('/jobs') } })
   return <Modal onClose={onClose} wide={apply}><DialogHeader eyebrow={apply ? 'Final review' : 'Archive job'} title={apply ? 'Ready to make your move?' : 'Why isn’t this a fit?'} onClose={onClose} /><div className="mt-7 rounded-2xl bg-[var(--paper)] p-4"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-[var(--muted)]">{job.company}</p><p className="mt-1 text-sm font-semibold">{job.title}</p></div>{apply ? <><div className="mt-6 flex items-center justify-between"><label className="text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Cover letter</label><button onClick={() => navigator.clipboard?.writeText(letter)} className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--muted)]"><Copy size={13} />Copy</button></div><textarea value={letter} onChange={(event) => setLetter(event.target.value)} rows={12} className="mt-2 w-full resize-none rounded-2xl bg-[var(--paper)] p-5 text-sm leading-6 outline-none ring-1 ring-black/5 focus:ring-[var(--lime-dark)]" /></> : <><label className="mt-7 block text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Rejection reason · required</label><textarea autoFocus value={reason} onChange={(event) => setReason(event.target.value)} rows={5} placeholder="e.g. Budget is below our project minimum…" className="mt-2 w-full resize-none rounded-2xl bg-[var(--paper)] p-4 text-sm outline-none ring-1 ring-black/5 focus:ring-[var(--danger)]" /><p className="mt-2 text-[10px] text-[var(--muted)]">This note is stored in the job activity log.</p></>}
     {apply && (job.url || job.applyUrl) && <div className="mt-5 grid gap-2 sm:grid-cols-2">{job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" className="upwork-view-button flex items-center justify-between rounded-2xl px-4 py-3 text-xs font-bold"><span>View job</span><ArrowSquareOut size={17} /></a>}{job.applyUrl && <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" className="upwork-apply-button flex items-center justify-between rounded-2xl px-4 py-3 text-xs font-bold"><span className="relative z-10">Apply on Upwork</span><ArrowSquareOut className="relative z-10" size={17} /></a>}</div>}
     <div className="mt-7 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button onClick={onClose} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)]">Keep reviewing</button><button disabled={mutation.isPending || (!apply && !reason.trim())} onClick={() => mutation.mutate({ id: job.id, status: apply ? 'Applied' : 'Rejected', reason: reason.trim(), coverLetter: apply ? letter : undefined })} className={`${primaryButton} ${apply ? 'bg-[var(--lime)] text-[var(--ink)]' : 'bg-[var(--danger)]'}`}><span>{mutation.isPending ? 'Updating…' : apply ? 'Mark as applied' : 'Reject job'}</span><span className="grid size-8 place-items-center rounded-full bg-black/10">{apply ? <PaperPlaneTilt size={15} /> : <X size={15} />}</span></button></div>
@@ -56,11 +57,13 @@ export function SaveViewDialog({ onSave, onClose }) {
 
 export function StatusConfirmDialog({ job, status, onClose }) {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const accepting = status === 'Applied'
   const mutation = useMutation({
-    mutationFn: () => api.updateStatus({ id: job.id, status }),
+    mutationFn: () => api.updateStatus({ id: job.id, status, userEmail: user?.email }),
     onSuccess: (updatedJob) => {
       queryClient.setQueryData(['job', job.id], updatedJob)
+      queryClient.invalidateQueries({ queryKey: ['job-activity', job.id] })
       queryClient.setQueriesData({ queryKey: ['jobs'] }, (data) => {
         if (Array.isArray(data)) return data.map((item) => item.id === job.id ? { ...item, status } : item)
         if (!data?.pages) return data
