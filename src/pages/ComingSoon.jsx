@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Brain, Cloud, Code, Globe, MagnifyingGlass, Newspaper, ShareNetwork, Sparkle, VideoCamera } from '@phosphor-icons/react'
+import { ArrowRight, Brain, Cloud, Code, EnvelopeSimple, Globe, MagnifyingGlass, Newspaper, ShareNetwork, Sparkle, VideoCamera } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import { primaryButton } from '../components/ui'
 
@@ -19,6 +19,7 @@ export default function ComingSoon({
     wordpress: Globe,
     cloud: Cloud,
     social: ShareNetwork,
+    'email-to-blog': EnvelopeSimple,
   }
   const Icon = icons[type] || Newspaper
 

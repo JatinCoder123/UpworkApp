@@ -244,24 +244,13 @@ export default function DocNotificationToast() {
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-1">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
-                      style={{
-                        backgroundColor: `color-mix(in srgb, ${cfg.color} 18%, transparent)`,
-                        color: cfg.color,
-                      }}
-                    >
-                      {cfg.label}
-                    </span>
-                    <span className="text-[10px] text-[var(--muted)]">{toast.timestamp}</span>
-                  </div>
+                  <span className="text-[10px] font-medium text-[var(--muted)]">{toast.timestamp}</span>
 
                   <button
                     type="button"
                     onClick={() => removeToast(toast.id)}
                     aria-label="Dismiss notification"
-                    className="grid size-6 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]"
+                    className="grid size-6 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)] transition-colors"
                   >
                     <X size={12} weight="bold" />
                   </button>

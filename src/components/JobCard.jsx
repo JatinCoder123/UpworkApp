@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Briefcase, Clock, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Star, Target } from '@phosphor-icons/react'
+import { ArrowUUpLeft, Briefcase, Clock, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Star, Target } from '@phosphor-icons/react'
 import { StatusPill } from './ui'
 import { Chips, Price } from './JobApplySection'
 import ShareJobDialog from './ShareJobDialog'
@@ -62,7 +62,8 @@ export function JobCardAside({ job, score, extra }) {
   </aside>
 }
 
-export default function JobCard({ job, index, now, liked, favorite, onLike, onFavorite, onOpen }) {
+// `onUndo` (Applied and Rejected tabs) adds a button that puts the job back to Seen.
+export default function JobCard({ job, index, now, liked, favorite, onLike, onFavorite, onOpen, onUndo, undoing = false, undoError = '' }) {
   const fit = job.match > 0 ? null : scoreJob(job)
   const score = fit ? fit.score : job.match
   const matchLabel = fit ? fit.verdict : job.fitLabel
@@ -118,6 +119,12 @@ export default function JobCard({ job, index, now, liked, favorite, onLike, onFa
         </div>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/[.07] dark:bg-white/10"><div className="h-full rounded-full" style={{ width: `${score}%`, background: matchTone(score) }} /></div>
         {matchLabel && <p className="mt-2 truncate text-[11px] font-medium text-[var(--muted)]" title={matchLabel}>{matchLabel}</p>}
+      </div>} extra={onUndo && <div>
+        <button type="button" onClick={onUndo} disabled={undoing} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-3 py-1.5 text-[11px] font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)] disabled:opacity-60">
+          {undoing ? <span className="size-3 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" /> : <ArrowUUpLeft size={13} weight="bold" />}
+          {undoing ? 'Undoing…' : job.status === 'Applied' ? 'Undo applied' : 'Undo not a fit'}
+        </button>
+        {undoError && <p role="alert" className="mt-1.5 text-[11px] font-semibold text-[var(--bad)]">{undoError}</p>}
       </div>} />
     </div>
   </article>

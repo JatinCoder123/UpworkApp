@@ -41,11 +41,31 @@ export function saveJobScope(scope) {
 export function loadJobStatus() {
   const status = localStorage.getItem(JOB_STATUS_KEY)
   if (['My Jobs', 'All Jobs', 'Most recent'].includes(status)) return 'All'
-  return ['All', 'New', 'Applied', 'Rejected', 'Favorites', 'Liked'].includes(status) ? status : 'All'
+  // Favorites and Liked are separate toggles now (see loadReactionFilter), so they fall back to New here.
+  if (['Favorites', 'Liked'].includes(status)) return 'New'
+  return ['All', 'New', 'Applied', 'Rejected'].includes(status) ? status : 'All'
 }
 
 export function saveJobStatus(status) {
   localStorage.setItem(JOB_STATUS_KEY, status)
+}
+
+const JOB_REACTION_FILTER_KEY = 'pitchflow-job-reaction-filter'
+
+export const EMPTY_REACTION_FILTER = { favorites: false, liked: false }
+
+// Favorites-only and liked-only toggles that combine with the status tab and every other filter.
+export function loadReactionFilter() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(JOB_REACTION_FILTER_KEY) || 'null')
+    if (saved && typeof saved === 'object') return { favorites: Boolean(saved.favorites), liked: Boolean(saved.liked) }
+  } catch { /* fall through to the older status-tab value */ }
+  const status = localStorage.getItem(JOB_STATUS_KEY)
+  return { favorites: status === 'Favorites', liked: status === 'Liked' }
+}
+
+export function saveReactionFilter(filter) {
+  try { localStorage.setItem(JOB_REACTION_FILTER_KEY, JSON.stringify(filter)) } catch { /* storage unavailable */ }
 }
 
 const JOB_SORT_KEY = 'pitchflow-job-sort'

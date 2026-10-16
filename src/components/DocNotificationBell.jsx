@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bell,
@@ -11,7 +11,6 @@ import {
   X,
   Trash,
   Check,
-  FileDoc,
 } from '@phosphor-icons/react'
 import { useDocNotifications } from '../services/docNotifications'
 import { getDocumentViewUrl } from '../services/api'
@@ -26,51 +25,47 @@ function formatTimeAgo(timestamp) {
   return new Date(timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
-const STATUS_BADGES = {
+const STATUS_THEME = {
   queued: {
-    label: 'Queued',
-    bg: 'bg-[var(--paper)]',
-    text: 'text-[var(--ink)]',
-    border: 'border-[var(--line)]',
     Icon: HourglassMedium,
+    iconColor: 'text-[var(--muted)]',
+    iconBg: 'bg-[var(--paper)]',
+    subtitle: 'Waiting in generation queue...',
     animate: false,
   },
   processing: {
-    label: 'Processing',
-    bg: 'bg-[var(--lime)]/15',
-    text: 'text-[var(--lime-dark)]',
-    border: 'border-[var(--lime-dark)]/30',
     Icon: Sparkle,
+    iconColor: 'text-[var(--lime-dark)]',
+    iconBg: 'bg-[var(--lime)]/15',
+    subtitle: 'Drafting article & synthesizing sources...',
     animate: true,
   },
   compiling: {
-    label: 'Compiling',
-    bg: 'bg-amber-500/15',
-    text: 'text-amber-700 dark:text-amber-400',
-    border: 'border-amber-500/30',
     Icon: Sparkle,
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    iconBg: 'bg-amber-500/15',
+    subtitle: 'Packaging Word document...',
     animate: true,
   },
   completed: {
-    label: 'Completed',
-    bg: 'bg-emerald-500/15',
-    text: 'text-emerald-700 dark:text-emerald-400',
-    border: 'border-emerald-500/30',
     Icon: CheckCircle,
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    iconBg: 'bg-emerald-500/12',
+    subtitle: 'Document is ready to view or download',
     animate: false,
   },
   failed: {
-    label: 'Failed',
-    bg: 'bg-rose-500/15',
-    text: 'text-rose-700 dark:text-rose-400',
-    border: 'border-rose-500/30',
     Icon: WarningCircle,
+    iconColor: 'text-rose-600 dark:text-rose-400',
+    iconBg: 'bg-rose-500/12',
+    subtitle: 'Generation could not be completed',
     animate: false,
   },
 }
 
 export default function DocNotificationBell() {
   const [open, setOpen] = useState(false)
+  const [filterTab, setFilterTab] = useState('all') // 'all' | 'unread'
   const [downloadingId, setDownloadingId] = useState(null)
   const menuRef = useRef(null)
   const navigate = useNavigate()
@@ -136,7 +131,7 @@ export default function DocNotificationBell() {
         return
       }
     } catch (err) {
-      console.warn('Doc download failed, opening in new tab:', err)
+      console.warn('Doc download fallback, opening view URL:', err)
     }
 
     setDownloadingId(null)
@@ -155,23 +150,25 @@ export default function DocNotificationBell() {
     (n) => ['queued', 'processing', 'compiling'].includes(n.status)
   )
 
+  const displayedList = useMemo(() => {
+    if (filterTab === 'unread') {
+      return notifications.filter((n) => !n.read)
+    }
+    return notifications
+  }, [notifications, filterTab])
+
   return (
     <div ref={menuRef} className="relative">
       <button
         type="button"
-        onClick={() => {
-          setOpen((prev) => !prev)
-          if (!open && unreadCount > 0) {
-            // Optional: User clicked to open, keep unread pills or clear on demand
-          }
-        }}
-        aria-label="Document generation notifications"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-label="Document notifications"
         aria-expanded={open}
         className={`${iconButton} relative size-9`}
       >
         <Bell size={17} weight={unreadCount > 0 ? 'fill' : 'light'} />
 
-        {/* Unread badge count or active generating pulse */}
+        {/* Unread badge count or active generation indicator */}
         {unreadCount > 0 ? (
           <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-[var(--lime-dark)] text-[9px] font-black text-white ring-2 ring-[var(--surface)] shadow-xs animate-in zoom-in-50 duration-200">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -188,19 +185,18 @@ export default function DocNotificationBell() {
         <div
           role="region"
           aria-label="Document notifications panel"
-          className="absolute right-0 top-12 z-50 w-[min(92vw,22rem)] sm:w-[24rem] rounded-[1.5rem] bg-black/5 p-1.5 ring-1 ring-black/5 shadow-[0_24px_70px_rgba(30,32,25,.18)] backdrop-blur-xl animate-in fade-in-0 zoom-in-95 duration-150"
+          className="absolute right-0 top-12 z-50 w-[min(94vw,23rem)] sm:w-[25rem] rounded-[1.6rem] bg-black/5 p-1.5 ring-1 ring-black/5 shadow-[0_24px_70px_rgba(30,32,25,.18)] backdrop-blur-xl animate-in fade-in-0 zoom-in-95 duration-150"
         >
-          <div className="flex max-h-[80vh] flex-col rounded-[calc(1.5rem-.375rem)] bg-[var(--surface)] p-3">
+          <div className="flex max-h-[82vh] flex-col rounded-[calc(1.6rem-.375rem)] bg-[var(--surface)] p-3.5">
             {/* Header */}
-            <div className="flex items-center justify-between gap-2 border-b border-[var(--line)]/60 pb-2.5 px-1">
+            <div className="flex items-center justify-between gap-2 border-b border-[var(--line)]/50 pb-3 px-1">
               <div className="flex items-center gap-2">
-                <FileDoc size={18} weight="duotone" className="text-[var(--ink)]" />
-                <h3 className="text-xs font-bold tracking-tight text-[var(--ink)]">
-                  Document Updates
+                <h3 className="text-sm font-semibold tracking-tight text-[var(--ink)]">
+                  Notifications
                 </h3>
                 {unreadCount > 0 && (
-                  <span className="rounded-full bg-[var(--lime)] px-1.5 py-0.5 text-[9px] font-bold text-[#26320b] ring-1 ring-[var(--lime-dark)]/25">
-                    {unreadCount} new
+                  <span className="rounded-full bg-[var(--lime)]/30 px-2 py-0.5 text-[10px] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/25">
+                    {unreadCount}
                   </span>
                 )}
               </div>
@@ -211,18 +207,18 @@ export default function DocNotificationBell() {
                     type="button"
                     onClick={() => markAllAsRead()}
                     title="Mark all as read"
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold text-[var(--muted)] hover:bg-black/[.04] hover:text-[var(--ink)] dark:hover:bg-white/[.04]"
+                    className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] hover:bg-black/[.04] hover:text-[var(--ink)] dark:hover:bg-white/[.05] transition-colors"
                   >
                     <Check size={12} weight="bold" />
-                    <span>Read all</span>
+                    <span>Mark all read</span>
                   </button>
                 )}
                 {notifications.length > 0 && (
                   <button
                     type="button"
                     onClick={() => clearAll()}
-                    title="Clear history"
-                    className="rounded-lg p-1 text-[var(--muted)] hover:bg-black/[.04] hover:text-rose-600 dark:hover:bg-white/[.04]"
+                    title="Clear all notifications"
+                    className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-black/[.04] hover:text-rose-600 dark:hover:bg-white/[.05] transition-colors"
                   >
                     <Trash size={14} />
                   </button>
@@ -230,22 +226,54 @@ export default function DocNotificationBell() {
               </div>
             </div>
 
-            {/* List */}
-            <div className="mt-1 flex-1 overflow-y-auto pr-0.5 divide-y divide-[var(--line)]/40">
-              {notifications.length === 0 ? (
-                <div className="py-10 text-center">
-                  <div className="mx-auto grid size-10 place-items-center rounded-2xl bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)]">
-                    <Bell size={18} weight="light" />
+            {/* Filter Pills (All / Unread) */}
+            {notifications.length > 0 && unreadCount > 0 && (
+              <div className="mt-2.5 flex items-center gap-1.5 px-1">
+                <button
+                  type="button"
+                  onClick={() => setFilterTab('all')}
+                  className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-all ${
+                    filterTab === 'all'
+                      ? 'bg-[var(--ink)] text-white shadow-xs'
+                      : 'text-[var(--muted)] hover:bg-black/[.04] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  All ({notifications.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterTab('unread')}
+                  className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-all ${
+                    filterTab === 'unread'
+                      ? 'bg-[var(--ink)] text-white shadow-xs'
+                      : 'text-[var(--muted)] hover:bg-black/[.04] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  Unread ({unreadCount})
+                </button>
+              </div>
+            )}
+
+            {/* Notification List */}
+            <div className="mt-2 flex-1 overflow-y-auto pr-0.5 space-y-1.5">
+              {displayedList.length === 0 ? (
+                <div className="py-12 text-center">
+                  <div className="mx-auto grid size-11 place-items-center rounded-2xl bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)]/60">
+                    <CheckCircle size={20} weight="light" />
                   </div>
-                  <p className="mt-3 text-xs font-bold text-[var(--ink)]">No notifications yet</p>
-                  <p className="mt-1 px-4 text-[11px] text-[var(--muted)]">
-                    Generate articles in Site Content to view real-time document progress and download links here.
+                  <p className="mt-3 text-xs font-semibold text-[var(--ink)]">
+                    {filterTab === 'unread' ? 'No unread notifications' : "You're all caught up"}
+                  </p>
+                  <p className="mt-1 px-6 text-[11px] text-[var(--muted)] leading-relaxed">
+                    {filterTab === 'unread'
+                      ? 'All current document updates have been marked as read.'
+                      : 'Updates will appear here as documents are generated in Site Content.'}
                   </p>
                 </div>
               ) : (
-                notifications.map((notif) => {
-                  const cfg = STATUS_BADGES[notif.status] || STATUS_BADGES.processing
-                  const IconComponent = cfg.Icon
+                displayedList.map((notif) => {
+                  const theme = STATUS_THEME[notif.status] || STATUS_THEME.processing
+                  const IconComponent = theme.Icon
                   const isCompleted = notif.status === 'completed'
                   const isDownloading = downloadingId === notif.id
 
@@ -253,80 +281,93 @@ export default function DocNotificationBell() {
                     <div
                       key={notif.id}
                       onClick={() => handleOpenItem(notif)}
-                      className={`group relative cursor-pointer px-2 py-3 transition-colors duration-150 hover:bg-black/[.025] dark:hover:bg-white/[.025] rounded-xl ${
-                        !notif.read ? 'bg-[var(--lime)]/5' : ''
+                      className={`group relative cursor-pointer rounded-2xl p-3 transition-all duration-200 border ${
+                        !notif.read
+                          ? 'border-[var(--line)] bg-[var(--paper)]/60 hover:bg-[var(--paper)] shadow-xs'
+                          : 'border-transparent hover:bg-black/[.03] dark:hover:bg-white/[.03]'
                       }`}
                     >
-                      <div className="flex items-start gap-2.5">
+                      <div className="flex items-start gap-3">
+                        {/* Refined status glyph */}
                         <div
-                          className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg border ${cfg.bg} ${cfg.text} ${cfg.border}`}
+                          className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl ${theme.iconBg} ${theme.iconColor}`}
                         >
                           <IconComponent
-                            size={14}
+                            size={16}
                             weight={isCompleted || notif.status === 'failed' ? 'fill' : 'bold'}
-                            className={cfg.animate ? 'animate-spin' : ''}
+                            className={theme.animate ? 'animate-spin' : ''}
                           />
                         </div>
 
                         <div className="min-w-0 flex-1">
+                          {/* Header row: time + unread dot + dismiss */}
                           <div className="flex items-center justify-between gap-1">
-                            <span
-                              className={`rounded-full border px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider ${cfg.bg} ${cfg.text} ${cfg.border}`}
-                            >
-                              {cfg.label}
-                            </span>
-                            <span className="text-[10px] text-[var(--muted)]">
+                            <span className="text-[10px] font-medium text-[var(--muted)]">
                               {formatTimeAgo(notif.timestamp)}
                             </span>
+
+                            <div className="flex items-center gap-1.5">
+                              {!notif.read && (
+                                <span
+                                  className="size-1.5 rounded-full bg-[var(--lime-dark)] ring-1 ring-[var(--surface)]"
+                                  title="Unread"
+                                />
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  removeNotification(notif.id)
+                                }}
+                                title="Dismiss"
+                                className="opacity-0 group-hover:opacity-100 p-0.5 text-[var(--muted)] hover:text-rose-600 transition-opacity"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
                           </div>
 
-                          <h4 className="mt-1 line-clamp-2 text-xs font-semibold text-[var(--ink)] leading-snug">
+                          {/* Document Title (headline) */}
+                          <h4 className="mt-0.5 line-clamp-2 text-xs font-semibold text-[var(--ink)] leading-snug">
                             {notif.title}
                           </h4>
 
-                          {/* Action footer */}
-                          <div className="mt-2 flex items-center gap-2">
-                            {isCompleted && (
+                          {/* Natural human subtitle (NO TAGS) */}
+                          <p className="mt-0.5 text-[11px] text-[var(--muted)] leading-tight">
+                            {notif.message || theme.subtitle}
+                          </p>
+
+                          {/* Action Buttons for ready documents */}
+                          {isCompleted && (
+                            <div className="mt-2.5 flex items-center gap-2">
                               <button
                                 type="button"
                                 disabled={isDownloading}
                                 onClick={(e) => handleDownload(notif, e)}
-                                className="inline-flex items-center gap-1 rounded-md bg-[var(--lime)] px-2 py-1 text-[10px] font-bold text-[#26320b] ring-1 ring-[var(--lime-dark)]/30 hover:bg-[var(--lime)]/90 transition-colors"
+                                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-3 py-1 text-[11px] font-semibold text-white hover:opacity-90 active:scale-95 transition-all shadow-xs"
                               >
                                 {isDownloading ? (
-                                  <Sparkle size={11} className="animate-spin" />
+                                  <Sparkle size={12} className="animate-spin" />
                                 ) : (
-                                  <DownloadSimple size={11} weight="bold" />
+                                  <DownloadSimple size={12} weight="bold" />
                                 )}
                                 <span>{isDownloading ? 'Downloading...' : 'Download .doc'}</span>
                               </button>
-                            )}
 
-                            {notif.viewUrl && (
-                              <a
-                                href={notif.viewUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 rounded-md bg-[var(--paper)] px-2 py-1 text-[10px] font-semibold text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface)] transition-colors"
-                              >
-                                <ArrowSquareOut size={11} />
-                                <span>View</span>
-                              </a>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                removeNotification(notif.id)
-                              }}
-                              title="Dismiss"
-                              className="ml-auto opacity-0 group-hover:opacity-100 p-1 text-[var(--muted)] hover:text-rose-600 transition-opacity"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
+                              {notif.viewUrl && (
+                                <a
+                                  href={notif.viewUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 rounded-full bg-[var(--paper)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink)] ring-1 ring-[var(--line)] hover:bg-[var(--surface)] transition-colors"
+                                >
+                                  <span>View</span>
+                                  <ArrowSquareOut size={11} />
+                                </a>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

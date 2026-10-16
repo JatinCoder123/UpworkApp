@@ -63,6 +63,7 @@ export default function App() {
       <Route path="/wordpress" element={<ProtectedRoute><ComingSoon title="Wordpress" subtitle="publishing incoming." description="The Wordpress workspace is being prepared for publishing and site management workflows." type="wordpress" /></ProtectedRoute>} />
       <Route path="/cloud" element={<ProtectedRoute><ComingSoon title="Cloud" subtitle="infrastructure incoming." description="The Cloud workspace is being prepared for cloud infrastructure, deployments, and server management." type="cloud" /></ProtectedRoute>} />
       <Route path="/social" element={<ProtectedRoute><ComingSoon title="Social" subtitle="connections incoming." description="The Social workspace is being prepared for social media integrations, channels, and community feeds." type="social" /></ProtectedRoute>} />
+      <Route path="/email-to-blog" element={<ProtectedRoute><ComingSoon title="Email to Blog" subtitle="publishing incoming." description="The Email to Blog workspace is being prepared to turn emails into ready-to-publish blog posts." type="email-to-blog" /></ProtectedRoute>} />
       <Route path="/technews" element={<Navigate to="/tech-news" replace />} />
       <Route path="/news" element={<Navigate to="/tech-news" replace />} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

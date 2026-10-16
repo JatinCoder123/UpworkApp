@@ -1,4 +1,5 @@
-import { useSyncExternalStore } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 const SKILL_HUES = [88, 142, 172, 198, 222, 256, 288, 322, 12, 34, 52]
 
@@ -138,6 +139,22 @@ export const previewClick = (onOpen) => (event) => {
   if (!onOpen || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
   event.preventDefault()
   onOpen()
+}
+
+// The open preview lives in the URL (?job=<id>) so a refresh or a shared link reopens it, without leaving the list.
+// Opening from the list pushes a history entry, so Back closes the drawer; switching jobs inside it replaces.
+export function usePreviewParam() {
+  const [params, setParams] = useSearchParams()
+  const previewId = params.get('job')
+  const update = useCallback((id, replace) => setParams((current) => {
+    const next = new URLSearchParams(current)
+    if (id) next.set('job', id)
+    else next.delete('job')
+    return next
+  }, { replace }), [setParams])
+  const openPreview = useCallback((id) => update(id, Boolean(previewId)), [update, previewId])
+  const closePreview = useCallback(() => update(null, true), [update])
+  return { previewId, openPreview, closePreview }
 }
 
 /* Extra list filters and "next similar", applied to jobs already loaded in the browser. */

@@ -31,6 +31,11 @@
   --warn-bg: #f6e8b8;
   --bad: #9c3526;
   --bad-bg: #f5d6cf;
+  /* Rejected / Not a fit: a calm clay tone that sits with the olive palette, unlike the alarm red of --bad. */
+  --reject-bg: #f6eee6;
+  --reject-line: #e6d3c2;
+  --reject-tile: #ecdccd;
+  --reject-text: #8a5636;
 }
 
 :root[data-theme='dark'] {
@@ -60,6 +65,10 @@
   --warn-bg: #383017;
   --bad: #f2a194;
   --bad-bg: #3c201b;
+  --reject-bg: #2a231d;
+  --reject-line: #44372c;
+  --reject-tile: #3a2f25;
+  --reject-text: #e4b892;
 }
 
 /* Height of the sticky Shell header band; page-level sticky bars dock right below it. */
@@ -122,6 +131,10 @@ button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
 .upwork-apply-button:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lime-dark) 60%, transparent), 0 12px 30px color-mix(in srgb, var(--lime-dark) 32%, transparent); }
 .upwork-apply-button:hover::before { translate: 520% 0; }
 .upwork-apply-button:active, .upwork-view-button:active { transform: translateY(0) scale(.98); }
+/* Jobs search box: raised with a lime edge so it reads as the main control, and a lime glow while typing. */
+.job-search { background: var(--raised); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lime-dark) 35%, var(--line)), 0 6px 20px color-mix(in srgb, var(--lime-dark) 10%, transparent); transition: box-shadow 300ms ease; }
+.job-search:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lime-dark) 60%, var(--line)), 0 8px 24px color-mix(in srgb, var(--lime-dark) 14%, transparent); }
+.job-search:focus-within { box-shadow: inset 0 0 0 1.5px var(--lime-dark), 0 0 0 4px color-mix(in srgb, var(--lime) 30%, transparent), 0 10px 28px color-mix(in srgb, var(--lime-dark) 16%, transparent); }
 .job-detail-title { max-width: 52rem; font-size: clamp(1.75rem, 2.9vw, 2.9rem); font-weight: 600; line-height: 1.1; letter-spacing: -.035em; text-wrap: balance; overflow-wrap: anywhere; }
 /* Live Upwork scanner */
 .live-hero { position: relative; isolation: isolate; overflow: hidden; color: #f4f7ea; background: radial-gradient(120% 90% at 85% 10%, #3a5229 0%, transparent 55%), radial-gradient(90% 80% at 0% 100%, #1e2c1c 0%, transparent 60%), #172015; }
@@ -148,6 +161,9 @@ button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
 .skill-chip { --skill-bg: hsl(var(--skill-h) 62% 91%); --skill-fg: hsl(var(--skill-h) 48% 28%); --skill-line: hsl(var(--skill-h) 45% 78%); background: var(--skill-bg); color: var(--skill-fg); box-shadow: inset 0 0 0 1px var(--skill-line); }
 :root[data-theme='dark'] .skill-chip { --skill-bg: hsl(var(--skill-h) 30% 18%); --skill-fg: hsl(var(--skill-h) 70% 80%); --skill-line: hsl(var(--skill-h) 30% 30%); }
 .skill-chip[aria-pressed='true'] { --skill-bg: hsl(var(--skill-h) 55% 40%); --skill-fg: #fff; --skill-line: transparent; }
+/* Needs the same specificity as the dark chip rule above, or a selected chip looks unselected in dark mode.
+   Selected flips to a bright fill with dark text, the reverse of the dim unselected chip. */
+:root[data-theme='dark'] .skill-chip[aria-pressed='true'] { --skill-bg: hsl(var(--skill-h) 62% 66%); --skill-fg: hsl(var(--skill-h) 55% 12%); --skill-line: hsl(var(--skill-h) 70% 78%); }
 .skill-tag { background: var(--paper); color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); transition: background-color 200ms ease, color 200ms ease; }
 .skill-tag:is(button):hover { color: var(--text); }
 .skill-tag[aria-pressed='true'] { background: color-mix(in srgb, var(--lime) 55%, var(--surface)); color: #26320b; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lime-dark) 45%, transparent); }

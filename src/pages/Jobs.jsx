@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import gsap from "gsap";
-import { Briefcase, Broadcast, ClockCounterClockwise, Funnel, GearSix, Heart, MagnifyingGlass, Plus, Star, X } from "@phosphor-icons/react";
+import { Briefcase, Broadcast, Check, ClockCounterClockwise, Funnel, GearSix, Heart, MagnifyingGlass, Plus, Star, X } from "@phosphor-icons/react";
 import Shell from "../components/Shell";
 import JobCard from "../components/JobCard";
 import JobDrawer from "../components/JobDrawer";
@@ -15,9 +15,10 @@ import LiveSearchDialog from "../components/LiveSearchDialog";
 import { ActiveDateFilterChip, RefreshFilterButton } from "../components/FilterToolbarControls";
 import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
-import { EMPTY_EXTRA_FILTERS, JOB_SORTS, loadDateFilter, loadExtraFilters, loadJobScope, loadJobSort, loadJobStatus, saveDateFilter, saveExtraFilters, saveJobScope, saveJobSort, saveJobStatus } from "../lib/preferences";
+import { EMPTY_EXTRA_FILTERS, EMPTY_REACTION_FILTER, JOB_SORTS, loadDateFilter, loadExtraFilters, loadJobScope, loadJobSort, loadJobStatus, loadReactionFilter, saveDateFilter, saveExtraFilters, saveJobScope, saveJobSort, saveJobStatus, saveReactionFilter } from "../lib/preferences";
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from "../lib/dateRange";
-import { clientLocation, countExtraFilters, forgetSearch, loadRecentSearches, matchesExtraFilters, rememberSearch, skillStyle, useJobReactions } from "../lib/jobSignals";
+import { clientLocation, countExtraFilters, forgetSearch, loadRecentSearches, matchesExtraFilters, rememberSearch, skillStyle, useJobReactions, usePreviewParam } from "../lib/jobSignals";
+import { useJobStatus } from "../lib/jobStatus";
 import { timeAgo, useNow } from "../lib/time";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -26,6 +27,7 @@ const pipeline = ["New", "Applied", "Rejected"];
 // "New" covers New and Seen, which the gateway cannot OR together, so only the other tabs filter on the server.
 const serverStatus = (tab) => (tab === "Applied" || tab === "Rejected" ? tab : "");
 const label = "text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]";
+const TOOLBAR_SKILLS = 5;
 
 function useDebounced(value, delay) {
   const [debounced, setDebounced] = useState(value);
@@ -47,10 +49,14 @@ export default function Jobs() {
   const { user } = useAuth();
   const now = useNow();
   const reactions = useJobReactions(user?.email);
+  const jobStatus = useJobStatus();
   const [dateFilter, setDateFilter] = useState(() => loadDateFilter("jobs"));
   const gatewayDateFilter = useMemo(() => toGatewayDateFilter(dateFilter), [dateFilter]);
   const [scope, setScope] = useState(loadJobScope);
   const [tab, setTab] = useState(() => (loadJobStatus() === "Seen" ? "New" : loadJobStatus()));
+  // Independent of the status tab, so e.g. Rejected + Favorites + Liked narrow the list together.
+  const [reactionFilter, setReactionFilter] = useState(loadReactionFilter);
+  const { favorites: favoritesOnly, liked: likedOnly } = reactionFilter;
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounced(searchInput.trim(), 450);
   const [recentSearches, setRecentSearches] = useState(() => loadRecentSearches(user?.email));
@@ -61,7 +67,7 @@ export default function Jobs() {
   const [activeId, setActiveId] = useState(null);
   const [sort, setSort] = useState(loadJobSort);
   const [extraFilters, setExtraFilters] = useState(() => loadExtraFilters("jobs"));
-  const [preview, setPreview] = useState(null);
+  const { previewId, openPreview, closePreview } = usePreviewParam();
   const [searchFocused, setSearchFocused] = useState(false);
   const showAllJobs = scope === "All Jobs";
   const status = serverStatus(tab);
@@ -103,6 +109,7 @@ export default function Jobs() {
 
   useEffect(() => saveDateFilter("jobs", dateFilter), [dateFilter]);
   useEffect(() => saveExtraFilters("jobs", extraFilters), [extraFilters]);
+  useEffect(() => saveReactionFilter(reactionFilter), [reactionFilter]);
   useEffect(() => {
     if (hasMoreSkills && !isFetchingMoreSkills) fetchMoreSkills();
   }, [fetchMoreSkills, hasMoreSkills, isFetchingMoreSkills]);
@@ -110,12 +117,33 @@ export default function Jobs() {
     () => (skillPages?.pages || []).flatMap((page) => page.records).filter((record, index, records) => records.findIndex((item) => item.id === record.id) === index).sort((a, b) => a.name.localeCompare(b.name)),
     [skillPages],
   );
+  // Job counts per skill follow the scope and date window, like the pipeline counts; fetched once every skill page is in.
+  const skillNames = useMemo(() => skillRecords.map((record) => record.name), [skillRecords]);
+  const { data: skillCounts = {}, isFetching: isFetchingSkillCounts, refetch: refetchSkillCounts } = useQuery({
+    queryKey: ["skill-counts", showAllJobs ? "all" : user?.email, gatewayDateFilter, skillNames],
+    queryFn: () => api.getSkillCounts({ skills: skillNames, dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs }),
+    enabled: Boolean(user?.email) && skillNames.length > 0 && !hasMoreSkills,
+    placeholderData: (previous) => previous,
+  });
+  // Most jobs first; ties and not-yet-counted skills stay alphabetical.
+  const rankedSkillRecords = useMemo(
+    () => [...skillRecords].sort((a, b) => (skillCounts[b.name] ?? -1) - (skillCounts[a.name] ?? -1) || a.name.localeCompare(b.name)),
+    [skillRecords, skillCounts],
+  );
+  // The toolbar shows the top skills plus any selected one outside them; the rest sit behind "+N more".
+  const shownSkillRecords = useMemo(
+    () => rankedSkillRecords.filter((record, index) => index < TOOLBAR_SKILLS || skills.includes(record.name)),
+    [rankedSkillRecords, skills],
+  );
+  const hiddenSkillCount = rankedSkillRecords.length - shownSkillRecords.length;
 
   const allDisplayJobs = useMemo(() => {
     const baseJobs = (jobPages?.pages || []).flatMap((page) => page.records).filter((job, index, records) => records.findIndex((item) => item.id === job.id) === index);
     const baseIds = new Set(baseJobs.map((j) => j.id));
     const extraFromReactions = [];
-    const relevantIds = tab === "Favorites" ? reactions.favorites : tab === "Liked" ? reactions.liked : [...reactions.favorites, ...reactions.liked];
+    const relevantIds = favoritesOnly || likedOnly
+      ? [...(favoritesOnly ? reactions.favorites : []), ...(likedOnly ? reactions.liked : [])]
+      : [...reactions.favorites, ...reactions.liked];
     for (const id of relevantIds) {
       if (!baseIds.has(id) && reactions.jobRecords?.[id]) {
         extraFromReactions.push(reactions.jobRecords[id]);
@@ -123,24 +151,34 @@ export default function Jobs() {
       }
     }
     return [...baseJobs, ...extraFromReactions];
-  }, [jobPages, tab, reactions.favorites, reactions.liked, reactions.jobRecords]);
+  }, [jobPages, favoritesOnly, likedOnly, reactions.favorites, reactions.liked, reactions.jobRecords]);
 
-  // Text search runs on the gateway; status "New" (New + Seen) and multi-skill selection are applied to the loaded pages.
+  // A refreshed or shared ?job= link can point at a job outside the loaded pages; fetch that one on its own.
+  const listedPreview = previewId ? allDisplayJobs.find((job) => job.id === previewId) : null;
+  const { data: fetchedPreview, isError: previewMissing } = useQuery({
+    queryKey: ["job", previewId],
+    queryFn: () => api.getJob(previewId),
+    enabled: Boolean(previewId) && !listedPreview,
+    retry: false,
+  });
+  const preview = listedPreview || (fetchedPreview?.id === previewId ? fetchedPreview : null);
+  useEffect(() => { if (previewMissing) closePreview(); }, [previewMissing, closePreview]);
+
+  // Text search runs on the gateway; status "New" (New + Seen), favorites/liked and multi-skill selection are applied to the loaded pages.
+  // Every active filter must match, so they all combine.
   const filtered = useMemo(
     () => allDisplayJobs.filter((job) => {
-      if (tab === "Favorites") {
-        if (!reactions.favorites.includes(job.id)) return false;
-      } else if (tab === "Liked") {
-        if (!reactions.liked.includes(job.id)) return false;
-      } else if (tab === "New") {
+      if (tab === "New") {
         if (!["New", "Seen"].includes(job.status)) return false;
       } else if (tab !== "All") {
         if (job.status !== tab) return false;
       }
+      if (favoritesOnly && !reactions.favorites.includes(job.id)) return false;
+      if (likedOnly && !reactions.liked.includes(job.id)) return false;
       return matchesExtraFilters(job, extraFilters) &&
         (!skills.length || skills.some((skill) => (job.skills || []).some((jobSkill) => jobSkill.toLowerCase() === skill.toLowerCase()) || `${job.title} ${job.description}`.toLowerCase().includes(skill.toLowerCase())));
     }),
-    [allDisplayJobs, tab, skills, extraFilters, reactions.favorites, reactions.liked],
+    [allDisplayJobs, tab, favoritesOnly, likedOnly, skills, extraFilters, reactions.favorites, reactions.liked],
   );
 
   useEffect(() => {
@@ -166,7 +204,7 @@ export default function Jobs() {
     if (isLoading || !root.current) return undefined;
     const ctx = gsap.context(() => gsap.fromTo("[data-card]", { y: 24, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.6, stagger: 0.05, ease: "power3.out", clearProps: "transform" }), root);
     return () => ctx.revert();
-  }, [scope, tab, search, skills, dateFilter, sort, extraFilters, isLoading]);
+  }, [scope, tab, reactionFilter, search, skills, dateFilter, sort, extraFilters, isLoading]);
 
   // Searches are saved to history on Enter, on picking a past search, or when leaving the box with a term in it.
   const commitSearch = (value = searchInput) => setRecentSearches(rememberSearch(user?.email, value));
@@ -175,11 +213,14 @@ export default function Jobs() {
   const searchHistory = recentSearches.filter((term) => !historyTerm || (term.toLowerCase().includes(historyTerm) && term.toLowerCase() !== historyTerm));
   const changeSort = (value) => { setSort(value); saveJobSort(value); };
   const toggleSkill = (skill) => setSkills((current) => (current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill]));
-  const changeTab = (item) => { const next = tab === item ? (item === "Favorites" || item === "Liked" ? "New" : "All") : item; setTab(next); saveJobStatus(next); };
+  const changeTab = (item) => { const next = tab === item ? "All" : item; setTab(next); saveJobStatus(next); };
+  const toggleReactionFilter = (key) => setReactionFilter((current) => ({ ...current, [key]: !current[key] }));
+  const noFavoritesYet = favoritesOnly && !reactions.favorites.length;
+  const noLikedYet = likedOnly && !reactions.liked.length;
   const jumpTo = (id) => document.getElementById(`job-${id}`)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   // The funnel dialog holds skills, job type and client location, so its badge counts all three.
   const filterCount = skills.length + countExtraFilters(extraFilters);
-  const hasFilters = skills.length > 0 || dateFilter.preset !== "all" || searchInput || countExtraFilters(extraFilters) > 0 || tab === "Favorites" || tab === "Liked";
+  const hasFilters = skills.length > 0 || dateFilter.preset !== "all" || searchInput || countExtraFilters(extraFilters) > 0 || favoritesOnly || likedOnly;
   const searching = isFetching && !isFetchingNextPage && searchInput.trim() === search;
 
   return (
@@ -201,8 +242,8 @@ export default function Jobs() {
                 </div>
               </HScroll>
               <div className="flex flex-1 items-center gap-2">
-                <form onSubmit={(event) => { event.preventDefault(); commitSearch(); setSearchFocused(false); }} className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-4 py-2.5 ring-1 ring-transparent transition-shadow focus-within:ring-[var(--lime-dark)]">
-                  {searching ? <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" /> : <MagnifyingGlass size={15} className="shrink-0 text-[var(--muted)]" />}
+                <form onSubmit={(event) => { event.preventDefault(); commitSearch(); setSearchFocused(false); }} className="job-search relative flex min-w-0 flex-1 items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-4">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--lime)]/40 text-[var(--accent-strong)] dark:bg-[var(--lime)]/15">{searching ? <span className="size-3.5 animate-spin rounded-full border-2 border-[var(--lime-dark)]/25 border-t-[var(--lime-dark)]" /> : <MagnifyingGlass size={14} weight="bold" />}</span>
                   <input value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setSearchFocused(true); }} onFocus={() => setSearchFocused(true)} onBlur={() => { setSearchFocused(false); if (searchInput.trim()) commitSearch(); }} onKeyDown={(event) => event.key === "Escape" && setSearchFocused(false)} placeholder="Search title, description, skills…" aria-label="Search jobs" aria-expanded={searchFocused && searchHistory.length > 0} aria-controls="job-search-history" autoComplete="off" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
                   {searchInput && <button type="button" onClick={() => setSearchInput("")} aria-label="Clear search" className="grid size-5 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] hover:bg-black/15 dark:bg-white/10"><X size={11} weight="bold" /></button>}
                   {searchFocused && searchHistory.length > 0 && <div id="job-search-history" onMouseDown={(event) => event.preventDefault()} className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5">
@@ -221,45 +262,53 @@ export default function Jobs() {
                   <Funnel size={16} weight={filterCount ? "fill" : "regular"} />
                   {filterCount > 0 && <span className="absolute -right-1 -top-1 grid size-4.5 place-items-center rounded-full bg-[var(--ink)] text-[9px] font-bold text-white">{filterCount}</span>}
                 </button>
-                <RefreshFilterButton onClick={() => { refetch(); refetchStats(); }} loading={isFetching || isFetchingStats} label="Refresh jobs" />
+                <RefreshFilterButton onClick={() => { refetch(); refetchStats(); refetchSkillCounts(); }} loading={isFetching || isFetchingStats || isFetchingSkillCounts} label="Refresh jobs" />
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
               <span className={`${label} shrink-0`}>Skills</span>
-              <HScroll className="min-w-0 max-w-[24rem] flex-[1_1_18rem]" innerClassName="gap-1.5" label="skills">
-                {skillRecords.map(({ id, name }) => <button key={id} type="button" onClick={() => toggleSkill(name)} aria-pressed={skills.includes(name)} style={skillStyle(name)} className="skill-chip shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-transform duration-300 hover:-translate-y-0.5">{name}</button>)}
+              <HScroll className="min-w-0 max-w-full" innerClassName="gap-1.5" label="skills">
+                {shownSkillRecords.map(({ id, name }) => {
+                  const selected = skills.includes(name);
+                  const count = skillCounts[name];
+                  return <button key={id} type="button" onClick={() => toggleSkill(name)} aria-pressed={selected} style={skillStyle(name)} className="skill-chip inline-flex shrink-0 items-center gap-1 rounded-full py-1.5 pl-3 pr-1.5 text-[11px] font-semibold transition-transform duration-300 hover:-translate-y-0.5">
+                    {selected && <Check size={11} weight="bold" />}{name}
+                    <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[9px] tabular-nums ${selected ? "bg-white/20 dark:bg-black/15" : "bg-black/5 dark:bg-white/10"}`}>{count == null ? "…" : count}</span>
+                  </button>;
+                })}
+                {hiddenSkillCount > 0 && <button type="button" onClick={() => setSkillDialog(true)} title="Show all skills" className="shrink-0 rounded-full bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)] transition-colors hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]">+{hiddenSkillCount} more</button>}
                 {skillsLoading && <span className="skeleton-bone h-7 w-40 shrink-0 rounded-full" />}
               </HScroll>
               <button type="button" onClick={() => setSkillDialog(true)} aria-label="Skill settings" title="Skill settings" className="grid size-8 shrink-0 place-items-center rounded-full text-[var(--muted)] ring-1 ring-[var(--line)] transition-all duration-300 hover:rotate-45 hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]"><GearSix size={16} weight="bold" /></button>
               <div className="ml-auto flex shrink-0 items-center gap-2">
                 <button
                   type="button"
-                  aria-pressed={tab === "Favorites"}
-                  onClick={() => changeTab("Favorites")}
+                  aria-pressed={favoritesOnly}
+                  onClick={() => toggleReactionFilter("favorites")}
                   title={reactions.favorites.length > 0 ? `Favorites (${reactions.favorites.length})` : "Favorites"}
                   aria-label="Favorites"
                   className={`grid size-8 shrink-0 place-items-center rounded-full transition-all duration-300 hover:-translate-y-0.5 ${
-                    tab === "Favorites"
+                    favoritesOnly
                       ? "bg-[#fef9c3] text-[#b45309] ring-1 ring-[#fde047] shadow-sm dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/40"
                       : "bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)] hover:bg-[#fef9c3]/60 hover:text-[#b45309] hover:ring-[#fde047]/70"
                   }`}
                 >
-                  <Star size={16} weight={tab === "Favorites" || reactions.favorites.length > 0 ? "fill" : "regular"} className={tab === "Favorites" ? "text-[#d97706] dark:text-[#fde047]" : reactions.favorites.length > 0 ? "text-[#f59e0b] dark:text-[#fde047]" : "currentColor"} />
+                  <Star size={16} weight={favoritesOnly || reactions.favorites.length > 0 ? "fill" : "regular"} className={favoritesOnly ? "text-[#d97706] dark:text-[#fde047]" : reactions.favorites.length > 0 ? "text-[#f59e0b] dark:text-[#fde047]" : "currentColor"} />
                 </button>
                 <button
                   type="button"
-                  aria-pressed={tab === "Liked"}
-                  onClick={() => changeTab("Liked")}
+                  aria-pressed={likedOnly}
+                  onClick={() => toggleReactionFilter("liked")}
                   title={reactions.liked.length > 0 ? `Liked jobs (${reactions.liked.length})` : "Liked jobs"}
                   aria-label="Liked jobs"
                   className={`grid size-8 shrink-0 place-items-center rounded-full transition-all duration-300 hover:-translate-y-0.5 ${
-                    tab === "Liked"
+                    likedOnly
                       ? "bg-[#ffe4e6] text-[#e11d48] ring-1 ring-[#fecdd3] shadow-sm dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/40"
                       : "bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)] hover:bg-[#ffe4e6]/60 hover:text-[#e11d48] hover:ring-[#fecdd3]/70"
                   }`}
                 >
-                  <Heart size={16} weight={tab === "Liked" || reactions.liked.length > 0 ? "fill" : "regular"} className={tab === "Liked" ? "text-[#e11d48] dark:text-[#fda4af]" : reactions.liked.length > 0 ? "text-[#fb7185] dark:text-[#fda4af]" : "currentColor"} />
+                  <Heart size={16} weight={likedOnly || reactions.liked.length > 0 ? "fill" : "regular"} className={likedOnly ? "text-[#e11d48] dark:text-[#fda4af]" : reactions.liked.length > 0 ? "text-[#fb7185] dark:text-[#fda4af]" : "currentColor"} />
                 </button>
                 <button type="button" onClick={() => setLiveSearching(true)} className="inline-flex items-center gap-2 rounded-full bg-[var(--lime)]/30 py-2 pl-3 pr-4 text-xs font-bold text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/35 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--lime)]/55">
                   <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--lime-dark)] opacity-70" /><span className="relative inline-flex size-2 rounded-full bg-[var(--lime-dark)]" /></span>
@@ -270,12 +319,12 @@ export default function Jobs() {
             </div>
 
             {hasFilters && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
-              {tab === "Favorites" && <FilterChip onClear={() => changeTab("New")}>Favorites only</FilterChip>}
-              {tab === "Liked" && <FilterChip onClear={() => changeTab("New")}>Liked only</FilterChip>}
+              {favoritesOnly && <FilterChip onClear={() => toggleReactionFilter("favorites")}>Favorites only</FilterChip>}
+              {likedOnly && <FilterChip onClear={() => toggleReactionFilter("liked")}>Liked only</FilterChip>}
               {extraFilters.jobType !== "any" && <FilterChip onClear={() => setExtraFilters({ ...extraFilters, jobType: "any" })}>{extraFilters.jobType === "hourly" ? "Hourly jobs" : "Fixed-price jobs"}</FilterChip>}
               {extraFilters.location !== "any" && <FilterChip onClear={() => setExtraFilters({ ...extraFilters, location: "any" })}>{`${clientLocation(extraFilters.location).label} clients`}</FilterChip>}
               <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} />
-              <button type="button" onClick={() => { setSkills([]); setSearchInput(""); setDateFilter(EMPTY_DATE_RANGE); setExtraFilters(EMPTY_EXTRA_FILTERS); if (tab === "Favorites" || tab === "Liked") changeTab("New"); }} className="text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear all</button>
+              <button type="button" onClick={() => { setSkills([]); setSearchInput(""); setDateFilter(EMPTY_DATE_RANGE); setExtraFilters(EMPTY_EXTRA_FILTERS); setReactionFilter(EMPTY_REACTION_FILTER); }} className="text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear all</button>
             </div>}
           </div>
         </section>
@@ -291,7 +340,7 @@ export default function Jobs() {
               : filtered.length ? <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
                 <nav aria-label="Jump to job" className="hidden lg:block">
                   <div className="sticky top-[calc(var(--shell-h)+1rem)] max-h-[calc(100dvh-var(--shell-h)-2rem)] overflow-y-auto overscroll-contain rounded-[1.5rem] bg-[var(--surface)] p-3 ring-1 ring-[var(--line)]/70 [scrollbar-width:thin]">
-                    {tab === "Favorites" ? (
+                    {favoritesOnly && !likedOnly ? (
                       <div className="mb-2 flex items-center justify-between border-b border-[var(--line)]/70 px-2 pb-2">
                         <p className={`${label} flex items-center gap-1.5 text-[#b45309] dark:text-[#fde047]`}>
                           <Star size={12} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" />
@@ -301,7 +350,7 @@ export default function Jobs() {
                           {search ? `${filtered.length} matched` : `${filtered.length} ${filtered.length === 1 ? "job" : "jobs"}`}
                         </span>
                       </div>
-                    ) : tab === "Liked" ? (
+                    ) : likedOnly && !favoritesOnly ? (
                       <div className="mb-2 flex items-center justify-between border-b border-[var(--line)]/70 px-2 pb-2">
                         <p className={`${label} flex items-center gap-1.5 text-[#be123c] dark:text-[#fda4af]`}>
                           <Heart size={12} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" />
@@ -333,7 +382,10 @@ export default function Jobs() {
                   </div>
                 </nav>
                 <div className="min-w-0">
-                  <section className="space-y-4">{filtered.map((job, index) => <JobCard key={job.id} job={job} index={index} now={now} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} onOpen={() => setPreview(job)} />)}</section>
+                  <section className="space-y-4">{filtered.map((job, index) => <JobCard key={job.id} job={job} index={index} now={now} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} onOpen={() => openPreview(job.id)}
+                    onUndo={(tab === "Applied" || tab === "Rejected") && job.status === tab ? () => jobStatus.undo(job) : undefined}
+                    undoing={jobStatus.pendingId === job.id}
+                    undoError={jobStatus.errorId === job.id ? jobStatus.error?.message || "Could not undo. Try again." : ""} />)}</section>
                   <div ref={loadMoreRef} className="flex min-h-24 items-center justify-center py-8" aria-live="polite">
                     {isFetchingNextPage ? <div className="flex items-center gap-3 text-xs font-semibold text-[var(--muted)]"><span className="size-4 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />Loading more jobs</div>
                       : <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--muted)]">{hasNextPage ? "Scroll for more jobs" : "All jobs loaded"}</span>}
@@ -343,32 +395,34 @@ export default function Jobs() {
                 : <section ref={loadMoreRef} className="py-24 text-center">
                   <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--ink)]/5">
                     {isFetchingNextPage || isFetching ? <span className="size-5 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />
-                      : tab === "Favorites" ? <Star size={24} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" />
-                      : tab === "Liked" ? <Heart size={24} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" />
+                      : favoritesOnly ? <Star size={24} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" />
+                      : likedOnly ? <Heart size={24} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" />
                       : <Briefcase size={22} />}
                   </div>
                   <h3 className="mt-5 text-xl font-semibold">
-                    {tab === "Favorites" ? "No favorite jobs yet"
-                      : tab === "Liked" ? "No liked jobs yet"
+                    {noFavoritesYet ? "No favorite jobs yet"
+                      : noLikedYet ? "No liked jobs yet"
+                      : favoritesOnly || likedOnly ? "No saved jobs match these filters"
                       : hasNextPage || isFetching ? "Looking for matching jobs"
                       : "No matching jobs"}
                   </h3>
                   <p className="mt-2 text-sm text-[var(--muted)]">
-                    {tab === "Favorites" ? "Click the star icon on any job card to save it here for fast review."
-                      : tab === "Liked" ? "Click the heart icon on any job card to save it to your liked jobs list."
+                    {noFavoritesYet ? "Click the star icon on any job card to save it here for fast review."
+                      : noLikedYet ? "Click the heart icon on any job card to save it to your liked jobs list."
+                      : favoritesOnly || likedOnly ? "Try another status tab, skill or time window, or turn off Favorites or Liked."
                       : hasNextPage ? "Loading more results from the next page."
                       : search ? `Nothing matches “${search}”. Try another word.`
                       : "Try another skill, time window, or search term."}
                   </p>
-                  {(tab === "Favorites" || tab === "Liked") && (
-                    <button type="button" onClick={() => changeTab("New")} className={`${primaryButton} mt-5`}>
+                  {(favoritesOnly || likedOnly) && (
+                    <button type="button" onClick={() => setReactionFilter(EMPTY_REACTION_FILTER)} className={`${primaryButton} mt-5`}>
                       Browse all jobs
                     </button>
                   )}
                 </section>}
         </div>
 
-        {preview && <JobDrawer job={preview} jobs={filtered} onSelect={setPreview} onClose={() => setPreview(null)} />}
+        {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={jobStatus.markApplied} undoTab={tab === "Applied" || tab === "Rejected" ? tab : null} applyError={jobStatus.errorId === preview.id ? `Could not mark this job as applied: ${jobStatus.error?.message || "please try again."}` : ""} />}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}
         {skillDialog && <OpportunityFilterDialog skills={skills} extraFilters={extraFilters} skillRecords={skillRecords} isLoading={skillsLoading || isFetchingMoreSkills} error={skillsError ? skillsQueryError : null} onClose={() => setSkillDialog(false)} onApply={({ skills: nextSkills, extraFilters: nextFilters }) => { setSkills(nextSkills); setExtraFilters(nextFilters); setSkillDialog(false); }} onRemove={({ skills: nextSkills, extraFilters: nextFilters }) => { setSkills(nextSkills); setExtraFilters(nextFilters); }} />}

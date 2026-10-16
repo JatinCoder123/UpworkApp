@@ -1,4 +1,4 @@
-import { ArrowSquareOut, Check, Eye, Heart, LinkSimple, MicrosoftTeamsLogo, PaperPlaneTilt, Star, UsersThree, X } from '@phosphor-icons/react'
+import { ArrowSquareOut, ArrowUUpLeft, Check, Eye, Heart, LinkSimple, MicrosoftTeamsLogo, PaperPlaneTilt, Star, UsersThree, WarningCircle, X } from '@phosphor-icons/react'
 import { useCopied } from './JobDetailParts'
 import { jobShareLink } from '../lib/jobSignals'
 
@@ -21,29 +21,49 @@ export function Chips({ job }) {
 
 const squareButton = (active, activeStyle) => `grid h-11 min-w-11 place-items-center rounded-2xl ring-1 transition-all duration-300 active:scale-90 ${active ? (activeStyle || 'bg-[var(--ink)] text-white ring-[var(--ink)]') : 'bg-[var(--raised)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`
 
-/** Price, apply, status and sharing controls for the job detail page and preview drawer. */
-export default function JobApplySection({ job, statusLabel, applied, dismissed, onApplied, onDismiss, liked, favorite, onLike, onFavorite, onShare }) {
+/**
+ * Price, apply, status and sharing controls for the job detail page and preview drawer.
+ * `showApply` is off in the drawer, whose header already carries Apply on Upwork.
+ */
+// `onApplied` runs when Apply on Upwork is clicked; the separate Applied button is commented out below.
+// `resolved` ('applied' | 'rejected') swaps Not a fit for that status and an Undo button wired to `onUndo`.
+export default function JobApplySection({ job, statusLabel, dismissed, onApplied, onDismiss, liked, favorite, onLike, onFavorite, onShare, showApply = true, statusError, resolved = null, onUndo, undoing = false }) {
   const [copied, copy] = useCopied()
   const segment = (active, tone) => `flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 text-xs font-semibold transition-colors ${active ? tone : 'text-[var(--muted)] hover:text-[var(--ink)]'}`
 
   return <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
+    {showApply && <div className="mb-5 flex gap-2">
+      {job.applyUrl
+        ? <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={onApplied} className="upwork-apply-button flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl text-sm font-bold"><span className="relative z-10 truncate">Apply on Upwork</span><ArrowSquareOut size={15} weight="bold" className="relative z-10 shrink-0" /></a>
+        : <span className="flex h-11 flex-1 items-center justify-center rounded-2xl bg-[var(--frame)] text-xs font-semibold text-[var(--muted)]">No Upwork link</span>}
+      {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="View job on Upwork" title="View job on Upwork" className={squareButton(false)}><Eye size={17} weight="bold" /></a>}
+    </div>}
+
     <div className="flex items-start justify-between gap-3">
       <Price job={job} />
       {statusLabel && <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--frame)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.14em] text-[var(--muted)]"><span className="size-1.5 rounded-full bg-current" />{statusLabel}</span>}
     </div>
     <div className="mt-3"><Chips job={job} /></div>
 
-    <div className="mt-5 flex gap-2">
-      {job.applyUrl
-        ? <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" className="upwork-apply-button flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl text-sm font-bold"><span className="relative z-10 truncate">Apply on Upwork</span><ArrowSquareOut size={15} weight="bold" className="relative z-10 shrink-0" /></a>
-        : <span className="flex h-11 flex-1 items-center justify-center rounded-2xl bg-[var(--frame)] text-xs font-semibold text-[var(--muted)]">No Upwork link</span>}
-      {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="View job on Upwork" title="View job on Upwork" className={squareButton(false)}><Eye size={17} weight="bold" /></a>}
-    </div>
-
-    <div className="mt-2 flex h-11 gap-1 rounded-2xl bg-[var(--raised)] p-1 ring-1 ring-[var(--line)]">
-      <button type="button" onClick={onApplied} aria-pressed={applied} className={segment(applied, 'bg-[var(--lime)]/45 text-[#26320b]')}><PaperPlaneTilt size={14} weight={applied ? 'fill' : 'regular'} />Applied</button>
-      <button type="button" onClick={onDismiss} aria-pressed={dismissed} className={segment(dismissed, 'bg-[var(--bad-bg)] text-[var(--bad)]')}><X size={14} />Not a fit</button>
-    </div>
+    {resolved && onUndo
+      ? <div className={`mt-5 flex items-center gap-3 rounded-2xl p-2.5 ring-1 ${resolved === 'applied' ? 'bg-[var(--lime)]/20 text-[var(--accent-strong)] ring-[var(--lime-dark)]/25 dark:bg-[var(--lime)]/10' : 'bg-[var(--reject-bg)] text-[var(--reject-text)] ring-[var(--reject-line)]'}`}>
+        <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${resolved === 'applied' ? 'bg-[var(--lime)] text-[#26320b]' : 'bg-[var(--reject-tile)]'}`}>{resolved === 'applied' ? <PaperPlaneTilt size={15} weight="fill" /> : <X size={15} weight="bold" />}</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold leading-4">{resolved === 'applied' ? 'Applied' : 'Not a fit'}</p>
+          <p className="mt-0.5 truncate text-[11px] leading-4 opacity-75">{resolved === 'applied' ? 'In your Applied list' : 'In your Rejected list'}</p>
+        </div>
+        <button type="button" onClick={onUndo} disabled={undoing} title="Move this job back to New" className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--surface)]/70 px-3 text-[11px] font-bold ring-1 transition-colors hover:bg-[var(--surface)] disabled:opacity-60 ${resolved === 'applied' ? 'ring-[var(--lime-dark)]/30' : 'ring-[var(--reject-line)]'}`}>
+          {undoing ? <span className="size-3 animate-spin rounded-full border-2 border-[var(--line)] border-t-current" /> : <ArrowUUpLeft size={13} weight="bold" />}
+          {undoing ? 'Undoing…' : 'Undo'}
+        </button>
+      </div>
+      : <div className="mt-5 flex h-11 gap-1 rounded-2xl bg-[var(--raised)] p-1 ring-1 ring-[var(--line)]">
+        {/* Applied button disabled: clicking Apply on Upwork now marks the job as applied.
+        <button type="button" onClick={onApplied} aria-pressed={applied} className={segment(applied, 'bg-[var(--lime)]/45 text-[#26320b]')}><PaperPlaneTilt size={14} weight={applied ? 'fill' : 'regular'} />Applied</button>
+        */}
+        <button type="button" onClick={onDismiss} aria-pressed={dismissed} className={segment(dismissed, 'bg-[var(--reject-bg)] text-[var(--reject-text)] ring-1 ring-[var(--reject-line)]')}><X size={14} />Not a fit</button>
+      </div>}
+    {statusError && <p role="alert" className="mt-2 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{statusError}</p>}
 
     <div className="mt-2 grid grid-cols-5 gap-2">
       <button
