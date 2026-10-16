@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { ArrowClockwise, Briefcase, Check, Clock, Copy, CurrencyDollar, FileText, FloppyDisk, Hourglass, Lightbulb, MagicWand, PencilSimple, SealCheck, Sparkle, Star, Target, User, Users, WarningCircle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, Briefcase, Check, Clock, Copy, CurrencyDollar, FilePdf, FileText, FloppyDisk, Hourglass, Lightbulb, MagicWand, PencilSimple, SealCheck, Sparkle, Star, Target, User, Users, WarningCircle, X } from '@phosphor-icons/react'
 import ExpandableText from './ExpandableText'
 import { api } from '../services/api'
+import { downloadCoverLetterPdf } from '../lib/coverLetterPdf'
 
 // Building blocks shared by the CRM job detail and the live Upwork job detail.
 export const card = 'rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 sm:p-7'
@@ -114,12 +115,14 @@ export function CoverLetter({ job, onLetter }) {
   const fetchLetter = useMutation({ mutationFn: () => api.getCoverLetter(job), onSuccess: onLetter })
   const save = useMutation({ mutationFn: (letter) => api.saveCoverLetter(job, letter), onSuccess: (letter) => { onLetter(letter); setDraft(null) } })
   const aiEdit = useMutation({ mutationFn: (prompt) => api.editCoverLetter(job, current, prompt), onSuccess: (letter, prompt) => setSuggestion({ letter, prompt }) })
+  const pdf = useMutation({ mutationFn: () => downloadCoverLetterPdf(current, job.title) })
   const runAi = (prompt) => { const value = prompt.trim(); if (value && current.trim() && !aiEdit.isPending) aiEdit.mutate(value) }
   const accept = () => { setDraft(suggestion.letter); setSuggestion(null); setInstruction('') }
   const pill = 'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[var(--line)] transition-colors disabled:pointer-events-none disabled:opacity-45'
 
   const action = <div className="flex flex-wrap justify-end gap-2">
     {current && <button type="button" onClick={() => copy('letter', current)} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>{copied === 'letter' ? <Check size={13} weight="bold" /> : <Copy size={13} />}{copied === 'letter' ? 'Copied' : 'Copy'}</button>}
+    {current.trim() && <button type="button" disabled={pdf.isPending} onClick={() => pdf.mutate()} title={pdf.isError ? pdf.error?.message : 'Download as PDF'} className={`${pill} ${pdf.isError ? 'text-[var(--bad)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{pdf.isPending ? <span className="size-3 animate-spin rounded-full border-2 border-current/30 border-t-current" /> : <FilePdf size={13} />}{pdf.isPending ? 'Generating…' : pdf.isError ? 'Retry PDF' : 'PDF'}</button>}
     {job.coverLetter && !editing && <button type="button" onClick={() => setDraft(job.coverLetter)} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}><PencilSimple size={13} />Edit</button>}
   </div>
 
