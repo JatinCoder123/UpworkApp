@@ -4,6 +4,7 @@ import { JobCardActions, JobCardAside } from './JobCard'
 import { previewClick } from '../lib/jobSignals'
 import { timeAgo } from '../lib/time'
 import { competition, isEarlyBird, minutesSince } from '../lib/liveJobs'
+import { asArray, asObject, asText } from '../lib/safe'
 
 // The left edge fades from lime to amber as a job ages across the scan window.
 export function freshnessTone(minutes, windowMinutes) {
@@ -30,10 +31,10 @@ function Fact({ icon: Icon, children }) {
 export default function LiveJobCard({ job, index, now, windowMinutes, justIn, liked, favorite, onLike, onFavorite, applied, dismissed, onOpen }) {
   const minutes = minutesSince(job.postedAt, now)
   const tone = freshnessTone(minutes, windowMinutes)
-  const matched = new Set(job.matchedSkills.map((skill) => skill.toLowerCase()))
-  const skills = [...job.skills].sort((a, b) => matched.has(b.toLowerCase()) - matched.has(a.toLowerCase()))
+  const matched = new Set(asArray(job.matchedSkills).map((skill) => asText(skill).toLowerCase()))
+  const skills = [...asArray(job.skills)].sort((a, b) => matched.has(asText(b).toLowerCase()) - matched.has(asText(a).toLowerCase()))
   const visibleSkills = skills.slice(0, 6)
-  const client = job.clientStats
+  const client = asObject(job.clientStats), tags = asArray(job.tags)
   const earlyBird = isEarlyBird(job, now)
 
   return <article id={`live-${job.id}`} data-card data-job-id={job.id} style={{ '--fresh': tone }} className={`live-card group scroll-mt-[calc(var(--shell-h)+1rem)] rounded-[1.6rem] bg-[var(--frame)] p-1 ring-1 ring-[var(--line)]/60 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(30,40,25,.1)] ${justIn ? 'live-just-in' : ''}`}>
@@ -58,7 +59,7 @@ export default function LiveJobCard({ job, index, now, windowMinutes, justIn, li
           {earlyBird && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-bg)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-[var(--warn)]"><Lightning size={11} weight="fill" />Early bird</span>}
           {job.renewedAt && <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-[var(--muted)]">Renewed</span>}
           <time dateTime={job.postedAt} className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: tone }}><Clock size={12} weight="bold" />{timeAgo(job.postedAt, now)}</time>
-          {job.tags[1] && <span className="truncate text-[11px] font-medium text-[var(--muted)]">{job.tags[1]}</span>}
+          {tags[1] && <span className="truncate text-[11px] font-medium text-[var(--muted)]">{tags[1]}</span>}
         </div>
         <h3 className="mt-3 text-lg font-semibold leading-snug tracking-[-.025em] transition-colors duration-300 group-hover:text-[var(--accent-strong)] sm:text-[1.2rem]">{job.title}</h3>
         <p className="mt-2 line-clamp-2 max-w-3xl text-[13px] leading-6 text-[var(--muted)]">{job.description}</p>
@@ -69,7 +70,7 @@ export default function LiveJobCard({ job, index, now, windowMinutes, justIn, li
           <Fact icon={Hourglass}>{job.workload}</Fact>
         </div>
         <div className="mt-4 flex flex-wrap gap-1.5">
-          {visibleSkills.map((skill) => <span key={skill} aria-pressed={matched.has(skill.toLowerCase())} title={matched.has(skill.toLowerCase()) ? 'Matched your search' : undefined} className="skill-tag max-w-44 truncate rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}
+          {visibleSkills.map((skill) => <span key={skill} aria-pressed={matched.has(asText(skill).toLowerCase())} title={matched.has(asText(skill).toLowerCase()) ? 'Matched your search' : undefined} className="skill-tag max-w-44 truncate rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}
           {skills.length > visibleSkills.length && <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)]">+{skills.length - visibleSkills.length}</span>}
         </div>
         <div className="mt-4 max-w-md"><CompetitionMeter applicants={job.applicants} /></div>

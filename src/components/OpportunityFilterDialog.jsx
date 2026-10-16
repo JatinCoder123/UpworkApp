@@ -6,9 +6,10 @@ import { ExtraFilterFields } from './JobListControls'
 import { api } from '../services/api'
 import { EMPTY_EXTRA_FILTERS } from '../lib/preferences'
 import { countExtraFilters } from '../lib/jobSignals'
+import { asArray, asText } from '../lib/safe'
 
 // Skills plus job type and client location; everything applies together on "Apply filters".
-export default function OpportunityFilterDialog({ skills, extraFilters = EMPTY_EXTRA_FILTERS, skillRecords = [], isLoading, error, onApply, onRemove, onClose }) {
+export default function OpportunityFilterDialog({ skills = [], extraFilters = EMPTY_EXTRA_FILTERS, skillRecords = [], isLoading, error, onApply, onRemove, onClose }) {
   const queryClient = useQueryClient()
   const [selectedSkills, setSelectedSkills] = useState(skills)
   const [filters, setFilters] = useState(extraFilters)
@@ -18,7 +19,7 @@ export default function OpportunityFilterDialog({ skills, extraFilters = EMPTY_E
   const [deleteCandidate, setDeleteCandidate] = useState(null)
 
   const updateSkillCache = (updater) => queryClient.setQueryData(['skills'], (current) => {
-    if (!current?.pages?.length) return current
+    if (!asArray(current?.pages).length) return current
     return { ...current, pages: current.pages.map(updater) }
   })
   const createMutation = useMutation({
@@ -29,7 +30,7 @@ export default function OpportunityFilterDialog({ skills, extraFilters = EMPTY_E
       const previousSelected = selectedSkills
       const trimmedName = name.trim()
       const optimisticId = `optimistic-${crypto.randomUUID()}`
-      updateSkillCache((page, index) => index === 0 ? { ...page, total: page.total + 1, records: [...page.records, { id: optimisticId, name: trimmedName, _creating: true }] } : page)
+      updateSkillCache((page, index) => index === 0 ? { ...page, total: page.total + 1, records: [...asArray(page.records), { id: optimisticId, name: trimmedName, _creating: true }] } : page)
       setSelectedSkills((current) => current.includes(trimmedName) ? current : [...current, trimmedName])
       setNewSkill('')
       setIsAdding(false)
@@ -44,7 +45,7 @@ export default function OpportunityFilterDialog({ skills, extraFilters = EMPTY_E
       await queryClient.cancelQueries({ queryKey: ['skills'] })
       const previous = queryClient.getQueryData(['skills'])
       const previousSelected = selectedSkills
-      updateSkillCache((page) => ({ ...page, records: page.records.map((record) => record.id === id ? { ...record, name: name.trim(), _updating: true } : record) }))
+      updateSkillCache((page) => ({ ...page, records: asArray(page.records).map((record) => record.id === id ? { ...record, name: name.trim(), _updating: true } : record) }))
       setSelectedSkills((current) => current.map((skill) => skill === previousName ? name.trim() : skill))
       return { previous, previousSelected }
     },
@@ -59,12 +60,12 @@ export default function OpportunityFilterDialog({ skills, extraFilters = EMPTY_E
       const previous = queryClient.getQueryData(['skills'])
       const previousSelected = selectedSkills
       const deletedSkill = skillRecords.find((record) => record.id === deletedId)
-      updateSkillCache((page) => ({ ...page, records: page.records.map((record) => record.id === deletedId ? { ...record, _deleting: true } : record) }))
+      updateSkillCache((page) => ({ ...page, records: asArray(page.records).map((record) => record.id === deletedId ? { ...record, _deleting: true } : record) }))
       if (deletedSkill) setSelectedSkills((current) => current.filter((skill) => skill !== deletedSkill.name))
       return { previous, previousSelected }
     },
     onSuccess: (_, deletedId) => {
-      updateSkillCache((page) => ({ ...page, total: Math.max(0, page.total - 1), records: page.records.filter((record) => record.id !== deletedId) }))
+      updateSkillCache((page) => ({ ...page, total: Math.max(0, page.total - 1), records: asArray(page.records).filter((record) => record.id !== deletedId) }))
       setDeleteCandidate(null)
     },
     onError: (_, __, context) => { if (context?.previous) queryClient.setQueryData(['skills'], context.previous); if (context?.previousSelected) setSelectedSkills(context.previousSelected) },
@@ -93,7 +94,7 @@ export default function OpportunityFilterDialog({ skills, extraFilters = EMPTY_E
   const handleAddSkill = () => {
     const trimmed = newSkill.trim()
     if (!trimmed) return
-    const existing = allSkillNames.find((skill) => skill.toLowerCase() === trimmed.toLowerCase())
+    const existing = allSkillNames.find((skill) => asText(skill).toLowerCase() === trimmed.toLowerCase())
     if (existing) {
       setSelectedSkills((current) => current.includes(existing) ? current : [...current, existing])
       setNewSkill('')
@@ -153,7 +154,7 @@ export default function OpportunityFilterDialog({ skills, extraFilters = EMPTY_E
           ) : (
             <div key={record.id} className={`group flex items-center rounded-full ring-1 transition-all duration-300 ${record._deleting ? 'opacity-55' : ''} ${selectedSkills.includes(record.name) ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/30' : 'bg-[var(--surface)] text-[var(--muted)] ring-black/5'}`}>
               <button type="button" disabled={record._creating || record._deleting} onClick={() => toggleSkill(record.name)} className="py-2 pl-3 pr-2 text-[10px] font-semibold disabled:cursor-wait">{record.name}</button>
-              {record._creating ? <span className="mr-2 grid size-5 place-items-center" aria-label="Creating skill"><CircleNotch size={11} className="animate-spin" /></span> : <button type="button" disabled={record._deleting} onClick={() => { setEditing({ id: record.id, name: record.name, previousName: record.name }); setDeleteCandidate(null) }} className="grid size-6 place-items-center rounded-full opacity-45 transition-opacity hover:bg-black/5 hover:opacity-100 disabled:pointer-events-none" aria-label={`Rename ${record.name}`}><PencilSimple size={10} /></button>}
+              {record._creating ? <span className="mr-2 grid size-5 place-items-center" aria-label="Creating skill"><CircleNotch size={11} className="animate-spin" /></span> : <button type="button" disabled={record._deleting} onClick={() => { setEditing({ id: record.id, name: asText(record.name), previousName: record.name }); setDeleteCandidate(null) }} className="grid size-6 place-items-center rounded-full opacity-45 transition-opacity hover:bg-black/5 hover:opacity-100 disabled:pointer-events-none" aria-label={`Rename ${record.name}`}><PencilSimple size={10} /></button>}
               {!record._creating && (record._deleting ? <span className="mr-2 grid size-6 place-items-center" aria-label="Deleting skill"><CircleNotch size={11} className="animate-spin" /></span> :
               deleteCandidate === record.id ? <>
                 <button type="button" onClick={() => deleteMutation.mutate(record.id)} disabled={deleteMutation.isPending} className="grid size-6 place-items-center rounded-full bg-[var(--danger)] text-white" aria-label={`Confirm delete ${record.name}`}>{deleteMutation.isPending ? <CircleNotch size={10} className="animate-spin" /> : <Check size={10} weight="bold" />}</button>

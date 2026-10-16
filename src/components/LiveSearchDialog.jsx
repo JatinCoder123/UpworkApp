@@ -5,6 +5,7 @@ import { Crosshair, MagnifyingGlass, Plus, WarningCircle, X } from '@phosphor-ic
 import { DialogHeader, Modal } from './ui'
 import { api } from '../services/api'
 import { LIVE_WINDOWS, loadLiveResult, loadLiveSettings, newSince, saveLiveResult, saveLiveSettings, scanSteps, windowLabel } from '../lib/liveJobs'
+import { asText } from '../lib/safe'
 
 const label = 'text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]'
 
@@ -43,13 +44,13 @@ export default function LiveSearchDialog({ skillRecords = [], skillsLoading = fa
   const toggleSkill = (name) => update({ skills: settings.skills.includes(name) ? settings.skills.filter((item) => item !== name) : [...settings.skills, name] })
   const addSkill = () => {
     const value = draft.trim()
-    if (value && !settings.skills.some((item) => item.toLowerCase() === value.toLowerCase())) update({ skills: [...settings.skills, value] })
+    if (value && !settings.skills.some((item) => asText(item).toLowerCase() === value.toLowerCase())) update({ skills: [...settings.skills, value] })
     setDraft('')
   }
   const start = () => { if (!settings.skills.length || scanning) return; setStep(0); setElapsed(0); scan.mutate(settings) }
   const stop = () => { controller.current?.abort(); scan.reset() }
-  const known = new Set(skillRecords.map((record) => record.name.toLowerCase()))
-  const custom = settings.skills.filter((skill) => !known.has(skill.toLowerCase()))
+  const known = new Set(skillRecords.map((record) => asText(record.name).toLowerCase()))
+  const custom = settings.skills.filter((skill) => !known.has(asText(skill).toLowerCase()))
 
   return <Modal onClose={onClose} wide>
     <DialogHeader eyebrow="Live from Upwork" title="Search jobs live" onClose={onClose} />

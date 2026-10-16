@@ -16,6 +16,7 @@ import NotFound from './NotFound'
 import { primaryButton } from '../components/ui'
 import GenerateNewsDialog from '../components/GenerateNewsDialog'
 import { api } from '../services/api'
+import { asArray } from '../lib/safe'
 import {
   classifyScoreTier,
   classifySourceType,
@@ -48,7 +49,7 @@ export default function TechNewsDetail() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const allNews = useMemo(() => newsResult?.records || [], [newsResult])
+  const allNews = useMemo(() => asArray(newsResult?.records), [newsResult])
 
   // All Up Next / Related Latest News items for the current story (strictly deduplicated)
   const allUpNextStories = useMemo(() => {

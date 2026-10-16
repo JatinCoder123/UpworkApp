@@ -6,6 +6,7 @@ import { useCopied } from './JobDetailParts'
 import { api } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { jobShareLink } from '../lib/jobSignals'
+import { asArray, asText } from '../lib/safe'
 
 const defaultMessage = (job) => [
   `Job worth a look: ${job.title}`,
@@ -16,7 +17,7 @@ const defaultMessage = (job) => [
 ].filter(Boolean).join('\n')
 
 const teamsShareUrl = (href, text) => `https://teams.microsoft.com/share?href=${encodeURIComponent(href)}&msgText=${encodeURIComponent(text)}&preview=true`
-const teamsChatUrl = (emails, topic, text) => `https://teams.microsoft.com/l/chat/0/0?users=${emails.map(encodeURIComponent).join(',')}${emails.length > 1 ? `&topicName=${encodeURIComponent(topic.slice(0, 120))}` : ''}&message=${encodeURIComponent(text)}`
+const teamsChatUrl = (emails, topic, text) => `https://teams.microsoft.com/l/chat/0/0?users=${emails.map(encodeURIComponent).join(',')}${emails.length > 1 ? `&topicName=${encodeURIComponent(asText(topic).slice(0, 120))}` : ''}&message=${encodeURIComponent(text)}`
 
 /** mode: 'teams' shares the job in any Teams chat, 'notify' messages chosen teammates directly. */
 export default function ShareJobDialog({ job, mode: initialMode = 'teams', onClose }) {
@@ -26,11 +27,12 @@ export default function ShareJobDialog({ job, mode: initialMode = 'teams', onClo
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState([])
   const [copied, copy] = useCopied()
-  const { data: members = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['team-members'], queryFn: api.getTeamMembers, enabled: mode === 'notify', staleTime: 10 * 60_000 })
+  const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['team-members'], queryFn: api.getTeamMembers, enabled: mode === 'notify', staleTime: 10 * 60_000 })
+  const members = useMemo(() => asArray(data), [data])
   const self = String(user?.email || '').toLowerCase()
   const visible = useMemo(() => {
     const term = query.trim().toLowerCase()
-    return members.filter((member) => member.email.toLowerCase() !== self && (!term || `${member.name} ${member.email} ${member.title}`.toLowerCase().includes(term)))
+    return members.filter((member) => asText(member.email).toLowerCase() !== self && (!term || `${member.name} ${member.email} ${member.title}`.toLowerCase().includes(term)))
   }, [members, query, self])
   const toggle = (email) => setSelected((current) => (current.includes(email) ? current.filter((item) => item !== email) : [...current, email]))
   const tab = (value) => `flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${mode === value ? 'bg-[var(--ink)] text-white' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`
@@ -65,7 +67,7 @@ export default function ShareJobDialog({ job, mode: initialMode = 'teams', onClo
               : visible.length ? visible.map((member) => {
                 const active = selected.includes(member.email)
                 return <button key={member.id} type="button" aria-pressed={active} onClick={() => toggle(member.email)} className={`flex w-full items-center gap-3 border-b border-[var(--line)]/60 px-3 py-2.5 text-left last:border-0 transition-colors ${active ? 'bg-[var(--lime)]/25' : 'hover:bg-[var(--paper)]'}`}>
-                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--ink)] text-[10px] font-bold text-white">{member.name.split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase()}</span>
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--ink)] text-[10px] font-bold text-white">{asText(member.name).split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase()}</span>
                   <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{member.name}</span><span className="block truncate text-[11px] text-[var(--muted)]">{[member.title, member.email].filter(Boolean).join(' · ')}</span></span>
                   {active && <CheckCircle size={17} weight="fill" className="shrink-0 text-[var(--accent-strong)]" />}
                 </button>

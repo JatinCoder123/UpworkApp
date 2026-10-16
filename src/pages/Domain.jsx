@@ -12,18 +12,19 @@ import {
   crmUpdateSearch, detectInputMode, domainLabel, domainTld, getDomainConfig, isAbortError, makeId, normalizeDomain, normalizeTlds,
   oneYearPricePlan, requestMozMetrics,
 } from '../services/domainApi'
+import { asArray, asObject, asText } from '../lib/safe'
 
 const EMPTY_LAB = { round: 0, step: 0, candidates: [] }
 
 function labReducer(lab, event) {
   if (event.type === 'round') return { ...lab, round: event.round, step: 0 }
-  if (event.type === 'candidates') return { ...lab, step: 1, candidates: [...lab.candidates, ...event.candidates.map((candidate) => ({ domain: candidate.domain, status: 'checking' }))] }
+  if (event.type === 'candidates') return { ...lab, step: 1, candidates: [...lab.candidates, ...asArray(event.candidates).map((candidate) => ({ domain: candidate?.domain, status: 'checking' }))] }
   if (event.type === 'availability') {
     return {
       ...lab,
       step: 2,
       candidates: lab.candidates.map((candidate) => {
-        const result = event.results[candidate.domain]
+        const result = asObject(event.results)[candidate.domain]
         if (!result || candidate.status !== 'checking') return candidate
         return { ...candidate, status: result.available === true ? 'free' : result.available === false ? 'taken' : 'unknown' }
       }),
@@ -343,7 +344,7 @@ export default function Domain() {
     const { flowId } = beginFlow()
     crmRef.current = { searchId: search.id, requestKey: makeId() }
     resetResults()
-    setInput(search.input_text || search.source_domain || '')
+    setInput(asText(search.input_text || search.source_domain || ''))
     setNotice('Loading saved search…')
     try {
       const records = await crmSearchResults(search.id)

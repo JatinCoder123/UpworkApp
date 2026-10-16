@@ -4,9 +4,11 @@ import Shell from '../components/Shell'
 import { primaryButton } from '../components/ui'
 import { loadPreferences, savePreferences } from '../lib/preferences'
 import { seedJobs } from '../data'
+import { asArray } from '../lib/safe'
 
 export default function Preferences() {
-  const [form, setForm] = useState(loadPreferences)
+  // Saved preferences come from localStorage, so the lists may be missing.
+  const [form, setForm] = useState(() => { const saved = loadPreferences(); return { ...saved, skills: asArray(saved.skills), blockedKeywords: asArray(saved.blockedKeywords) } })
   const [saved, setSaved] = useState(false)
   const skills = useMemo(() => [...new Set(seedJobs.flatMap((job) => job.tags))].sort(), [])
   const toggle = (skill) => setForm((current) => ({ ...current, skills: current.skills.includes(skill) ? current.skills.filter((item) => item !== skill) : [...current.skills, skill] }))

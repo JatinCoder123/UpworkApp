@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import gsap from 'gsap'
-import { ArrowLeft, Briefcase, CalendarBlank, ChartBar, Clock, ClockCounterClockwise, CurrencyDollar, Hourglass, MapPin, SealCheck, Sparkle, Star, Tag, Target, WarningCircle } from '@phosphor-icons/react'
+import { ArrowLeft, Briefcase, CalendarBlank, ChartBar, Clock, ClockCounterClockwise, CurrencyDollar, Heart, Hourglass, MapPin, SealCheck, Sparkle, Star, Tag, Target, WarningCircle } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import NotFound from './NotFound'
 import ExpandableText from '../components/ExpandableText'
 import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, Tips, card } from '../components/JobDetailParts'
 import JobApplySection from '../components/JobApplySection'
+import ErrorBoundary from '../components/ErrorBoundary'
 import ShareJobDialog from '../components/ShareJobDialog'
 import { StatusPill } from '../components/ui'
 import { api } from '../services/api'
@@ -16,12 +17,31 @@ import { timeAgo, useNow } from '../lib/time'
 import { skillStyle, useJobReactions } from '../lib/jobSignals'
 import { useJobStatus } from '../lib/jobStatus'
 import { useAuth } from '../contexts/AuthContext'
+import { asArray, asObject } from '../lib/safe'
 
 function MatchRing({ value }) {
   const tone = value >= 75 ? 'var(--lime-dark)' : value >= 55 ? '#d9a53a' : 'var(--danger)'
   return <div className="relative grid size-20 shrink-0 place-items-center">
     <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90"><circle cx="18" cy="18" r="15.9155" pathLength="100" fill="none" strokeWidth="3" className="stroke-black/[.07] dark:stroke-white/10" /><circle cx="18" cy="18" r="15.9155" pathLength="100" fill="none" strokeWidth="3" strokeLinecap="round" strokeDasharray={`${value} 100`} style={{ stroke: tone }} /></svg>
     <span className="text-center leading-none"><span className="block text-xl font-semibold tracking-[-.04em]">{value}%</span><span className="text-[9px] font-bold uppercase tracking-[.12em] text-[var(--muted)]">match</span></span>
+  </div>
+}
+
+// Sidebar cards are components (not inline JSX) so each one's ErrorBoundary catches its own render errors.
+function SkillsCard({ skills = [] }) {
+  return <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
+    <div className="flex items-center justify-between gap-2">
+      <p className="flex items-center gap-2 text-sm font-semibold"><Target size={16} />Skills and expertise</p>
+      <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[var(--muted)]" title={`${skills.length} skill${skills.length === 1 ? '' : 's'} requested`}>{skills.length}</span>
+    </div>
+    <div className="mt-4 flex flex-wrap gap-1.5">{skills.map((skill) => <span key={skill} style={skillStyle(skill)} className="skill-chip rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}</div>
+  </div>
+}
+
+function ActivityCard({ items = [] }) {
+  return <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
+    <p className="flex items-center gap-2 text-sm font-semibold"><ClockCounterClockwise size={16} />Activity</p>
+    <ol className="mt-4 space-y-3 border-l border-[var(--line)] pl-4">{items.map((item, index) => <li key={`${item}-${index}`} className="relative text-xs leading-5"><span className={`absolute -left-[1.3rem] top-1.5 size-2 rounded-full ring-2 ring-[var(--surface)] ${index === 0 ? 'bg-[var(--lime-dark)]' : 'bg-[var(--line)]'}`} />{item}</li>)}</ol>
   </div>
 }
 
@@ -46,7 +66,7 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
       queryClient.setQueriesData({ queryKey: ['jobs'] }, (data) => {
         if (Array.isArray(data)) return data.map((item) => item.id === id ? { ...item, status: 'Seen' } : item)
         if (!data?.pages) return data
-        return { ...data, pages: data.pages.map((page) => ({ ...page, records: page.records.map((item) => item.id === id ? { ...item, status: 'Seen' } : item) })) }
+        return { ...data, pages: asArray(data.pages).map((page) => ({ ...page, records: asArray(page?.records).map((item) => item.id === id ? { ...item, status: 'Seen' } : item) })) }
       })
     },
   })
@@ -65,10 +85,11 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
     return <div role="alert" className="m-5 flex items-start gap-2 rounded-2xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" /><span className="flex-1">{error?.message || 'Could not load this job.'}</span><button type="button" onClick={() => refetch()} className="font-bold underline underline-offset-4">Try again</button></div>
   }
 
-  const skills = job.skills?.length ? job.skills : job.tags
+  const tags = asArray(job.tags), clientStats = asObject(job.clientStats)
+  const skills = asArray(job.skills).length ? job.skills : tags
   const setLetter = (coverLetter) => queryClient.setQueryData(['job', job.id], (current) => (current ? { ...current, coverLetter } : current))
   const setTips = (pitch) => queryClient.setQueryData(['job', job.id], (current) => (current ? { ...current, pitch } : current))
-  const actions = <JobApplySection
+  const actions = <ErrorBoundary name="apply-box" resetKey={job.id}><JobApplySection
     job={job}
     statusLabel={job.status}
     dismissed={job.status === 'Rejected'}
@@ -84,18 +105,9 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
     onFavorite={() => reactions.toggleFavorite(job.id, job)}
     onShare={setShare}
     showApply={!embedded}
-  />
-  const skillsCard = <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
-    <div className="flex items-center justify-between gap-2">
-      <p className="flex items-center gap-2 text-sm font-semibold"><Target size={16} />Skills and expertise</p>
-      <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[var(--muted)]" title={`${skills.length} skill${skills.length === 1 ? '' : 's'} requested`}>{skills.length}</span>
-    </div>
-    <div className="mt-4 flex flex-wrap gap-1.5">{skills.map((skill) => <span key={skill} style={skillStyle(skill)} className="skill-chip rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}</div>
-  </div>
-  const activity = <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
-    <p className="flex items-center gap-2 text-sm font-semibold"><ClockCounterClockwise size={16} />Activity</p>
-    <ol className="mt-4 space-y-3 border-l border-[var(--line)] pl-4">{job.activity.map((item, index) => <li key={`${item}-${index}`} className="relative text-xs leading-5"><span className={`absolute -left-[1.3rem] top-1.5 size-2 rounded-full ring-2 ring-[var(--surface)] ${index === 0 ? 'bg-[var(--lime-dark)]' : 'bg-[var(--line)]'}`} />{item}</li>)}</ol>
-  </div>
+  /></ErrorBoundary>
+  const skillsCard = <ErrorBoundary name="skills" resetKey={job.id}><SkillsCard skills={skills} /></ErrorBoundary>
+  const activity = <ErrorBoundary name="activity" resetKey={job.id}><ActivityCard items={asArray(job.activity)} /></ErrorBoundary>
 
   const content = <div ref={root} className={embedded ? 'space-y-5 p-4 sm:p-6' : 'mx-auto w-full max-w-[1320px] px-4 pb-20 pt-6 sm:px-6 md:pt-8'}>
     {!embedded && <Link data-detail to="/jobs" className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--muted)] transition-colors hover:text-[var(--ink)]"><span className="grid size-8 place-items-center rounded-full bg-[var(--surface)] ring-1 ring-[var(--line)]"><ArrowLeft size={14} /></span>All jobs</Link>}
@@ -116,13 +128,11 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#ffe4e6] px-2.5 py-1 text-[11px] font-bold text-[#be123c] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/15 dark:text-[#fda4af] dark:ring-[#fda4af]/30">
                   <Heart size={12} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" /> Liked
                 </span>
-              )}
-              <span className="rounded-full bg-[var(--surface)] px-2.5 py-1 font-mono text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]">{job.jobId}</span>
-              {job.tags[0] && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]"><Tag size={12} weight="bold" />{job.tags[0]}</span>}
+              )}              {tags[0] && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]"><Tag size={12} weight="bold" />{tags[0]}</span>}
               <time dateTime={job.postedAt} title={job.posted} className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent-strong)]"><Clock size={13} weight="bold" />Posted {timeAgo(job.postedAt, now) || job.posted}</time>
             </div>
             <h1 className="job-detail-title mt-5">{job.title}</h1>
-            {job.clientStats.country && <p className="mt-3 flex items-center gap-1.5 text-sm text-[var(--muted)]"><MapPin size={15} weight="bold" />{job.clientStats.country}{job.clientStats.rating != null && <><span aria-hidden="true">·</span><Star size={14} weight="fill" className="text-[#e6a817]" />{job.clientStats.rating.toFixed(1)}</>}{job.clientStats.paymentVerified && <><span aria-hidden="true">·</span><SealCheck size={14} weight="fill" className="text-[var(--ok)]" />Payment verified</>}</p>}
+            {clientStats.country && <p className="mt-3 flex items-center gap-1.5 text-sm text-[var(--muted)]"><MapPin size={15} weight="bold" />{clientStats.country}{clientStats.rating != null && <><span aria-hidden="true">·</span><Star size={14} weight="fill" className="text-[#e6a817]" />{Number(clientStats.rating).toFixed(1)}</>}{clientStats.paymentVerified && <><span aria-hidden="true">·</span><SealCheck size={14} weight="fill" className="text-[var(--ok)]" />Payment verified</>}</p>}
             {job.summary && <ExpandableText className="mt-5 max-w-3xl" collapsedHeight="3.6rem"><p className="text-[15px] leading-7">{job.summary}</p></ExpandableText>}
             <div className="mt-6 grid gap-3 grid-cols-2 sm:grid-cols-4">
               <FactTile icon={CurrencyDollar} label="Budget" value={job.budget} note={job.type} />
@@ -135,7 +145,7 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
 
         {embedded && <div data-detail className="xl:hidden">{actions}</div>}
 
-        <AboutClient stats={job.clientStats} now={now} />
+        <ErrorBoundary name="about-client" resetKey={job.id}><AboutClient stats={clientStats} now={now} /></ErrorBoundary>
 
         {job.match > 0 && <section data-detail className={`${card} flex flex-col gap-5 sm:flex-row sm:items-start`}>
           <MatchRing value={job.match} />
@@ -153,9 +163,9 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
         {/* Skills live in the right sidebar; the drawer hides that sidebar below xl, so show them here instead. */}
         {embedded && <div data-detail className="xl:hidden">{skillsCard}</div>}
 
-        <Tips job={job} onTips={setTips} />
+        <ErrorBoundary name="tips" resetKey={job.id}><Tips job={job} onTips={setTips} /></ErrorBoundary>
 
-        <CoverLetter job={job} onLetter={setLetter} />
+        <ErrorBoundary name="cover-letter" resetKey={job.id}><CoverLetter job={job} onLetter={setLetter} /></ErrorBoundary>
 
         {embedded && <div data-detail className="xl:hidden">{activity}</div>}
       </div>

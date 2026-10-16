@@ -5,6 +5,10 @@ import { ArrowSquareOut, DotsThree, Eye, Shuffle, WarningCircle, X } from '@phos
 import { JobDetailView } from '../pages/JobDetail'
 import { LiveJobDetailView } from '../pages/LiveJobDetail'
 import { nextSimilarJob } from '../lib/jobSignals'
+import ErrorBoundary, { SectionError } from './ErrorBoundary'
+
+// A job whose details fail to render shows this inside the drawer; the list behind it keeps working.
+const DrawerError = (props) => <div className="p-4 sm:p-6"><SectionError {...props} title="This job could not be displayed" /></div>
 
 const menuItem = 'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-[var(--muted)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:pointer-events-none disabled:opacity-40'
 
@@ -82,7 +86,9 @@ export default function JobDrawer({ job, jobs = [], live = false, onSelect, onCl
         </header>
         {applyError && <p role="alert" className="flex items-start gap-2 border-b border-[var(--line)]/70 bg-[var(--bad-bg)] px-4 py-2.5 text-xs font-semibold text-[var(--bad)] sm:px-6"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" />{applyError}</p>}
         <div ref={body} className="drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
-          {live ? <LiveJobDetailView key={job.id} id={job.id} job={job} embedded /> : <JobDetailView key={job.id} id={job.id} initialJob={job} embedded undoTab={undoTab} />}
+          <ErrorBoundary name="job-drawer" resetKey={job.id} fallback={DrawerError}>
+            {live ? <LiveJobDetailView key={job.id} id={job.id} job={job} embedded /> : <JobDetailView key={job.id} id={job.id} initialJob={job} embedded undoTab={undoTab} />}
+          </ErrorBoundary>
         </div>
       </aside>
     </div>,

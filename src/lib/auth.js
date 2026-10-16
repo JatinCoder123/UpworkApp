@@ -2,14 +2,22 @@ export const AUTH_ORIGIN ="https://upworkapp.backend.outrightcrm.in".replace(/\/
 const LOGIN_INTRO_KEY = "outrightfeedportal-login-intro";
 
 export function startMicrosoftLogin() {
-  sessionStorage.setItem(LOGIN_INTRO_KEY, "pending");
+  try {
+    sessionStorage.setItem(LOGIN_INTRO_KEY, "pending");
+  } catch {
+    /* storage blocked: skip the intro */
+  }
   window.location.assign(`${AUTH_ORIGIN}/`);
 }
 
 export function consumeLoginIntro() {
-  const pending = sessionStorage.getItem(LOGIN_INTRO_KEY) === "pending";
-  if (pending) sessionStorage.removeItem(LOGIN_INTRO_KEY);
-  return pending;
+  try {
+    const pending = sessionStorage.getItem(LOGIN_INTRO_KEY) === "pending";
+    if (pending) sessionStorage.removeItem(LOGIN_INTRO_KEY);
+    return pending;
+  } catch {
+    return false;
+  }
 }
 
 export async function fetchSessionUser({ signal } = {}) {
@@ -22,7 +30,7 @@ export async function fetchSessionUser({ signal } = {}) {
   if (!response.ok) throw new Error("Unable to verify your session. Please try again.");
 
   const data = await response.json();
-  return data?.authenticated && data?.user ? data.user : null;
+  return data?.authenticated && data?.user && typeof data.user === "object" ? data.user : null;
 }
 
 export async function endSession() {

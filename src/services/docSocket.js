@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client';
+import { asObject } from '../lib/safe.js';
 
 export const BACKEND_SOCKET_URL = (
   import.meta.env?.VITE_DOC_SOCKET_URL ||
@@ -15,7 +16,7 @@ function loadStorage(key) {
   try {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return {};
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : {};
+    return raw ? asObject(JSON.parse(raw)) : {};
   } catch {
     return {};
   }

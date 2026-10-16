@@ -4,6 +4,7 @@ import { ArrowClockwise, Briefcase, Check, Clock, Copy, CurrencyDollar, FilePdf,
 import ExpandableText from './ExpandableText'
 import { api } from '../services/api'
 import { downloadCoverLetterPdf } from '../lib/coverLetterPdf'
+import { asObject, asText } from '../lib/safe'
 
 // Building blocks shared by the CRM job detail and the live Upwork job detail.
 export const card = 'rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 sm:p-7'
@@ -60,7 +61,8 @@ function Verified({ ok, children }) {
   return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${ok ? 'bg-[var(--ok-bg)] text-[var(--ok)]' : 'bg-[var(--bad-bg)] text-[var(--bad)]'}`}><SealCheck size={13} weight="fill" />{children}</span>
 }
 
-export function AboutClient({ stats, now }) {
+export function AboutClient({ stats: clientStats, now }) {
+  const stats = asObject(clientStats), rating = stats.rating == null ? null : Number(stats.rating)
   const count = (value, word) => `${value.toLocaleString()} ${word}${value === 1 ? '' : 's'}`
   const place = [stats.city, localTime(stats.timezone, now)].filter(Boolean).join(' · ')
   const items = [
@@ -74,8 +76,8 @@ export function AboutClient({ stats, now }) {
 
   return <Panel icon={User} title="About the client" subtitle={[stats.companyName, stats.country, place].filter(Boolean).join(' · ') || 'Location not shared'}>
     <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[var(--paper)] p-4">
-      {stats.rating != null
-        ? <div className="flex items-center gap-3" aria-label={`Rating is ${stats.rating.toFixed(1)} out of 5`}><span className="text-3xl font-semibold leading-none tracking-[-.04em]">{stats.rating.toFixed(1)}</span><div><Stars rating={stats.rating} /><p className="mt-1 text-[11px] text-[var(--muted)]">{stats.reviews != null ? `${stats.rating.toFixed(2)} of ${count(stats.reviews, 'review')}` : 'Client rating'}</p></div></div>
+      {rating != null
+        ? <div className="flex items-center gap-3" aria-label={`Rating is ${rating.toFixed(1)} out of 5`}><span className="text-3xl font-semibold leading-none tracking-[-.04em]">{rating.toFixed(1)}</span><div><Stars rating={rating} /><p className="mt-1 text-[11px] text-[var(--muted)]">{stats.reviews != null ? `${rating.toFixed(2)} of ${count(stats.reviews, 'review')}` : 'Client rating'}</p></div></div>
         : <p className="text-sm text-[var(--muted)]">No reviews yet</p>}
       <div className="flex flex-wrap gap-2">
         <Verified ok={stats.paymentVerified}>{stats.paymentVerified ? 'Payment verified' : 'Payment not verified'}</Verified>
@@ -111,19 +113,19 @@ export function CoverLetter({ job, onLetter }) {
   const [instruction, setInstruction] = useState('')
   const [suggestion, setSuggestion] = useState(null)
   const editing = draft != null
-  const current = editing ? draft : job.coverLetter || ''
+  const current = editing ? draft : asText(job.coverLetter)
   const fetchLetter = useMutation({ mutationFn: () => api.getCoverLetter(job), onSuccess: onLetter })
   const save = useMutation({ mutationFn: (letter) => api.saveCoverLetter(job, letter), onSuccess: (letter) => { onLetter(letter); setDraft(null) } })
   const aiEdit = useMutation({ mutationFn: (prompt) => api.editCoverLetter(job, current, prompt), onSuccess: (letter, prompt) => setSuggestion({ letter, prompt }) })
   const pdf = useMutation({ mutationFn: () => downloadCoverLetterPdf(current, job.title) })
   const runAi = (prompt) => { const value = prompt.trim(); if (value && current.trim() && !aiEdit.isPending) aiEdit.mutate(value) }
-  const accept = () => { setDraft(suggestion.letter); setSuggestion(null); setInstruction('') }
+  const accept = () => { setDraft(asText(suggestion.letter)); setSuggestion(null); setInstruction('') }
   const pill = 'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[var(--line)] transition-colors disabled:pointer-events-none disabled:opacity-45'
 
   const action = <div className="flex flex-wrap justify-end gap-2">
     {current && <button type="button" onClick={() => copy('letter', current)} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>{copied === 'letter' ? <Check size={13} weight="bold" /> : <Copy size={13} />}{copied === 'letter' ? 'Copied' : 'Copy'}</button>}
     {current.trim() && <button type="button" disabled={pdf.isPending} onClick={() => pdf.mutate()} title={pdf.isError ? pdf.error?.message : 'Download as PDF'} className={`${pill} ${pdf.isError ? 'text-[var(--bad)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{pdf.isPending ? <span className="size-3 animate-spin rounded-full border-2 border-current/30 border-t-current" /> : <FilePdf size={13} />}{pdf.isPending ? 'Generating…' : pdf.isError ? 'Retry PDF' : 'PDF'}</button>}
-    {job.coverLetter && !editing && <button type="button" onClick={() => setDraft(job.coverLetter)} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}><PencilSimple size={13} />Edit</button>}
+    {job.coverLetter && !editing && <button type="button" onClick={() => setDraft(asText(job.coverLetter))} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}><PencilSimple size={13} />Edit</button>}
   </div>
 
   return <Panel icon={FileText} title="Cover letter" subtitle={editing ? 'Editing · changes are not saved yet' : job.coverLetter ? 'Tailored for this job' : 'Not written yet'} action={action}>
@@ -187,7 +189,7 @@ function TipPoints({ text }) {
 // Proposal tips for a CRM job (stored as its pitch), with a button that asks the strategy endpoint for fresh ones.
 export function Tips({ job, onTips }) {
   const generate = useMutation({ mutationFn: () => api.getStrategy(job), onSuccess: onTips })
-  const tips = job.pitch || ''
+  const tips = asText(job.pitch)
   const action = <button type="button" disabled={generate.isPending} onClick={() => generate.mutate()} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--ink)] px-4 text-xs font-semibold text-white transition-opacity disabled:opacity-60">
     {generate.isPending ? <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <Sparkle size={14} weight="fill" />}
     {generate.isPending ? 'Generating…' : 'Next tips'}

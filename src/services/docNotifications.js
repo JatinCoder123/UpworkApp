@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { subscribeDocStatus, getDocInProgress } from './docSocket.js';
 import { getDocumentViewUrl } from './api.js';
+import { asArray } from '../lib/safe.js';
 
 const STORAGE_KEY = 'upworkapp_doc_notifications';
 const MAX_NOTIFICATIONS = 40;
@@ -9,7 +10,7 @@ function loadStoredNotifications() {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? asArray(JSON.parse(raw)).filter(Boolean) : [];
   } catch {
     return [];
   }
