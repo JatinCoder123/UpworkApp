@@ -26,20 +26,19 @@ function FreshnessRing({ minutes, tone }) {
 }
 
 // Live jobs have no CRM record, so Applied / Not a fit are tracked in this browser.
-function ActionPanel({ job, reactions, onShare }) {
+function ActionPanel({ job, reactions, onShare, showApply }) {
   const applied = reactions.isApplied(job.id), dismissed = reactions.isDismissed(job.id)
   return <JobApplySection
     job={job}
     statusLabel={applied ? 'Applied' : dismissed ? 'Not a fit' : 'Live'}
-    applied={applied}
     dismissed={dismissed}
-    onApplied={() => reactions.toggleApplied(job.id)}
-    onDismiss={() => reactions.toggleDismissed(job.id)}
+    onApplied={() => { if (!applied) reactions.toggleApplied(job.id) }}    onDismiss={() => reactions.toggleDismissed(job.id)}
     liked={reactions.isLiked(job.id)}
     favorite={reactions.isFavorite(job.id)}
     onLike={() => reactions.toggleLike(job.id, job)}
     onFavorite={() => reactions.toggleFavorite(job.id, job)}
     onShare={onShare}
+    showApply={showApply}
   />
 }
 
@@ -74,9 +73,17 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
     job.raw?.createdDateTime && ['Draft created', job.raw.createdDateTime.replace(/([+-]\d{2})(\d{2})$/, '$1:$2')],
   ].filter(Boolean)
   const sidebar = <>
-    <ActionPanel job={job} reactions={reactions} onShare={setShare} />
+    <ActionPanel job={job} reactions={reactions} onShare={setShare} showApply={!embedded} />
     {job.preferredLocations.length > 0 && <div className="flex items-start gap-3 rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70"><GlobeHemisphereWest size={18} className="mt-0.5 shrink-0 text-[var(--accent-strong)]" /><div><p className="text-sm font-semibold">Preferred location</p><p className="mt-1 text-xs leading-5 text-[var(--muted)]">{job.preferredLocations.join(', ')} · {job.preferredLocationMandatory ? 'required by the client' : 'not required'}</p></div></div>}
   </>
+  const skillsCard = <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
+    <div className="flex items-center justify-between gap-2">
+      <p className="flex items-center gap-2 text-sm font-semibold"><Target size={16} />Skills and expertise</p>
+      <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[var(--muted)]" title={`${job.skills.length} skill${job.skills.length === 1 ? '' : 's'} requested`}>{job.skills.length}</span>
+    </div>
+    {matched.size > 0 && <p className="mt-1 text-[11px] text-[var(--muted)]">{job.matchedSkills.join(', ')} matched your scan</p>}
+    <div className="mt-4 flex flex-wrap gap-1.5">{job.skills.map((skill) => <span key={skill} aria-pressed={matched.has(skill.toLowerCase())} className="skill-tag rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}</div>
+  </div>
   const timelineCard = <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
     <p className="flex items-center gap-2 text-sm font-semibold"><ClockCounterClockwise size={16} />Timeline</p>
     <ol className="mt-4 space-y-3 border-l border-[var(--line)] pl-4">{timeline.map(([text, value], index) => <li key={text} className="relative text-xs leading-5"><span className={`absolute -left-[1.3rem] top-1.5 size-2 rounded-full ring-2 ring-[var(--surface)] ${index === 0 ? 'bg-[var(--lime-dark)]' : 'bg-[var(--line)]'}`} />{text}<span className="block text-[11px] text-[var(--muted)]">{clock(value)} · {timeAgo(value, now)}</span></li>)}</ol>
@@ -135,9 +142,8 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
           <ExpandableText collapsedHeight="12rem"><p className="whitespace-pre-wrap break-words text-[15px] leading-[1.8] text-[#3f413b]"><LinkifiedDescription text={job.description} /></p></ExpandableText>
         </Panel>
 
-        <Panel icon={Target} title="Skills and expertise" subtitle={`${job.skills.length} skill${job.skills.length === 1 ? '' : 's'} requested${matched.size ? ` · ${job.matchedSkills.join(', ')} matched your scan` : ''}`}>
-          <div className="flex flex-wrap gap-2">{job.skills.map((skill) => <span key={skill} aria-pressed={matched.has(skill.toLowerCase())} className="skill-tag rounded-full px-3 py-1.5 text-xs font-semibold">{skill}</span>)}</div>
-        </Panel>
+        {/* Skills live in the right sidebar; the drawer hides that sidebar below xl, so show them here instead. */}
+        {embedded && <div data-detail className="xl:hidden">{skillsCard}</div>}
 
         <CoverLetter job={job} onLetter={setCoverLetter} />
 
@@ -146,6 +152,7 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
 
       <aside data-detail className={`space-y-4 ${embedded ? 'hidden xl:block xl:sticky xl:top-2 xl:self-start' : 'lg:sticky lg:top-[calc(var(--shell-h)+1rem)] lg:self-start'}`}>
         {sidebar}
+        {skillsCard}
         {timelineCard}
       </aside>
     </div>

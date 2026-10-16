@@ -31,7 +31,6 @@ const COVER_LETTER_URL = import.meta.env?.VITE_COVER_LETTER_URL || "";
 const COVER_LETTER_EDIT_URL = import.meta.env?.VITE_COVER_LETTER_EDIT_URL || COVER_LETTER_URL;
 // Endpoint that generates a fresh proposal strategy for a job. Set it in .env once the backend is ready.
 const STRATEGY_URL = import.meta.env?.VITE_STRATEGY_URL || "";
-
 const apiClient = axios.create({
   baseURL: SMART_GATEWAY_URL,
   timeout: 600_000,
@@ -374,6 +373,25 @@ export async function fetchJobStats({ dateFilter, userEmail } = {}) {
   );
 }
 
+// Jobs per skill for the current scope and date window, as { [skillName]: count }.
+// Each get_stats query searches the jobs' skills field, the same search the jobs list uses.
+export async function fetchSkillCounts({ skills = [], dateFilter, userEmail, allJobs = false } = {}) {
+  const names = [...new Set(skills.map((skill) => String(skill).trim()).filter(Boolean))];
+  if (!names.length) return {};
+  const filters = { ai_processed: 1 };
+  if (!allJobs) filters.assigned_user_id = await findGatewayUserIdByEmail(userEmail);
+  // Index-based keys keep skill names with spaces or symbols out of the stats keys.
+  const data = await smartGateway({
+    action: "get_stats",
+    date_range: "",
+    date_field: dateFilter?.date_field || "",
+    date_from: dateFilter?.date_from || "",
+    date_to: dateFilter?.date_to || "",
+    queries: names.map((name, index) => ({ key: `skill_${index}`, module: JOBS_MODULE, filters, search: name, search_fields: ["skills"] })),
+  });
+  return Object.fromEntries(names.map((name, index) => [name, Number(data.stats?.[`skill_${index}`]?.count) || 0]));
+}
+
 export async function fetchJobs(options = {}) {
   const page = await fetchJobsPage(options);
   return page.records;
@@ -449,7 +467,7 @@ export async function editCoverLetterWithAi(job, letter, instruction) {
 // Asks for a new strategy; the current one is sent along so the endpoint can offer a different angle.
 export async function fetchStrategy(job) {
   if (!STRATEGY_URL) {
-    throw createAppError("STRATEGY_ENDPOINT_MISSING", "The strategy endpoint is not configured yet. Set VITE_STRATEGY_URL in .env.");
+    throw createAppError("STRATEGY_ENDPOINT_MISSING", "The tips endpoint is not configured yet. Set VITE_STRATEGY_URL in .env.");
   }
   let response;
   try {
@@ -465,12 +483,12 @@ export async function fetchStrategy(job) {
       current_strategy: job.pitch,
     }, { timeout: 90_000, headers: { "Content-Type": "application/json", "X-Api-Token": generateToken() } });
   } catch (err) {
-    throw createAppError("STRATEGY_FAILED", err?.response?.data?.message || "Could not generate a new strategy. Please try again.");
+    throw createAppError("STRATEGY_FAILED", err?.response?.data?.message || "Could not generate new tips. Please try again.");
   }
   const data = response.data;
   const raw = typeof data === "string" ? data : data?.strategy ?? data?.pitch ?? data?.data?.strategy ?? data?.data?.pitch ?? data?.content ?? data?.data ?? "";
   const strategy = decodeHtml(typeof raw === "string" ? raw : "").trim();
-  if (!strategy) throw createAppError("STRATEGY_EMPTY", "The endpoint did not return a strategy.");
+  if (!strategy) throw createAppError("STRATEGY_EMPTY", "The endpoint did not return any tips.");
   return strategy;
 }
 
@@ -1111,12 +1129,12 @@ export const api = {
   getJobs: (params) => fetchJobs(params),
   getJobsPage: (params) => fetchJobsPage(params),
   getJobStats: (params) => fetchJobStats(params),
+  getSkillCounts: (params) => fetchSkillCounts(params),
   getJob: (id) => fetchJobById(id),
   getCoverLetter: (job) => fetchCoverLetter(job),
   saveCoverLetter,
   editCoverLetter: editCoverLetterWithAi,
-  getStrategy: (job) => fetchStrategy(job),
-  getTeamMembers: () => fetchTeamMembers(),
+  getStrategy: (job) => fetchStrategy(job),  getTeamMembers: () => fetchTeamMembers(),
   getLiveJobs: (params) => fetchLiveUpworkJobs(params),
   getVideoFeeds: (options) => fetchVideoFeeds(options),
   getSiteContent: (options) => fetchSiteContent(options),

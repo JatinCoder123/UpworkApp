@@ -10,7 +10,7 @@ import { MoreFiltersMenu, SortMenu } from '../components/JobListControls'
 import { api } from '../services/api'
 import { LIVE_WINDOWS, isEarlyBird, loadLiveResult, loadLiveSettings, minutesSince, newSince, saveLiveResult, saveLiveSettings, scanSteps } from '../lib/liveJobs'
 import { loadExtraFilters, saveExtraFilters } from '../lib/preferences'
-import { matchesExtraFilters, useJobReactions } from '../lib/jobSignals'
+import { matchesExtraFilters, useJobReactions, usePreviewParam } from '../lib/jobSignals'
 import { timeAgo, useNow } from '../lib/time'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -101,7 +101,7 @@ export default function LiveJobs() {
   const [autoScan, setAutoScan] = useState(false)
   const [sort, setSort] = useState('newest')
   const [extraFilters, setExtraFilters] = useState(() => loadExtraFilters('live'))
-  const [preview, setPreview] = useState(null)
+  const { previewId, openPreview, closePreview } = usePreviewParam()
   const [reactionFilter, setReactionFilter] = useState('all')
   useEffect(() => saveExtraFilters('live', extraFilters), [extraFilters])
   const root = useRef(null)
@@ -166,6 +166,9 @@ export default function LiveJobs() {
   }, [autoScan])
 
   const jobs = useMemo(() => result?.jobs || [], [result])
+  // Live jobs only exist in this browser's last scan; a ?job= link to one that is gone is dropped.
+  const preview = previewId ? jobs.find((job) => job.id === previewId) || null : null
+  useEffect(() => { if (previewId && !preview) closePreview() }, [previewId, preview, closePreview])
   const visibleJobs = useMemo(() => {
     const compare = (LIVE_SORTS.find((item) => item.id === sort) || LIVE_SORTS[0]).compare
     return jobs
@@ -226,7 +229,7 @@ export default function LiveJobs() {
                   : <button type="button" onClick={() => setAutoScan((value) => !value)} aria-pressed={autoScan} className={`inline-flex items-center gap-2 text-xs font-semibold transition-colors ${autoScan ? 'text-[#c8e875]' : 'text-white/50 hover:text-white'}`}><Timer size={14} weight="bold" />{autoScan ? 'Auto-scan on · every 5 minutes' : 'Turn on auto-scan every 5 minutes'}</button>}
             </div>
           </div>
-          <LiveScope jobs={jobs} windowMinutes={resultWindow} scanning={scanning} now={now} onOpen={(id) => setPreview(jobs.find((job) => job.id === id) || null)} />
+          <LiveScope jobs={jobs} windowMinutes={resultWindow} scanning={scanning} now={now} onOpen={openPreview} />
         </div>
       </div>
     </section>
@@ -303,7 +306,7 @@ export default function LiveJobs() {
               </button>
             )}
           </section>
-            : jobs.length ? <section className="mt-4 space-y-4">{visibleJobs.map((job, index) => <LiveJobCard key={job.id} job={job} index={index} now={now} windowMinutes={resultWindow} justIn={justIn.includes(job.id)} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} applied={reactions.isApplied(job.id)} dismissed={reactions.isDismissed(job.id)} onOpen={() => setPreview(job)} />)}</section>
+            : jobs.length ? <section className="mt-4 space-y-4">{visibleJobs.map((job, index) => <LiveJobCard key={job.id} job={job} index={index} now={now} windowMinutes={resultWindow} justIn={justIn.includes(job.id)} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} applied={reactions.isApplied(job.id)} dismissed={reactions.isDismissed(job.id)} onOpen={() => openPreview(job.id)} />)}</section>
             : <section className="mt-4 rounded-[1.6rem] bg-[var(--surface)] px-6 py-16 text-center ring-1 ring-[var(--line)]/70">
               <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--lime)]/30 text-[var(--accent-strong)]"><Crosshair size={24} weight="duotone" /></div>
               <h3 className="mt-5 text-xl font-semibold">Quiet out there</h3>
@@ -319,6 +322,6 @@ export default function LiveJobs() {
             </div>)}
           </section>}
     </div>
-    {preview && <JobDrawer job={preview} jobs={visibleJobs} live onSelect={setPreview} onClose={() => setPreview(null)} />}
+    {preview && <JobDrawer job={preview} jobs={visibleJobs} live onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={(job) => { if (!reactions.isApplied(job.id)) reactions.toggleApplied(job.id) }} />}
   </main></Shell>
 }

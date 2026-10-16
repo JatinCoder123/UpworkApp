@@ -172,7 +172,7 @@ export function CoverLetter({ job, onLetter }) {
 }
 
 // Bullet lines ("- ", "• ", "* ") read as numbered steps on FactTile-style rows; any other text keeps its line breaks.
-function StrategyPoints({ text }) {
+function TipPoints({ text }) {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
   if (!lines.every((line) => /^[-•*]\s+/.test(line))) return <p className="whitespace-pre-wrap break-words rounded-2xl bg-[var(--paper)] p-4 text-sm leading-7">{text}</p>
   return <ol className="grid gap-2">{lines.map((line, index) => <li key={line} className="flex items-start gap-3 rounded-2xl bg-[var(--paper)] p-3.5 text-sm leading-6">
@@ -181,23 +181,23 @@ function StrategyPoints({ text }) {
   </li>)}</ol>
 }
 
-// The proposal strategy for a CRM job, with a button that asks the endpoint for a fresh one.
-export function Strategy({ job, onStrategy }) {
-  const generate = useMutation({ mutationFn: () => api.getStrategy(job), onSuccess: onStrategy })
-  const strategy = job.pitch || ''
+// Proposal tips for a CRM job (stored as its pitch), with a button that asks the strategy endpoint for fresh ones.
+export function Tips({ job, onTips }) {
+  const generate = useMutation({ mutationFn: () => api.getStrategy(job), onSuccess: onTips })
+  const tips = job.pitch || ''
   const action = <button type="button" disabled={generate.isPending} onClick={() => generate.mutate()} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--ink)] px-4 text-xs font-semibold text-white transition-opacity disabled:opacity-60">
     {generate.isPending ? <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <Sparkle size={14} weight="fill" />}
-    {generate.isPending ? 'Generating…' : 'Next strategy'}
+    {generate.isPending ? 'Generating…' : 'Next tips'}
   </button>
 
-  return <Panel icon={Lightbulb} title="Strategy" subtitle={generate.isPending ? 'Building a fresh strategy from the job, client and budget…' : 'Points to lead with in the proposal'} action={action} accent>
+  return <Panel icon={Lightbulb} title="Tips" subtitle={generate.isPending ? 'Building fresh tips from the job, client and budget…' : 'Points to lead with in the proposal'} action={action} accent>
     {generate.isError && <p role="alert" className="mb-3 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{generate.error?.message}</p>}
     <div aria-busy={generate.isPending} className={`transition-opacity duration-300 ${generate.isPending ? 'opacity-50' : ''}`}>
-      {strategy
-        ? <ExpandableText collapsedHeight="14rem"><StrategyPoints text={strategy} /></ExpandableText>
+      {tips
+        ? <ExpandableText collapsedHeight="14rem"><TipPoints text={tips} /></ExpandableText>
         : <div className="rounded-2xl border border-dashed border-[var(--line)] p-5">
-          <p className="text-sm font-semibold">No strategy yet</p>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">Use Next strategy to generate one from the job description and budget.</p>
+          <p className="text-sm font-semibold">No tips yet</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">Use Next tips to generate them from the job description and budget.</p>
         </div>}
     </div>
   </Panel>

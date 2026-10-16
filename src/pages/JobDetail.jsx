@@ -6,15 +6,15 @@ import { ArrowLeft, Briefcase, CalendarBlank, ChartBar, Clock, ClockCounterClock
 import Shell from '../components/Shell'
 import NotFound from './NotFound'
 import ExpandableText from '../components/ExpandableText'
-import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, Strategy, card } from '../components/JobDetailParts'
+import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, Tips, card } from '../components/JobDetailParts'
 import JobApplySection from '../components/JobApplySection'
 import ShareJobDialog from '../components/ShareJobDialog'
-import { ActionDialog } from '../components/dialogs'
 import { StatusPill } from '../components/ui'
 import { api } from '../services/api'
 import JobDetailSkeleton, { DrawerDetailSkeleton } from '../components/JobDetailSkeleton'
 import { timeAgo, useNow } from '../lib/time'
 import { skillStyle, useJobReactions } from '../lib/jobSignals'
+import { useJobStatus } from '../lib/jobStatus'
 import { useAuth } from '../contexts/AuthContext'
 
 function MatchRing({ value }) {
@@ -29,9 +29,12 @@ function MatchRing({ value }) {
  * The full CRM job detail. Rendered as a page at /jobs/:id and, with `embedded`,
  * inside the job preview drawer as a single column.
  */
-export function JobDetailView({ id, initialJob, embedded = false }) {
-  const [dialog, setDialog] = useState(null), [share, setShare] = useState(null), root = useRef(null), seenJob = useRef(null), queryClient = useQueryClient()
+// `undoTab` ('Applied' | 'Rejected') is set only when the drawer was opened from that tab; a job still in
+// that status then shows Undo instead of Not a fit.
+export function JobDetailView({ id, initialJob, embedded = false, undoTab = null }) {
+  const [share, setShare] = useState(null), root = useRef(null), seenJob = useRef(null), queryClient = useQueryClient()
   const { user } = useAuth()
+  const status = useJobStatus()
   const reactions = useJobReactions(user?.email)
   const now = useNow()
   const { data: job, isLoading, isError, error, refetch } = useQuery({ queryKey: ['job', id], queryFn: () => api.getJob(id), enabled: Boolean(id), retry: false, placeholderData: initialJob })
@@ -64,20 +67,31 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
 
   const skills = job.skills?.length ? job.skills : job.tags
   const setLetter = (coverLetter) => queryClient.setQueryData(['job', job.id], (current) => (current ? { ...current, coverLetter } : current))
-  const setStrategy = (pitch) => queryClient.setQueryData(['job', job.id], (current) => (current ? { ...current, pitch } : current))
+  const setTips = (pitch) => queryClient.setQueryData(['job', job.id], (current) => (current ? { ...current, pitch } : current))
   const actions = <JobApplySection
     job={job}
     statusLabel={job.status}
-    applied={job.status === 'Applied'}
     dismissed={job.status === 'Rejected'}
-    onApplied={() => job.status !== 'Applied' && setDialog('apply')}
-    onDismiss={() => job.status !== 'Rejected' && setDialog('reject')}
+    onApplied={() => status.markApplied(job)}
+    onDismiss={() => status.markNotFit(job)}
+    statusError={status.errorId === job.id ? status.error?.message || 'Could not update this job.' : ''}
+    resolved={undoTab && job.status === undoTab ? (undoTab === 'Applied' ? 'applied' : 'rejected') : null}
+    onUndo={() => status.undo(job)}
+    undoing={status.pendingId === job.id}
     liked={reactions.isLiked(job.id)}
     favorite={reactions.isFavorite(job.id)}
     onLike={() => reactions.toggleLike(job.id, job)}
     onFavorite={() => reactions.toggleFavorite(job.id, job)}
     onShare={setShare}
+    showApply={!embedded}
   />
+  const skillsCard = <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
+    <div className="flex items-center justify-between gap-2">
+      <p className="flex items-center gap-2 text-sm font-semibold"><Target size={16} />Skills and expertise</p>
+      <span className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[var(--muted)]" title={`${skills.length} skill${skills.length === 1 ? '' : 's'} requested`}>{skills.length}</span>
+    </div>
+    <div className="mt-4 flex flex-wrap gap-1.5">{skills.map((skill) => <span key={skill} style={skillStyle(skill)} className="skill-chip rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}</div>
+  </div>
   const activity = <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
     <p className="flex items-center gap-2 text-sm font-semibold"><ClockCounterClockwise size={16} />Activity</p>
     <ol className="mt-4 space-y-3 border-l border-[var(--line)] pl-4">{job.activity.map((item, index) => <li key={`${item}-${index}`} className="relative text-xs leading-5"><span className={`absolute -left-[1.3rem] top-1.5 size-2 rounded-full ring-2 ring-[var(--surface)] ${index === 0 ? 'bg-[var(--lime-dark)]' : 'bg-[var(--line)]'}`} />{item}</li>)}</ol>
@@ -136,11 +150,10 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
           <ExpandableText collapsedHeight="12rem"><p className="whitespace-pre-wrap break-words text-[15px] leading-[1.8] text-[#3f413b]"><LinkifiedDescription text={job.description} /></p></ExpandableText>
         </Panel>
 
-        <Panel icon={Target} title="Skills and expertise" subtitle={`${skills.length} skill${skills.length === 1 ? '' : 's'} requested`}>
-          <div className="flex flex-wrap gap-2">{skills.map((skill) => <span key={skill} style={skillStyle(skill)} className="skill-chip rounded-full px-3 py-1.5 text-xs font-semibold">{skill}</span>)}</div>
-        </Panel>
+        {/* Skills live in the right sidebar; the drawer hides that sidebar below xl, so show them here instead. */}
+        {embedded && <div data-detail className="xl:hidden">{skillsCard}</div>}
 
-        <Strategy job={job} onStrategy={setStrategy} />
+        <Tips job={job} onTips={setTips} />
 
         <CoverLetter job={job} onLetter={setLetter} />
 
@@ -149,10 +162,10 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
 
       <aside data-detail className={`space-y-4 ${embedded ? 'hidden xl:block xl:sticky xl:top-2 xl:self-start' : 'lg:sticky lg:top-[calc(var(--shell-h)+1rem)] lg:self-start'}`}>
         {actions}
+        {skillsCard}
         {activity}
       </aside>
     </div>
-    {dialog && <ActionDialog type={dialog} job={job} stay={embedded} onClose={() => setDialog(null)} />}
     {share && <ShareJobDialog job={job} mode={share} onClose={() => setShare(null)} />}
   </div>
   return embedded ? content : <Shell><main>{content}</main></Shell>
