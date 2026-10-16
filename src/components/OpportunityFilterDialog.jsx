@@ -7,10 +7,8 @@ import { api } from '../services/api'
 import { EMPTY_EXTRA_FILTERS } from '../lib/preferences'
 import { countExtraFilters } from '../lib/jobSignals'
 import { asArray, asText } from '../lib/safe'
+import { SKILL_TAXONOMY, UNCATEGORIZED, classifySkill } from '../lib/skillCategories'
 
-// Tabs shown even before any skill is tagged, matching the CRM category dropdown.
-const SKILL_CATEGORIES = ['Development', 'Digital Marketing']
-const OTHER = 'Uncategorized'
 
 // Skills plus job type and client location; picks apply together when the dialog closes (outside click, X or Escape).
 export default function OpportunityFilterDialog({ skills = [], extraFilters = EMPTY_EXTRA_FILTERS, skillRecords = [], isLoading, error, onApply, onRemove }) {
@@ -22,6 +20,7 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
   const [editing, setEditing] = useState(null)
   const [deleteCandidate, setDeleteCandidate] = useState(null)
   const [category, setCategory] = useState('All')
+  const [subcategory, setSubcategory] = useState('All')
 
   const updateSkillCache = (updater) => queryClient.setQueryData(['skills'], (current) => {
     if (!asArray(current?.pages).length) return current
@@ -78,11 +77,15 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
   })
 
   const allSkillNames = skillRecords.map((record) => record.name).filter(Boolean)
-  const categoryOf = (record) => record.category || OTHER
-  const categories = ['All', ...new Set([...SKILL_CATEGORIES, ...skillRecords.map((record) => record.category).filter(Boolean)]), ...(skillRecords.some((record) => !record.category) ? [OTHER] : [])]
-  const inTab = (record, tab) => tab === 'All' || categoryOf(record) === tab
-  const visibleSkills = skillRecords.filter((record) => inTab(record, category) || editing?.id === record.id)
-  const selectedIn = (tab) => skillRecords.filter((record) => inTab(record, tab) && selectedSkills.includes(record.name)).length
+  const classified = skillRecords.map((record) => ({ record, ...classifySkill(record) }))
+  const categories = ['All', ...new Set([...Object.keys(SKILL_TAXONOMY), ...classified.map((item) => item.category).filter((name) => name !== UNCATEGORIZED)]), ...(classified.some((item) => item.category === UNCATEGORIZED) ? [UNCATEGORIZED] : [])]
+  const subcategories = SKILL_TAXONOMY[category] ? ['All', ...SKILL_TAXONOMY[category]] : []
+  const inTab = (item, tab, sub = 'All') => (tab === 'All' || item.category === tab) && (sub === 'All' || item.subcategory === sub)
+  const visibleSkills = classified.filter((item) => inTab(item, category, subcategory) || editing?.id === item.record.id).map((item) => item.record)
+  const countIn = (tab, sub) => { const items = classified.filter((item) => inTab(item, tab, sub)); return { total: items.length, picked: items.filter((item) => selectedSkills.includes(item.record.name)).length } }
+  const pickCategory = (tab) => { setCategory(tab); setSubcategory('All') }
+  const tabClass = (active, small = false) => `inline-flex shrink-0 items-center gap-1.5 rounded-full ${small ? 'px-2.5 py-1 text-[9px]' : 'px-3 py-1.5 text-[10px]'} font-bold ring-1 transition-colors ${active ? (small ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/40' : 'bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]') : 'bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`
+  const countBadge = (active, { total, picked }) => <span className={`rounded-full px-1.5 py-px text-[9px] tabular-nums ${active ? 'bg-black/10 dark:bg-white/15' : 'bg-[var(--paper)]'}`}>{picked ? `${picked}/${total}` : total}</span>
   // Removing a filter takes effect on the list straight away; new picks still wait for "Apply filters".
   const removeNow = (next) => onRemove({ skills, extraFilters, ...next })
   const toggleSkill = (skill) => {
@@ -148,13 +151,16 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
 
         <div role="tablist" aria-label="Skill categories" className="mt-4 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
           {categories.map((tab) => {
-            const active = category === tab, total = skillRecords.filter((record) => inTab(record, tab)).length, picked = selectedIn(tab)
-            return <button key={tab} type="button" role="tab" aria-selected={active} onClick={() => setCategory(tab)} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold ring-1 transition-colors ${active ? 'bg-[var(--ink)] text-[var(--paper)] ring-[var(--ink)]' : 'bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`}>
-              {tab}
-              <span className={`rounded-full px-1.5 py-px text-[9px] tabular-nums ${active ? 'bg-white/15' : 'bg-[var(--paper)]'}`}>{picked ? `${picked}/${total}` : total}</span>
-            </button>
+            const active = category === tab
+            return <button key={tab} type="button" role="tab" aria-selected={active} onClick={() => pickCategory(tab)} className={tabClass(active)}>{tab}{countBadge(active, countIn(tab))}</button>
           })}
         </div>
+        {subcategories.length > 0 && <div role="tablist" aria-label={`${category} subcategories`} className="mt-2 flex gap-1.5 overflow-x-auto border-l-2 border-[var(--line)] pb-1 pl-2.5 [scrollbar-width:thin]">
+          {subcategories.map((sub) => {
+            const active = subcategory === sub
+            return <button key={sub} type="button" role="tab" aria-selected={active} onClick={() => setSubcategory(sub)} className={tabClass(active, true)}>{sub === 'All' ? `All ${category}` : sub}{countBadge(active, countIn(category, sub))}</button>
+          })}
+        </div>}
 
         {mutationError && <p role="alert" className="mt-4 rounded-xl bg-[#f5d6cf] px-3 py-2 text-[10px] font-semibold text-[var(--danger)]">{mutationError.message || 'The skill change could not be saved.'}</p>}
 
@@ -186,7 +192,7 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
           ))}
           {isLoading && <span className="rounded-full bg-[var(--surface)] px-3 py-2 text-[10px] font-semibold text-[var(--muted)]">Loading skills…</span>}
           {!isLoading && skillRecords.length === 0 && !mutationError && <p className="py-6 text-xs text-[var(--muted)]">No CRM skills have been created yet.</p>}
-          {!isLoading && skillRecords.length > 0 && visibleSkills.length === 0 && <p className="py-6 text-xs text-[var(--muted)]">No skills in {category} yet. Set a skill's category in the CRM to show it here.</p>}
+          {!isLoading && skillRecords.length > 0 && visibleSkills.length === 0 && <p className="py-6 text-xs text-[var(--muted)]">No skills in {subcategory === 'All' ? category : `${category} · ${subcategory}`} yet.</p>}
         </div>
       </div>
       {hasFilters && <div className="mt-5 flex justify-end">
