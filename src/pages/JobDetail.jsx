@@ -49,9 +49,8 @@ function ActivityCard({ items = [] }) {
  * The full CRM job detail. Rendered as a page at /jobs/:id and, with `embedded`,
  * inside the job preview drawer as a single column.
  */
-// `undoTab` ('Applied' | 'Rejected') is set only when the drawer was opened from that tab; a job still in
-// that status then shows Undo instead of Not a fit.
-export function JobDetailView({ id, initialJob, embedded = false, undoTab = null }) {
+// An Applied or Rejected job shows its status with Undo instead of Not a fit, wherever it is opened from.
+export function JobDetailView({ id, initialJob, embedded = false }) {
   const [share, setShare] = useState(null), root = useRef(null), seenJob = useRef(null), queryClient = useQueryClient()
   const { user } = useAuth()
   const status = useJobStatus()
@@ -96,7 +95,7 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
     onApplied={() => status.markApplied(job)}
     onDismiss={() => status.markNotFit(job)}
     statusError={status.errorId === job.id ? status.error?.message || 'Could not update this job.' : ''}
-    resolved={undoTab && job.status === undoTab ? (undoTab === 'Applied' ? 'applied' : 'rejected') : null}
+    resolved={job.status === 'Applied' ? 'applied' : job.status === 'Rejected' ? 'rejected' : null}
     onUndo={() => status.undo(job)}
     undoing={status.pendingId === job.id}
     liked={reactions.isLiked(job.id)}
@@ -104,7 +103,7 @@ export function JobDetailView({ id, initialJob, embedded = false, undoTab = null
     onLike={() => reactions.toggleLike(job.id, job)}
     onFavorite={() => reactions.toggleFavorite(job.id, job)}
     onShare={setShare}
-    showApply={!embedded}
+    showApply={!embedded && job.status !== 'Applied'}
   /></ErrorBoundary>
   const skillsCard = <ErrorBoundary name="skills" resetKey={job.id}><SkillsCard skills={skills} /></ErrorBoundary>
   const activity = <ErrorBoundary name="activity" resetKey={job.id}><ActivityCard items={asArray(job.activity)} /></ErrorBoundary>

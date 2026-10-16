@@ -387,7 +387,7 @@ export default function Jobs() {
                 </nav>
                 <div className="min-w-0">
                   <section className="space-y-4">{filtered.map((job, index) => <ErrorBoundary key={job.id} name="job-card" fallback={CardError} resetKey={job}><JobCard job={job} index={index} now={now} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} onOpen={() => openPreview(job.id)}
-                    onUndo={(tab === "Applied" || tab === "Rejected") && job.status === tab ? () => jobStatus.undo(job) : undefined}
+                    onUndo={job.status === "Applied" || job.status === "Rejected" ? () => jobStatus.undo(job) : undefined}
                     undoing={jobStatus.pendingId === job.id}
                     undoError={jobStatus.errorId === job.id ? jobStatus.error?.message || "Could not undo. Try again." : ""} /></ErrorBoundary>)}</section>
                   <div ref={loadMoreRef} className="flex min-h-24 items-center justify-center py-8" aria-live="polite">
@@ -426,7 +426,7 @@ export default function Jobs() {
                 </section>}
         </div>
 
-        {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={jobStatus.markApplied} undoTab={tab === "Applied" || tab === "Rejected" ? tab : null} applyError={jobStatus.errorId === preview.id ? `Could not mark this job as applied: ${jobStatus.error?.message || "please try again."}` : ""} />}
+        {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={jobStatus.markApplied} applyError={jobStatus.errorId === preview.id ? `Could not mark this job as applied: ${jobStatus.error?.message || "please try again."}` : ""} />}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}
         {skillDialog && <OpportunityFilterDialog skills={skills} extraFilters={extraFilters} skillRecords={skillRecords} isLoading={skillsLoading || isFetchingMoreSkills} error={skillsError ? skillsQueryError : null} onClose={() => setSkillDialog(false)} onApply={({ skills: nextSkills, extraFilters: nextFilters }) => { setSkills(nextSkills); setExtraFilters(nextFilters); setSkillDialog(false); }} onRemove={({ skills: nextSkills, extraFilters: nextFilters }) => { setSkills(nextSkills); setExtraFilters(nextFilters); }} />}

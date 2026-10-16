@@ -34,7 +34,10 @@ function ActionPanel({ job, reactions, onShare, showApply }) {
     job={job}
     statusLabel={applied ? 'Applied' : dismissed ? 'Not a fit' : 'Live'}
     dismissed={dismissed}
-    onApplied={() => { if (!applied) reactions.toggleApplied(job.id) }}    onDismiss={() => reactions.toggleDismissed(job.id)}
+    onApplied={() => { if (!applied) reactions.toggleApplied(job.id) }}
+    onDismiss={() => reactions.toggleDismissed(job.id)}
+    resolved={applied ? 'applied' : dismissed ? 'rejected' : null}
+    onUndo={() => (applied ? reactions.toggleApplied(job.id) : reactions.toggleDismissed(job.id))}
     liked={reactions.isLiked(job.id)}
     favorite={reactions.isFavorite(job.id)}
     onLike={() => reactions.toggleLike(job.id, job)}

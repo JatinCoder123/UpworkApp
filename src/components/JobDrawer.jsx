@@ -18,8 +18,8 @@ const menuItem = 'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-l
  */
 // `onApply(job)` runs when the header's Apply on Upwork is clicked, so the page can mark the job applied;
 // `applyError` shows under the header if that update failed.
-// `undoTab` is the Applied/Rejected tab the drawer was opened from; an applied job there has no Apply on Upwork.
-export default function JobDrawer({ job, jobs = [], live = false, onSelect, onClose, onApply, applyError = '', undoTab = null }) {
+// An already-applied job has no Apply on Upwork in the header.
+export default function JobDrawer({ job, jobs = [], live = false, onSelect, onClose, onApply, applyError = '' }) {
   const panel = useRef(null)
   const body = useRef(null)
   const closeRef = useRef(onClose)
@@ -71,7 +71,7 @@ export default function JobDrawer({ job, jobs = [], live = false, onSelect, onCl
             <p className="text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">{live ? 'Live job preview' : 'Job preview'}</p>
             <p className="truncate text-sm font-semibold" title={job.title}>{job.title}</p>
           </div>
-          {job.applyUrl && !(undoTab === 'Applied' && job.status === 'Applied') && <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={() => onApply?.(job)} className="upwork-apply-button inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-4 text-xs font-bold"><span className="relative z-10"><span className="sm:hidden">Apply</span><span className="hidden sm:inline">Apply on Upwork</span></span><ArrowSquareOut size={14} weight="bold" className="relative z-10 shrink-0" /></a>}
+          {job.applyUrl && job.status !== 'Applied' && <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={() => onApply?.(job)} className="upwork-apply-button inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-4 text-xs font-bold"><span className="relative z-10"><span className="sm:hidden">Apply</span><span className="hidden sm:inline">Apply on Upwork</span></span><ArrowSquareOut size={14} weight="bold" className="relative z-10 shrink-0" /></a>}
           <div ref={menuRoot} className="relative shrink-0">
             <button type="button" onClick={() => setMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={menuOpen} aria-label="More actions" title="More actions" className={`grid size-9 place-items-center rounded-full ring-1 transition-colors ${menuOpen ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/35' : 'text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}><DotsThree size={18} weight="bold" /></button>
             {menuOpen && <div className="absolute right-0 top-11 z-50 w-64 rounded-[1.5rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5">
@@ -87,7 +87,7 @@ export default function JobDrawer({ job, jobs = [], live = false, onSelect, onCl
         {applyError && <p role="alert" className="flex items-start gap-2 border-b border-[var(--line)]/70 bg-[var(--bad-bg)] px-4 py-2.5 text-xs font-semibold text-[var(--bad)] sm:px-6"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" />{applyError}</p>}
         <div ref={body} className="drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
           <ErrorBoundary name="job-drawer" resetKey={job.id} fallback={DrawerError}>
-            {live ? <LiveJobDetailView key={job.id} id={job.id} job={job} embedded /> : <JobDetailView key={job.id} id={job.id} initialJob={job} embedded undoTab={undoTab} />}
+            {live ? <LiveJobDetailView key={job.id} id={job.id} job={job} embedded /> : <JobDetailView key={job.id} id={job.id} initialJob={job} embedded />}
           </ErrorBoundary>
         </div>
       </aside>
