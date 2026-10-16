@@ -2,11 +2,16 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowUpRight, Check, CircleNotch, PencilSimple, Plus, Trash, X } from '@phosphor-icons/react'
 import { DialogHeader, Modal, primaryButton } from './ui'
+import { ExtraFilterFields } from './JobListControls'
 import { api } from '../services/api'
+import { EMPTY_EXTRA_FILTERS } from '../lib/preferences'
+import { countExtraFilters } from '../lib/jobSignals'
 
-export default function OpportunityFilterDialog({ skills, skillRecords = [], isLoading, error, onApply, onClose }) {
+// Skills plus job type and client location; everything applies together on "Apply filters".
+export default function OpportunityFilterDialog({ skills, extraFilters = EMPTY_EXTRA_FILTERS, skillRecords = [], isLoading, error, onApply, onRemove, onClose }) {
   const queryClient = useQueryClient()
   const [selectedSkills, setSelectedSkills] = useState(skills)
+  const [filters, setFilters] = useState(extraFilters)
   const [isAdding, setIsAdding] = useState(false)
   const [newSkill, setNewSkill] = useState('')
   const [editing, setEditing] = useState(null)
@@ -67,7 +72,24 @@ export default function OpportunityFilterDialog({ skills, skillRecords = [], isL
   })
 
   const allSkillNames = skillRecords.map((record) => record.name).filter(Boolean)
-  const toggleSkill = (skill) => setSelectedSkills((current) => current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill])
+  // Removing a filter takes effect on the list straight away; new picks still wait for "Apply filters".
+  const removeNow = (next) => onRemove({ skills, extraFilters, ...next })
+  const toggleSkill = (skill) => {
+    if (!selectedSkills.includes(skill)) return setSelectedSkills((current) => [...current, skill])
+    setSelectedSkills((current) => current.filter((item) => item !== skill))
+    if (skills.includes(skill)) removeNow({ skills: skills.filter((item) => item !== skill) })
+  }
+  const changeFilters = (next) => {
+    setFilters(next)
+    const cleared = Object.keys(EMPTY_EXTRA_FILTERS).filter((key) => next[key] === EMPTY_EXTRA_FILTERS[key] && extraFilters[key] !== EMPTY_EXTRA_FILTERS[key])
+    if (cleared.length) removeNow({ extraFilters: { ...extraFilters, ...Object.fromEntries(cleared.map((key) => [key, EMPTY_EXTRA_FILTERS[key]])) } })
+  }
+  const clearFilters = () => {
+    setSelectedSkills([])
+    setFilters(EMPTY_EXTRA_FILTERS)
+    removeNow({ skills: [], extraFilters: EMPTY_EXTRA_FILTERS })
+  }
+  const hasFilters = selectedSkills.length > 0 || skills.length > 0 || countExtraFilters(filters) > 0 || countExtraFilters(extraFilters) > 0
   const handleAddSkill = () => {
     const trimmed = newSkill.trim()
     if (!trimmed) return
@@ -91,9 +113,14 @@ export default function OpportunityFilterDialog({ skills, skillRecords = [], isL
     <Modal onClose={onClose} wide>
       <DialogHeader eyebrow="Refine jobs" title="Filter your job list" onClose={onClose} />
       <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-        Choose from the shared CRM skills. Changes here update the outr_skills module for everyone.
+        Narrow jobs by type and client location, and choose from the shared CRM skills. Skill changes here update the outr_skills module for everyone.
       </p>
       <div className="mt-7 rounded-2xl bg-[var(--paper)] p-4">
+        <p className="text-[10px] font-bold uppercase tracking-[.17em] text-[var(--muted)]">More filters</p>
+        <p className="mt-1 text-[9px] text-[var(--muted)]">Job type and client location</p>
+        <div className="mt-4"><ExtraFilterFields value={filters} onChange={changeFilters} onPaper /></div>
+      </div>
+      <div className="mt-4 rounded-2xl bg-[var(--paper)] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[.17em] text-[var(--muted)]">All skills</p>
@@ -103,7 +130,6 @@ export default function OpportunityFilterDialog({ skills, skillRecords = [], isL
             <button type="button" onClick={() => setIsAdding(true)} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--raised)] px-3 py-1.5 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-all duration-300 hover:ring-[var(--lime-dark)]">
               <Plus size={11} weight="bold" /> Add skill
             </button>
-            {selectedSkills.length > 0 && <button type="button" onClick={() => setSelectedSkills([])} className="text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear skills</button>}
           </div>
         </div>
 
@@ -139,10 +165,13 @@ export default function OpportunityFilterDialog({ skills, skillRecords = [], isL
           {!isLoading && skillRecords.length === 0 && !mutationError && <p className="py-6 text-xs text-[var(--muted)]">No CRM skills have been created yet.</p>}
         </div>
       </div>
-      <button onClick={() => onApply(selectedSkills)} className={`${primaryButton} mt-7 w-full`}>
-        <span>Apply skill filters</span>
-        <span className="ml-auto grid size-8 place-items-center rounded-full bg-white/10"><ArrowUpRight size={15} /></span>
-      </button>
+      <div className="mt-7 flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+        {hasFilters && <button type="button" onClick={clearFilters} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)] transition-colors hover:text-[var(--ink)]">Clear filters</button>}
+        <button type="button" onClick={() => onApply({ skills: selectedSkills, extraFilters: filters })} className={`${primaryButton} flex-1`}>
+          <span>Apply filters</span>
+          <span className="ml-auto grid size-8 place-items-center rounded-full bg-white/10"><ArrowUpRight size={15} /></span>
+        </button>
+      </div>
     </Modal>
   )
 }

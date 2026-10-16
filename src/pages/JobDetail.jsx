@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import gsap from 'gsap'
-import { ArrowLeft, Briefcase, CalendarBlank, ChartBar, Check, Clock, ClockCounterClockwise, CurrencyDollar, Hourglass, Lightbulb, MapPin, SealCheck, Sparkle, Star, Tag, Target, WarningCircle } from '@phosphor-icons/react'
+import { ArrowLeft, Briefcase, CalendarBlank, ChartBar, Clock, ClockCounterClockwise, CurrencyDollar, Hourglass, MapPin, SealCheck, Sparkle, Star, Tag, Target, WarningCircle } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import NotFound from './NotFound'
 import ExpandableText from '../components/ExpandableText'
-import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, ProfileSuggestions, card } from '../components/JobDetailParts'
+import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, Strategy, card } from '../components/JobDetailParts'
 import JobApplySection from '../components/JobApplySection'
 import ShareJobDialog from '../components/ShareJobDialog'
 import { ActionDialog } from '../components/dialogs'
@@ -23,12 +23,6 @@ function MatchRing({ value }) {
     <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90"><circle cx="18" cy="18" r="15.9155" pathLength="100" fill="none" strokeWidth="3" className="stroke-black/[.07] dark:stroke-white/10" /><circle cx="18" cy="18" r="15.9155" pathLength="100" fill="none" strokeWidth="3" strokeLinecap="round" strokeDasharray={`${value} 100`} style={{ stroke: tone }} /></svg>
     <span className="text-center leading-none"><span className="block text-xl font-semibold tracking-[-.04em]">{value}%</span><span className="text-[9px] font-bold uppercase tracking-[.12em] text-[var(--muted)]">match</span></span>
   </div>
-}
-
-function PitchList({ text }) {
-  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
-  if (!lines.every((line) => /^[-•*]\s+/.test(line))) return <p className="whitespace-pre-wrap text-sm leading-7">{text}</p>
-  return <ul className="grid gap-2.5">{lines.map((line) => <li key={line} className="flex gap-3 text-sm leading-6"><Check size={15} weight="bold" className="mt-1 shrink-0 text-[var(--accent-strong)]" />{line.replace(/^[-•*]\s+/, '')}</li>)}</ul>
 }
 
 /**
@@ -70,6 +64,7 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
 
   const skills = job.skills?.length ? job.skills : job.tags
   const setLetter = (coverLetter) => queryClient.setQueryData(['job', job.id], (current) => (current ? { ...current, coverLetter } : current))
+  const setStrategy = (pitch) => queryClient.setQueryData(['job', job.id], (current) => (current ? { ...current, pitch } : current))
   const actions = <JobApplySection
     job={job}
     statusLabel={job.status}
@@ -145,11 +140,7 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
           <div className="flex flex-wrap gap-2">{skills.map((skill) => <span key={skill} style={skillStyle(skill)} className="skill-chip rounded-full px-3 py-1.5 text-xs font-semibold">{skill}</span>)}</div>
         </Panel>
 
-        {job.pitch && <Panel icon={Lightbulb} title="Pitch angle" subtitle="Points to lead with in the proposal">
-          <ExpandableText collapsedHeight="8rem"><PitchList text={job.pitch} /></ExpandableText>
-        </Panel>}
-
-        <ProfileSuggestions job={job} />
+        <Strategy job={job} onStrategy={setStrategy} />
 
         <CoverLetter job={job} onLetter={setLetter} />
 

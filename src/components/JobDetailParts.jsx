@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { ArrowClockwise, Briefcase, ChartBar, Check, Clock, Copy, CurrencyDollar, FileText, FloppyDisk, Hourglass, IdentificationCard, MagicWand, PencilSimple, SealCheck, Sparkle, Star, Target, User, UserFocus, Users, WarningCircle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, Briefcase, Check, Clock, Copy, CurrencyDollar, FileText, FloppyDisk, Hourglass, Lightbulb, MagicWand, PencilSimple, SealCheck, Sparkle, Star, Target, User, Users, WarningCircle, X } from '@phosphor-icons/react'
 import ExpandableText from './ExpandableText'
 import { api } from '../services/api'
 
@@ -17,16 +17,18 @@ export function LinkifiedDescription({ text }) {
   })
 }
 
-export function Panel({ icon: Icon, title, subtitle, action, children }) {
-  return <section data-detail className={card}>
-    <header className="flex items-start justify-between gap-3">
+// `accent` adds the same lime wash the job header uses, for sections that should stand out.
+export function Panel({ icon: Icon, title, subtitle, action, accent = false, children }) {
+  return <section data-detail className={`${card} relative overflow-hidden`}>
+    {accent && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[var(--lime)]/25 to-transparent" />}
+    <header className="relative flex items-start justify-between gap-3">
       <div className="flex items-center gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--lime)]/30 text-[var(--accent-strong)]"><Icon size={17} weight="duotone" /></span>
         <div><h2 className="text-base font-semibold tracking-[-.015em]">{title}</h2>{subtitle && <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>}</div>
       </div>
       {action}
     </header>
-    <div className="mt-5">{children}</div>
+    <div className="relative mt-5">{children}</div>
   </section>
 }
 
@@ -169,26 +171,34 @@ export function CoverLetter({ job, onLetter }) {
   </Panel>
 }
 
-const median = (values) => (values.length ? [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)] : null)
+// Bullet lines ("- ", "• ", "* ") read as numbered steps on FactTile-style rows; any other text keeps its line breaks.
+function StrategyPoints({ text }) {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
+  if (!lines.every((line) => /^[-•*]\s+/.test(line))) return <p className="whitespace-pre-wrap break-words rounded-2xl bg-[var(--paper)] p-4 text-sm leading-7">{text}</p>
+  return <ol className="grid gap-2">{lines.map((line, index) => <li key={line} className="flex items-start gap-3 rounded-2xl bg-[var(--paper)] p-3.5 text-sm leading-6">
+    <span className="grid size-7 shrink-0 place-items-center rounded-xl bg-[var(--surface)] font-mono text-[10px] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--line)]/70">{String(index + 1).padStart(2, '0')}</span>
+    <span className="min-w-0 pt-0.5">{line.replace(/^[-•*]\s+/, '')}</span>
+  </li>)}</ol>
+}
 
-// Practical profile tweaks for this job, derived from its skills, category and budget.
-export function ProfileSuggestions({ job }) {
-  const skills = (job.skills?.length ? job.skills : job.tags || []).filter((skill) => skill && skill !== 'General')
-  const top = skills.slice(0, 2)
-  const category = job.tags?.find((tag) => tag && tag !== 'General') || ''
-  const amounts = String(job.budget || '').match(/\d[\d,.]*/g)?.map((value) => Number(value.replace(/,/g, ''))).filter((value) => Number.isFinite(value) && value > 0) || []
-  const hourly = job.type === 'Hourly'
-  const rate = hourly ? median(amounts) : null
-  const items = [
-    top.length > 0 && [IdentificationCard, 'Headline to lead with', `${top.join(' & ')} specialist${category ? ` for ${category}` : ''}`],
-    category && [Briefcase, 'Specialized profile', `Apply with your ${category} profile so the portfolio matches this job`],
-    skills.length > 0 && [Target, 'Skills to pin first', skills.slice(0, 6).join(', ')],
-    rate && [CurrencyDollar, 'Rate to show', `Around $${Math.round(rate)}/hr keeps you inside the ${job.budget} range`],
-    !hourly && amounts.length > 0 && [CurrencyDollar, 'Bid guidance', `Quote close to ${job.budget} and split it into milestones`],
-    job.level && job.level !== 'Not specified' && [ChartBar, 'Experience signal', job.level === 'Expert' ? 'Feature 2–3 detailed case studies with measurable results' : /entry/i.test(job.level) ? 'Keep it simple; quick turnaround and price matter most' : 'Show one closely related project with a clear outcome'],
-  ].filter(Boolean)
-  if (!items.length) return null
-  return <Panel icon={UserFocus} title="Profile suggestions" subtitle="Based on this job’s skills, category and budget">
-    <ul className="grid gap-3 sm:grid-cols-2">{items.map(([icon, label, value]) => <li key={label} className="min-w-0"><FactTile icon={icon} label={label} value={value} wrap /></li>)}</ul>
+// The proposal strategy for a CRM job, with a button that asks the endpoint for a fresh one.
+export function Strategy({ job, onStrategy }) {
+  const generate = useMutation({ mutationFn: () => api.getStrategy(job), onSuccess: onStrategy })
+  const strategy = job.pitch || ''
+  const action = <button type="button" disabled={generate.isPending} onClick={() => generate.mutate()} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-[var(--ink)] px-4 text-xs font-semibold text-white transition-opacity disabled:opacity-60">
+    {generate.isPending ? <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <Sparkle size={14} weight="fill" />}
+    {generate.isPending ? 'Generating…' : 'Next strategy'}
+  </button>
+
+  return <Panel icon={Lightbulb} title="Strategy" subtitle={generate.isPending ? 'Building a fresh strategy from the job, client and budget…' : 'Points to lead with in the proposal'} action={action} accent>
+    {generate.isError && <p role="alert" className="mb-3 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{generate.error?.message}</p>}
+    <div aria-busy={generate.isPending} className={`transition-opacity duration-300 ${generate.isPending ? 'opacity-50' : ''}`}>
+      {strategy
+        ? <ExpandableText collapsedHeight="14rem"><StrategyPoints text={strategy} /></ExpandableText>
+        : <div className="rounded-2xl border border-dashed border-[var(--line)] p-5">
+          <p className="text-sm font-semibold">No strategy yet</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">Use Next strategy to generate one from the job description and budget.</p>
+        </div>}
+    </div>
   </Panel>
 }

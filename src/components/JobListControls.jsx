@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowsDownUp, CaretDown, Check, SlidersHorizontal } from '@phosphor-icons/react'
+import { ArrowsDownUp, CaretDown, Check, MapPin, SlidersHorizontal } from '@phosphor-icons/react'
 import { EMPTY_EXTRA_FILTERS } from '../lib/preferences'
-import { countExtraFilters } from '../lib/jobSignals'
+import { CLIENT_LOCATIONS, clientLocation, countExtraFilters } from '../lib/jobSignals'
 
 function usePopover() {
   const [open, setOpen] = useState(false)
@@ -37,6 +37,42 @@ export function SortMenu({ value, options, onChange, label = 'Sort jobs' }) {
 }
 
 const JOB_TYPES = [['any', 'Any'], ['hourly', 'Hourly'], ['fixed', 'Fixed price']]
+const fieldLabel = 'text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]'
+
+// Fields sit on --paper inside surface menus, and on --surface inside paper boxes (like the dialog's skill chips).
+const fieldTone = (onPaper) => (onPaper ? { field: 'bg-[var(--surface)]', hover: 'hover:bg-[var(--paper)]' } : { field: 'bg-[var(--paper)]', hover: 'hover:bg-[var(--surface)]' })
+
+export function LocationSelect({ value, onChange, onPaper = false }) {
+  const { open, setOpen, root } = usePopover()
+  const current = clientLocation(value)
+  const tone = fieldTone(onPaper)
+  return <div ref={root} className="relative">
+    <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label={`Client location: ${current.label}`} onClick={() => setOpen((state) => !state)} className={`flex h-11 w-full items-center gap-2.5 rounded-xl ${tone.field} px-3 text-left text-xs font-semibold ring-1 transition-shadow ${open ? 'ring-[var(--lime-dark)]' : 'ring-black/5 hover:ring-black/15 dark:ring-white/10'}`}>
+      <MapPin size={15} weight={value === 'any' ? 'regular' : 'fill'} className={`shrink-0 ${value === 'any' ? 'text-[var(--muted)]' : 'text-[var(--accent-strong)]'}`} />
+      <span className={`min-w-0 flex-1 truncate ${value === 'any' ? 'text-[var(--muted)]' : ''}`}>{current.label}</span>
+      <CaretDown size={12} className={`shrink-0 text-[var(--muted)] transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+    </button>
+    {open && <div className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5">
+      <ul role="listbox" aria-label="Client location" className="max-h-64 overflow-y-auto rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
+        {CLIENT_LOCATIONS.map((option) => <li key={option.id}><button type="button" role="option" aria-selected={option.id === value} onClick={() => { onChange(option.id === value ? 'any' : option.id); setOpen(false) }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${option.id === value ? 'bg-[var(--lime)]/35 text-[var(--ink)]' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{option.label}{option.id === value && <Check size={13} weight="bold" />}</button></li>)}
+      </ul>
+    </div>}
+  </div>
+}
+
+// Job type and client location; shared by the jobs filter dialog and the live jobs More filters menu.
+export function ExtraFilterFields({ value, onChange, onPaper = false }) {
+  const tone = fieldTone(onPaper)
+  return <>
+    <p className={fieldLabel}>Job type</p>
+    <div className={`mt-2 grid grid-cols-3 gap-1 rounded-xl ${tone.field} p-1 ring-1 ring-black/5 dark:ring-white/10`} role="radiogroup" aria-label="Job type">
+      {JOB_TYPES.map(([id, label]) => <button key={id} type="button" role="radio" aria-checked={value.jobType === id} onClick={() => onChange({ ...value, jobType: value.jobType === id ? 'any' : id })} className={`whitespace-nowrap rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${value.jobType === id ? 'bg-[var(--ink)] text-white shadow-sm' : `text-[var(--muted)] ${tone.hover} hover:text-[var(--ink)]`}`}>{label}</button>)}
+    </div>
+
+    <p className={`${fieldLabel} mt-4`}>Client location</p>
+    <div className="mt-2"><LocationSelect value={value.location} onPaper={onPaper} onChange={(location) => onChange({ ...value, location })} /></div>
+  </>
+}
 
 export function MoreFiltersMenu({ value, onChange }) {
   const { open, setOpen, root } = usePopover()
@@ -53,17 +89,7 @@ export function MoreFiltersMenu({ value, onChange }) {
           <button type="button" disabled={!count} onClick={() => onChange(EMPTY_EXTRA_FILTERS)} className="rounded-full px-2.5 py-1 text-[11px] font-bold text-[var(--muted)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)] disabled:pointer-events-none disabled:opacity-40">Reset</button>
         </div>
 
-        <p className="mt-4 text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Job type</p>
-        <div className="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-[var(--paper)] p-1 ring-1 ring-[var(--line)]/70" role="radiogroup" aria-label="Job type">
-          {JOB_TYPES.map(([id, label]) => <button key={id} type="button" role="radio" aria-checked={value.jobType === id} onClick={() => onChange({ ...value, jobType: id })} className={`whitespace-nowrap rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${value.jobType === id ? 'bg-[var(--ink)] text-white shadow-sm' : 'text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]'}`}>{label}</button>)}
-        </div>
-
-        <p className="mt-4 text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Client location</p>
-        <label className="mt-2 flex cursor-pointer items-center justify-between gap-4 rounded-xl bg-[var(--paper)] p-3 ring-1 ring-[var(--line)]/70">
-          <span className="min-w-0"><span className="block text-xs font-semibold">USA clients only</span><span className="mt-0.5 block text-[11px] leading-4 text-[var(--muted)]">Hide clients outside the United States</span></span>
-          <input type="checkbox" role="switch" checked={value.usaOnly} onChange={(event) => onChange({ ...value, usaOnly: event.target.checked })} className="peer sr-only" />
-          <span aria-hidden="true" className="usa-switch relative h-6 w-11 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--lime-dark)]/60 after:absolute after:left-1 after:top-1 after:size-4 after:rounded-full after:shadow-[0_1px_3px_rgba(0,0,0,.3)] after:transition-transform peer-checked:after:translate-x-5" />
-        </label>
+        <div className="mt-4"><ExtraFilterFields value={value} onChange={onChange} /></div>
       </div>
     </div>}
   </div>

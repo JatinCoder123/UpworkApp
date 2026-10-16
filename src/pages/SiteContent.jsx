@@ -8,11 +8,13 @@ import {
   Check,
   CheckCircle,
   Circle,
+  ClockCounterClockwise,
   Copy,
   DownloadSimple,
   Eye,
   FileDoc,
   Fire,
+  GearSix,
   Globe,
   Key,
   LinkSimple,
@@ -28,7 +30,20 @@ import Shell from '../components/Shell'
 import LogoLoader from '../components/LogoLoader'
 import HScroll from '../components/HScroll'
 import { Modal, primaryButton, stickyBand } from '../components/ui'
-import { api } from '../services/api'
+import CategoryFilterDialog from '../components/CategoryFilterDialog'
+import { api, getDocumentViewUrl } from '../services/api'
+import {
+  subscribeDocStatus,
+  getCachedDocStatus,
+  getDocStartTime,
+  recordDocStartTime,
+  resetDocStartTime,
+  saveDocInProgress,
+  clearDocInProgress,
+} from '../services/docSocket'
+import { recordDocNotification } from '../services/docNotifications'
+import { useAuth } from '../contexts/AuthContext'
+import { forgetSearch, loadRecentSearches, rememberSearch } from '../lib/jobSignals'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -46,6 +61,15 @@ function hostname(url) {
   } catch {
     return url
   }
+}
+
+function useDebounced(value, delay) {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay)
+    return () => window.clearTimeout(timer)
+  }, [value, delay])
+  return debounced
 }
 
 function useDesktop() {
@@ -72,6 +96,7 @@ function SiteMark({ site, size = 'size-9' }) {
 }
 
 export default function SiteContent() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const {
     data: items = [],
@@ -90,11 +115,45 @@ export default function SiteContent() {
   const [category, setCategory] = useState('All')
   const [urgentOnly, setUrgentOnly] = useState(false)
   const [hideDone, setHideDone] = useState(false)
-  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const debouncedSearch = useDebounced(searchInput.trim(), 400)
+  const [recentSearches, setRecentSearches] = useState(() => loadRecentSearches(user?.email, 'sitecontent'))
+  const [searchFocused, setSearchFocused] = useState(false)
   const [selectedId, setSelectedId] = useState(null)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
   const desktop = useDesktop()
   const root = useRef(null)
+
+  useEffect(() => {
+    setRecentSearches(loadRecentSearches(user?.email, 'sitecontent'))
+  }, [user?.email])
+
+  const commitSearch = (value = searchInput) =>
+    setRecentSearches(rememberSearch(user?.email, value, 'sitecontent'))
+
+  const applySearch = (value) => {
+    setSearchInput(value)
+    commitSearch(value)
+    setSearchFocused(false)
+  }
+
+  const historyTerm = searchInput.trim().toLowerCase()
+  const searchHistory = recentSearches.filter(
+    (term) =>
+      !historyTerm ||
+      (term.toLowerCase().includes(historyTerm) && term.toLowerCase() !== historyTerm)
+  )
+
+  const searching = isFetching || (searchInput.trim() !== debouncedSearch)
+
+  const hasFilters = Boolean(
+    site !== 'All' ||
+    category !== 'All' ||
+    urgentOnly ||
+    hideDone ||
+    searchInput.trim()
+  )
 
   const sites = useMemo(() => {
     const counts = new Map()
@@ -103,12 +162,29 @@ export default function SiteContent() {
   }, [items])
 
   const categories = useMemo(
-    () => ['All', ...new Set(items.map((item) => item.category))],
+    () => ['All', ...new Set(items.map((item) => item.category).filter(Boolean))],
     [items]
   )
 
+  const categoryCounts = useMemo(() => {
+    const counts = { All: items.length }
+    items.forEach((item) => {
+      if (item.category) {
+        counts[item.category] = (counts[item.category] || 0) + 1
+      }
+    })
+    return counts
+  }, [items])
+
+  useEffect(() => {
+    if (category && category !== 'All') {
+      const el = document.getElementById(`cat-chip-${category}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+    }
+  }, [category])
+
   const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase()
+    const query = debouncedSearch.toLowerCase()
     return items
       .filter(
         (item) =>
@@ -125,7 +201,7 @@ export default function SiteContent() {
             .includes(query)
       )
       .sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt) || a.priority - b.priority)
-  }, [items, site, category, urgentOnly, hideDone, search])
+  }, [items, site, category, urgentOnly, hideDone, debouncedSearch])
 
   const selected = filtered.find((item) => item.id === selectedId) || filtered[0]
 
@@ -291,58 +367,247 @@ export default function SiteContent() {
         )}
 
         <div className={`${stickyBand} mt-4`}>
-          <div className="flex flex-col gap-2 rounded-[1.6rem] bg-[var(--surface)] p-2 ring-1 ring-[var(--line)]/70 shadow-[0_18px_50px_rgba(30,32,25,.08)] lg:flex-row lg:items-center">
-            <HScroll className="flex-1" innerClassName="gap-1" label="categories">
-              {categories.map((item) => (
+          <div className="flex flex-col gap-2 rounded-[1.6rem] bg-[var(--surface)] p-2 ring-1 ring-[var(--line)]/70 shadow-[0_18px_50px_rgba(30,32,25,.08)]">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center justify-between">
+              <div className="flex shrink-0 items-center gap-1.5">
+                <HScroll
+                  className="min-w-0 max-w-[19rem] sm:max-w-[22rem] md:max-w-[24rem]"
+                  innerClassName="gap-1"
+                  fade="var(--surface)"
+                  label="categories"
+                >
+                  {categories.map((item) => (
+                    <button
+                      key={item}
+                      id={`cat-chip-${item}`}
+                      type="button"
+                      onClick={() => setCategory(item)}
+                      className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-bold transition-all duration-300 ${
+                        category === item
+                          ? 'bg-[var(--lime)] !text-[#26320b] shadow-sm'
+                          : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </HScroll>
                 <button
-                  key={item}
                   type="button"
-                  onClick={() => setCategory(item)}
-                  className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-bold transition-all duration-300 ${
-                    category === item
-                      ? 'bg-[var(--lime)] !text-[#26320b] shadow-sm'
-                      : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'
+                  onClick={() => setCategoryDialogOpen(true)}
+                  aria-label="All content categories"
+                  title="Browse all categories"
+                  className={`grid size-8 shrink-0 place-items-center rounded-full transition-all duration-300 hover:rotate-45 ${
+                    category !== 'All'
+                      ? 'bg-[var(--lime)] text-[#26320b] ring-2 ring-[var(--lime-dark)]/40 shadow-xs'
+                      : 'text-[var(--muted)] ring-1 ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'
                   }`}
                 >
-                  {item}
+                  <GearSix size={16} weight="bold" />
                 </button>
-              ))}
-            </HScroll>
-            <div className="flex flex-wrap items-center gap-2">
-              <Toggle active={urgentOnly} onClick={() => setUrgentOnly((value) => !value)} icon={Fire}>
-                Hurry up
-              </Toggle>
-              <Toggle active={hideDone} onClick={() => setHideDone((value) => !value)} icon={CheckCircle}>
-                Hide done
-              </Toggle>
-              <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-3.5 py-2 lg:w-52 lg:flex-none">
-                <MagnifyingGlass size={14} className="shrink-0 text-[var(--muted)]" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search ideas"
-                  className="min-w-0 flex-1 bg-transparent text-xs outline-none"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch('')}
-                    aria-label="Clear search"
-                    className="grid size-5 place-items-center rounded-full text-[var(--muted)] hover:bg-black/10"
-                  >
-                    <X size={11} weight="bold" />
-                  </button>
-                )}
-              </label>
-              <button
-                type="button"
-                onClick={() => refetch()}
-                aria-label="Refresh ideas"
-                className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--paper)] text-[var(--muted)] hover:text-[var(--ink)]"
-              >
-                <ArrowsClockwise size={15} className={isFetching ? 'animate-spin' : ''} />
-              </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+                <Toggle active={urgentOnly} onClick={() => setUrgentOnly((value) => !value)} icon={Fire}>
+                  Hurry up
+                </Toggle>
+                <Toggle active={hideDone} onClick={() => setHideDone((value) => !value)} icon={CheckCircle}>
+                  Hide done
+                </Toggle>
+
+                {/* Search Bar matching Jobs & Tech News */}
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    commitSearch()
+                    setSearchFocused(false)
+                  }}
+                  className="relative flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[var(--paper)] px-4 py-2 ring-1 ring-transparent transition-shadow focus-within:ring-[var(--lime-dark)] sm:w-64 lg:w-72 lg:flex-none"
+                >
+                  {searching ? (
+                    <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />
+                  ) : (
+                    <MagnifyingGlass size={15} className="shrink-0 text-[var(--muted)]" />
+                  )}
+                  <input
+                    value={searchInput}
+                    onChange={(event) => {
+                      setSearchInput(event.target.value)
+                      setSearchFocused(true)
+                    }}
+                    onFocus={() => setSearchFocused(true)}
+                    onBlur={() => {
+                      setSearchFocused(false)
+                      if (searchInput.trim()) commitSearch()
+                    }}
+                    onKeyDown={(event) => event.key === 'Escape' && setSearchFocused(false)}
+                    placeholder="Search ideas, site, angle, keywords…"
+                    aria-label="Search site content"
+                    aria-expanded={searchFocused && searchHistory.length > 0}
+                    aria-controls="site-content-search-history"
+                    autoComplete="off"
+                    className="min-w-0 flex-1 bg-transparent text-xs outline-none"
+                  />
+                  {searchInput && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchInput('')
+                        setSearchFocused(false)
+                      }}
+                      aria-label="Clear search"
+                      className="grid size-5 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] hover:bg-black/15 dark:bg-white/10"
+                    >
+                      <X size={11} weight="bold" />
+                    </button>
+                  )}
+                  {searchFocused && searchHistory.length > 0 && (
+                    <div
+                      id="site-content-search-history"
+                      onMouseDown={(event) => event.preventDefault()}
+                      className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5"
+                    >
+                      <div className="rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
+                        <div className="flex items-center justify-between px-2 pb-1.5 pt-1">
+                          <span className="text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">
+                            Recent searches
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              recentSearches.forEach((term) => forgetSearch(user?.email, term, 'sitecontent'))
+                              setRecentSearches([])
+                            }}
+                            className="text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]"
+                          >
+                            Clear history
+                          </button>
+                        </div>
+                        <ul>
+                          {searchHistory.map((term) => (
+                            <li
+                              key={term}
+                              className="group/term flex items-center rounded-xl hover:bg-[var(--paper)]"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => applySearch(term)}
+                                className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-[var(--muted)] group-hover/term:text-[var(--ink)]"
+                              >
+                                <ClockCounterClockwise size={14} className="shrink-0" />
+                                <span className="truncate">{term}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRecentSearches(forgetSearch(user?.email, term, 'sitecontent'))}
+                                aria-label={`Forget search ${term}`}
+                                className="mr-1.5 grid size-6 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-black/10 hover:text-[var(--ink)]"
+                              >
+                                <X size={11} />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </form>
+
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  aria-label="Refresh ideas"
+                  title="Refresh content ideas"
+                  className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--paper)] text-[var(--muted)] hover:text-[var(--ink)] active:scale-95 transition-all"
+                >
+                  <ArrowsClockwise size={15} className={isFetching ? 'animate-spin text-[var(--lime-dark)]' : ''} />
+                </button>
+              </div>
             </div>
+
+            {/* Active Filter Chips */}
+            {hasFilters && (
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/[.06] px-1 pt-2 dark:border-white/[.08]">
+                {debouncedSearch && (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+                    <span>"{debouncedSearch}"</span>
+                    <button
+                      type="button"
+                      onClick={() => setSearchInput('')}
+                      aria-label="Remove search filter"
+                      className="grid size-4 place-items-center rounded-full transition-colors hover:bg-black/10"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                )}
+                {urgentOnly && (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+                    <span>Hurry up</span>
+                    <button
+                      type="button"
+                      onClick={() => setUrgentOnly(false)}
+                      aria-label="Remove hurry up filter"
+                      className="grid size-4 place-items-center rounded-full transition-colors hover:bg-black/10"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                )}
+                {hideDone && (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+                    <span>Hide done</span>
+                    <button
+                      type="button"
+                      onClick={() => setHideDone(false)}
+                      aria-label="Remove hide done filter"
+                      className="grid size-4 place-items-center rounded-full transition-colors hover:bg-black/10"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                )}
+                {site !== 'All' && (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+                    <span>Site: {site}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSite('All')}
+                      aria-label="Remove site filter"
+                      className="grid size-4 place-items-center rounded-full transition-colors hover:bg-black/10"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                )}
+                {category !== 'All' && (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+                    <span>Category: {category}</span>
+                    <button
+                      type="button"
+                      onClick={() => setCategory('All')}
+                      aria-label="Remove category filter"
+                      className="grid size-4 place-items-center rounded-full transition-colors hover:bg-black/10"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput('')
+                    setUrgentOnly(false)
+                    setHideDone(false)
+                    setSite('All')
+                    setCategory('All')
+                  }}
+                  className="text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -402,6 +667,16 @@ export default function SiteContent() {
               bare
             />
           </Modal>
+        )}
+
+        {categoryDialogOpen && (
+          <CategoryFilterDialog
+            categories={categories}
+            categoryCounts={categoryCounts}
+            selectedCategory={category}
+            onSelect={(cat) => setCategory(cat)}
+            onClose={() => setCategoryDialogOpen(false)}
+          />
         )}
       </main>
     </Shell>
@@ -541,66 +816,174 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
   const [activeNoteId, setActiveNoteId] = useState(item.notesId || '')
   const [isTriggering, setIsTriggering] = useState(false)
   const [triggerError, setTriggerError] = useState('')
+  const [justCompleted, setJustCompleted] = useState(false)
+  const [liveSocketStatus, setLiveSocketStatus] = useState(() => {
+    const cached = getCachedDocStatus(item.notesId, item.id)
+    return cached?.status || null
+  })
+  const [liveNoteFields, setLiveNoteFields] = useState(null)
 
   // Keep state in sync with selected item
   useEffect(() => {
-    setActiveNoteId(item.notesId || '')
-    setIsTriggering(false)
+    const cached = getCachedDocStatus(item.notesId, item.id)
+    const inProg = Boolean(cached?.status && ['queued', 'processing', 'compiling'].includes(cached.status))
+    setActiveNoteId(item.notesId || cached?.noteId || '')
+    setIsTriggering(inProg)
     setTriggerError('')
+    setJustCompleted(false)
+    setLiveSocketStatus(cached?.status || null)
+    if (cached?.filename || cached?.viewUrl || cached?.documentUrl) {
+      setLiveNoteFields({
+        filename: cached.filename,
+        viewUrl: cached.viewUrl,
+        documentUrl: cached.documentUrl,
+      })
+    } else {
+      setLiveNoteFields(null)
+    }
   }, [item.id, item.notesId])
 
-  // Real-time backend note tracking via smart gateway with 10-minute window and generous timeout
+  // Single on-demand note query via smart gateway (NO CONTINUOUS POLLING!)
+  // Endpoint is queried once on initial load, or when websocket signals completion
   const {
-    data: note,
-    isFetching: isNoteFetching,
+    data: fetchedNote,
     refetch: refetchNote,
   } = useQuery({
     queryKey: ['site-content-note', activeNoteId],
     queryFn: async () => {
-      try {
-        const res = await api.getNote(activeNoteId, { timeout: 600_000 })
-        return res
-      } catch (err) {
-        console.warn('Note polling check had a momentary delay/timeout, keeping previous data:', err)
-        // Keep existing note data so polling continues without aborting
-        return queryClient.getQueryData(['site-content-note', activeNoteId]) || null
-      }
+      if (!activeNoteId) return null
+      return api.getNote(activeNoteId, { timeout: 60_000 })
     },
     enabled: Boolean(activeNoteId),
-    refetchInterval: (query) => {
-      const status = query.state.data?.status
-      // Poll every 7s while queued or processing (keeps polling for 10+ minutes gently)
-      return status === 'queued' || status === 'processing' || isTriggering ? 7000 : false
-    },
-    refetchIntervalInBackground: true, // keeps polling active even if user switches browser tab or window
-    retry: Infinity, // never stop polling/retrying during the 8-10 minute generation process
-    retryDelay: 4000,
-    placeholderData: (prev) => prev,
+    refetchInterval: false, // ZERO POLLING: Driven purely via WebSocket events
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
   })
+
+  // Listen to WebSocket 'doc-status' events
+  useEffect(() => {
+    const unsubscribe = subscribeDocStatus((event) => {
+      // Check if this event matches activeNoteId, item.notesId, or item.id
+      const matches =
+        (activeNoteId && event.noteId && event.noteId === activeNoteId) ||
+        (item.notesId && event.noteId && event.noteId === item.notesId) ||
+        (item.id && event.contentId && event.contentId === item.id)
+
+      if (!matches) return
+
+      console.log('[SiteContent] Matching doc-status from WebSocket:', event)
+
+      if (event.noteId && (!activeNoteId || activeNoteId !== event.noteId)) {
+        setActiveNoteId(event.noteId)
+      }
+
+      // Update the live status immediately in UI without hitting endpoint
+      if (event.status) {
+        setLiveSocketStatus(event.status)
+      }
+
+      if (event.filename || event.viewUrl || event.documentUrl) {
+        setLiveNoteFields((prev) => ({
+          ...prev,
+          filename: event.filename || prev?.filename,
+          viewUrl: event.viewUrl || prev?.viewUrl,
+          documentUrl: event.documentUrl || prev?.documentUrl,
+        }))
+      }
+
+      // STRICT RULE: Only hit the SuiteCRM endpoint when the status actually changes to completed or failed
+      if (event.status === 'completed') {
+        setIsTriggering(false)
+        setJustCompleted(true)
+        clearDocInProgress(item.id, event.noteId || activeNoteId)
+        refetchNote()
+        onDocUpdated?.()
+        queryClient.invalidateQueries({ queryKey: ['site-content'] })
+      } else if (event.status === 'failed') {
+        setIsTriggering(false)
+        clearDocInProgress(item.id, event.noteId || activeNoteId)
+        refetchNote()
+      }
+    })
+
+    return () => unsubscribe()
+  }, [activeNoteId, item.id, item.notesId, refetchNote, onDocUpdated, queryClient])
+
+  // Merged note representation (fetched details + live WebSocket updates)
+  const note = useMemo(() => {
+    if (!fetchedNote && !liveNoteFields && !liveSocketStatus) return null
+    const base = fetchedNote || {}
+    return {
+      ...base,
+      ...liveNoteFields,
+      status: liveSocketStatus || liveNoteFields?.status || base?.status || '',
+    }
+  }, [fetchedNote, liveNoteFields, liveSocketStatus])
 
   // When note generation finishes, notify parent to refresh item list badges
   useEffect(() => {
     if (note?.status === 'completed' && isTriggering) {
       setIsTriggering(false)
+      setJustCompleted(true)
+      clearDocInProgress(item.id, activeNoteId)
       onDocUpdated?.()
     }
-  }, [note?.status, isTriggering, onDocUpdated])
+  }, [note?.status, isTriggering, onDocUpdated, item.id, activeNoteId])
 
   // Generate / Regenerate handler:
   // Calls entryPoint=TechContentDocx&id=${item.id} using the specific content module ID!
-  const handleGenerateDoc = async (isRegen = false) => {
+  const handleGenerateDoc = async (_isRegen = false) => {
     try {
       setIsTriggering(true)
       setTriggerError('')
+      setLiveSocketStatus('queued')
+      const now = Date.now()
+      resetDocStartTime(item.id, activeNoteId, now)
+      saveDocInProgress(item.id, {
+        noteId: activeNoteId,
+        status: 'queued',
+        startTime: now,
+        title: item.headline,
+      })
+      recordDocNotification({
+        contentId: item.id,
+        noteId: activeNoteId,
+        status: 'queued',
+        title: item.headline,
+        timestamp: now,
+      })
       const res = await api.generateTechContentDoc(item.id)
       if (res?.note_id) {
         setActiveNoteId(res.note_id)
-        queryClient.invalidateQueries({ queryKey: ['site-content-note', res.note_id] })
+        recordDocStartTime(item.id, res.note_id, now)
+        saveDocInProgress(item.id, {
+          noteId: res.note_id,
+          status: 'queued',
+          startTime: now,
+          title: item.headline,
+        })
+        recordDocNotification({
+          contentId: item.id,
+          noteId: res.note_id,
+          status: 'queued',
+          title: item.headline,
+          timestamp: now,
+        })
         onDocUpdated?.()
       }
     } catch (err) {
-      setIsTriggering(false)
-      setTriggerError(err?.message || 'Failed to start document generation')
+      console.warn('Doc generation trigger notice:', err)
+      // Even if direct fetch response had a CORS header restriction, the request reached
+      // the server (HTTP 202 Accepted). Keep 'queued' state and let WebSocket update the UI!
+      if (/failed to fetch|cors|network/i.test(err?.message || '')) {
+        setLiveSocketStatus('queued')
+        setTriggerError('')
+      } else {
+        setIsTriggering(false)
+        setLiveSocketStatus(null)
+        clearDocInProgress(item.id, activeNoteId)
+        setTriggerError(err?.message || 'Failed to start document generation')
+      }
     }
   }
 
@@ -706,6 +1089,8 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
           activeNoteId={activeNoteId}
           isTriggering={isTriggering}
           triggerError={triggerError}
+          justCompleted={justCompleted}
+          onDismissCompleted={() => setJustCompleted(false)}
           onGenerateDoc={() => handleGenerateDoc(false)}
           onRegenerateDoc={() => handleGenerateDoc(true)}
           onRefresh={() => refetchNote()}
@@ -847,93 +1232,183 @@ function DocSection({
   activeNoteId,
   isTriggering,
   triggerError,
+  justCompleted,
+  onDismissCompleted,
   onGenerateDoc,
   onRegenerateDoc,
   onRefresh,
 }) {
-  const isQueued = !isTriggering && note?.status === 'queued'
-  const isProcessing =
-    isTriggering ||
-    note?.status === 'processing' ||
-    (isQueued && !note?.filename)
+  const currentStatus = (note?.status || (isTriggering ? 'queued' : '')).toLowerCase()
+  const isQueued = currentStatus === 'queued'
+  const isProcessing = currentStatus === 'processing'
+  const isCompiling = currentStatus === 'compiling' || currentStatus === 'compiliing'
+  const isCompleted = currentStatus === 'completed'
+  const isFailed = currentStatus === 'failed'
 
-  const isCompleted = note?.status === 'completed'
-  const isFailed = note?.status === 'failed'
+  const [isDownloading, setIsDownloading] = useState(false)
 
-  // CASE 1: QUEUED OR PROCESSING -> Animated pipeline stages with theme colors
-  if (isTriggering || note?.status === 'queued' || note?.status === 'processing') {
+  // CASE 1: QUEUED, PROCESSING, OR COMPILING -> Live WebSocket animated pipeline stages
+  if (isTriggering || isQueued || isProcessing || isCompiling) {
     return (
       <DocProcessingStages
-        status={note?.status || (isTriggering ? 'queued' : 'processing')}
+        status={currentStatus || (isTriggering ? 'queued' : 'processing')}
+        itemId={item.id}
+        noteId={activeNoteId || note?.id || item.notesId}
+        noteDateEntered={note?.dateEntered}
         onRefresh={onRefresh}
       />
     )
   }
 
+  // Direct Word Document Download Handler
+  const handleDownload = async () => {
+    const noteId = activeNoteId || note?.id || item.notesId
+    const viewUrl = note?.viewUrl || getDocumentViewUrl(noteId)
+    const rawFilename = note?.filename || `${item.headline.slice(0, 48)}.doc`
+    const downloadFilename = rawFilename.endsWith('.docx')
+      ? rawFilename.replace(/\.docx$/, '.doc')
+      : rawFilename.endsWith('.doc')
+      ? rawFilename
+      : `${rawFilename}.doc`
+
+    setIsDownloading(true)
+    try {
+      // 1. Fetch the formatted document through proxy or direct viewdoc endpoint
+      const fetchUrl = import.meta.env?.DEV
+        ? `/crm-entrypoint/index.php?entryPoint=viewdoc&id=${encodeURIComponent(noteId)}`
+        : viewUrl
+
+      const res = await fetch(fetchUrl)
+      if (res.ok) {
+        const html = await res.text()
+        const blob = new Blob([html], { type: 'application/msword;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = downloadFilename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        setIsDownloading(false)
+        return
+      }
+    } catch (e) {
+      console.warn('Direct fetch download notice, falling back to viewer:', e)
+    }
+
+    // 2. Fallback: Open formatted document view directly in a new tab
+    // (Never open entryPoint=download which requires SuiteCRM session auth and returns "Not a Valid Entry Point")
+    setIsDownloading(false)
+    window.open(viewUrl, '_blank')
+  }
+
   // CASE 2: COMPLETED -> 3 requested actions: View Doc, Download Doc, Regenerate Doc
-  if (isCompleted) {
+  if (isCompleted && (note?.viewUrl || note?.documentUrl || note?.filename || activeNoteId || item.notesId)) {
+    const noteId = activeNoteId || note?.id || item.notesId
+    const viewUrl = note?.viewUrl || getDocumentViewUrl(noteId)
+
     return (
-      <div className="rounded-2xl bg-[var(--surface)] p-4 sm:p-5 ring-1 ring-[var(--line)] shadow-sm transition-all hover:ring-[var(--lime-dark)]/40">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-[var(--ok-bg)] text-[var(--ok)] ring-1 ring-[var(--ok)]/30">
-              <FileDoc size={24} weight="duotone" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-[var(--lime)] px-2 py-0.5 text-[9px] font-bold text-[#26320b] uppercase tracking-wider">
-                  DOCX
-                </span>
-                <span className="text-[10px] text-[var(--muted)]">
-                  {note.dateModified || note.dateEntered || 'Document Ready'}
-                </span>
+      <div className="space-y-3">
+        {/* Document Generation Complete Celebration Banner */}
+        {justCompleted && (
+          <div className="relative flex items-center justify-between gap-3 overflow-hidden rounded-2xl bg-[var(--ok-bg)] p-3.5 sm:p-4 ring-1 ring-[var(--ok)]/35 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--ok)] text-white shadow-sm">
+                <CheckCircle size={20} weight="fill" />
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs sm:text-sm font-bold text-[var(--ok)]">
+                    🎉 Document Generated Successfully!
+                  </h4>
+                  <span className="rounded-full bg-[var(--ok)]/20 px-2 py-0.5 text-[9px] font-bold text-[var(--ok)] uppercase tracking-wider">
+                    Ready
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-[11px] text-[var(--ink)]">
+                  Your document has finished compiling. You can now view it online or download the Word file below.
+                </p>
               </div>
-              <p
-                className="mt-1 truncate text-xs sm:text-sm font-bold text-[var(--ink)]"
-                title={note.filename}
-              >
-                {note.filename || `${item.headline.slice(0, 48)}.docx`}
-              </p>
             </div>
+            {onDismissCompleted && (
+              <button
+                type="button"
+                onClick={onDismissCompleted}
+                aria-label="Dismiss completion banner"
+                className="grid size-7 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)] transition-colors"
+              >
+                <X size={13} weight="bold" />
+              </button>
+            )}
           </div>
+        )}
 
-          {/* THREE REQUESTED ACTIONS: 1. View Doc, 2. Download Doc, 3. Regenerate Doc */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* 1. View Doc */}
-            <a
-              href={note.viewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="upwork-view-button inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold text-[var(--ink)] active:scale-95 transition-all"
-              title="Open document viewer in new tab"
-            >
-              <Eye size={14} weight="bold" />
-              <span>View doc</span>
-            </a>
+        <div className="rounded-2xl bg-[var(--surface)] p-4 sm:p-5 ring-1 ring-[var(--line)] shadow-sm transition-all hover:ring-[var(--lime-dark)]/40">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-[var(--ok-bg)] text-[var(--ok)] ring-1 ring-[var(--ok)]/30">
+                <FileDoc size={24} weight="duotone" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-[var(--lime)] px-2 py-0.5 text-[9px] font-bold text-[#26320b] uppercase tracking-wider">
+                    DOCX
+                  </span>
+                  <span className="text-[10px] text-[var(--muted)]">
+                    {note?.dateModified || note?.dateEntered || 'Document Ready'}
+                  </span>
+                </div>
+                <p
+                  className="mt-1 truncate text-xs sm:text-sm font-bold text-[var(--ink)]"
+                  title={note?.filename}
+                >
+                  {note?.filename || `${item.headline.slice(0, 48)}.docx`}
+                </p>
+              </div>
+            </div>
 
-            {/* 2. Download Doc */}
-            <a
-              href={note.documentUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              download={note.filename || true}
-              className="upwork-apply-button inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold active:scale-95 transition-all"
-              title="Download Microsoft Word .docx"
-            >
-              <DownloadSimple size={14} weight="bold" />
-              <span>Download</span>
-            </a>
+            {/* THREE REQUESTED ACTIONS: 1. View Doc, 2. Download Doc, 3. Regenerate Doc */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {/* 1. View Doc */}
+              <a
+                href={viewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="upwork-view-button inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold text-[var(--ink)] active:scale-95 transition-all"
+                title="Open document viewer in new tab"
+              >
+                <Eye size={14} weight="bold" />
+                <span>View doc</span>
+              </a>
 
-            {/* 3. Regenerate Doc (Passes item.id to TechContentDocx&id=${item.id}) */}
-            <button
-              type="button"
-              onClick={onRegenerateDoc}
-              className="upwork-view-button inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--ink)] active:scale-95 transition-all"
-              title="Regenerate this document with AI"
-            >
-              <ArrowsClockwise size={14} weight="bold" className={isTriggering ? 'animate-spin' : ''} />
-              <span>Regenerate</span>
-            </button>
+              {/* 2. Download Doc */}
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="upwork-apply-button inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold active:scale-95 transition-all cursor-pointer disabled:opacity-60"
+                title="Download Microsoft Word document"
+              >
+                {isDownloading ? (
+                  <ArrowsClockwise size={14} weight="bold" className="animate-spin" />
+                ) : (
+                  <DownloadSimple size={14} weight="bold" />
+                )}
+                <span>{isDownloading ? 'Downloading...' : 'Download'}</span>
+              </button>
+
+              {/* 3. Regenerate Doc (Passes item.id to TechContentDocx&id=${item.id}) */}
+              <button
+                type="button"
+                onClick={onRegenerateDoc}
+                className="upwork-view-button inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--ink)] active:scale-95 transition-all"
+                title="Regenerate this document with AI"
+              >
+                <ArrowsClockwise size={14} weight="bold" className={isTriggering ? 'animate-spin' : ''} />
+                <span>Regenerate</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -959,7 +1434,7 @@ function DocSection({
                 </span>
               </div>
               <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-                The AI document process timed out or encountered an issue. Click below to regenerate.
+                The AI document process encountered an issue. Click below to regenerate.
               </p>
             </div>
           </div>
@@ -1008,55 +1483,125 @@ function DocSection({
   )
 }
 
-function DocProcessingStages({ status, onRefresh }) {
+function DocProcessingStages({ status, itemId, noteId, noteDateEntered, onRefresh }) {
   const STAGES = [
     {
-      title: 'Audience & Angle Analysis',
-      desc: 'Target audience, search intent & keywords',
+      key: 'queued',
+      title: 'Queued in Pipeline',
+      desc: 'Accepted and queued for synthesis',
       icon: Target,
     },
     {
-      title: 'Synthesizing Source References',
-      desc: 'Grounding citations & competitor benchmarks',
-      icon: LinkSimple,
-    },
-    {
-      title: 'Drafting Comprehensive Article',
-      desc: 'Synthesizing technical article with AI',
+      key: 'processing',
+      title: 'AI Drafting & Research Synthesis',
+      desc: 'Grounded citations, competitor benchmarks & content',
       icon: Quotes,
     },
     {
-      title: 'Compiling DOCX Document',
-      desc: 'Formatting styles, tables, headings & packaging',
+      key: 'compiling',
+      title: 'Compiling DOCX & Layout Packaging',
+      desc: 'Typography, tables, styles & Word DOCX generation',
       icon: FileDoc,
     },
   ]
 
-  const [elapsed, setElapsed] = useState(0)
+  // Track the persistent start time for this specific content item / note
+  const [startTime, setStartTime] = useState(() => {
+    const existing = getDocStartTime(itemId, noteId)
+    if (existing) return existing
+
+    if (noteDateEntered) {
+      const parsed = new Date(noteDateEntered).getTime()
+      if (!isNaN(parsed) && parsed > 0 && Date.now() - parsed < 25 * 60 * 1000) {
+        recordDocStartTime(itemId, noteId, parsed)
+        return parsed
+      }
+    }
+
+    const now = Date.now()
+    recordDocStartTime(itemId, noteId, now)
+    return now
+  })
+
+  // Synchronize start time when itemId or noteId changes (e.g. user selects different content item)
+  useEffect(() => {
+    const existing = getDocStartTime(itemId, noteId)
+    if (existing) {
+      setStartTime(existing)
+    } else if (noteDateEntered) {
+      const parsed = new Date(noteDateEntered).getTime()
+      if (!isNaN(parsed) && parsed > 0 && Date.now() - parsed < 25 * 60 * 1000) {
+        recordDocStartTime(itemId, noteId, parsed)
+        setStartTime(parsed)
+      } else {
+        const now = Date.now()
+        recordDocStartTime(itemId, noteId, now)
+        setStartTime(now)
+      }
+    } else {
+      const now = Date.now()
+      recordDocStartTime(itemId, noteId, now)
+      setStartTime(now)
+    }
+  }, [itemId, noteId, noteDateEntered])
+
+  // Real-time elapsed time calculated directly from the absolute startTime
+  const [elapsed, setElapsed] = useState(() =>
+    Math.max(0, Math.floor((Date.now() - startTime) / 1000))
+  )
 
   useEffect(() => {
+    // Update immediately on mount or when startTime changes
+    setElapsed(Math.max(0, Math.floor((Date.now() - startTime) / 1000)))
+
     const elapsedTimer = setInterval(() => {
-      setElapsed((prev) => prev + 1)
+      setElapsed(Math.max(0, Math.floor((Date.now() - startTime) / 1000)))
     }, 1000)
+
     return () => clearInterval(elapsedTimer)
-  }, [])
+  }, [startTime])
 
-  // Paced for an 8–10 minute generation timeline (600 seconds total)
+  // Maps backend status directly to the stage index
   const activeStage = useMemo(() => {
-    if (status === 'queued' || elapsed < 90) return 0 // Stage 1: Audience & Angle (0 - 1.5 min)
-    if (elapsed < 240) return 1 // Stage 2: Sourcing References (1.5 - 4.0 min)
-    if (elapsed < 480) return 2 // Stage 3: Deep Technical Drafting (4.0 - 8.0 min)
-    return 3 // Stage 4: Compiling DOCX (8.0 - 10.0 min)
-  }, [status, elapsed])
+    if (status === 'queued') return 0
+    if (status === 'compiling' || status === 'compiliing') return 2
+    return 1 // 'processing' or default
+  }, [status])
 
-  // Progress rises smoothly from 8% up to ~94% over 10 minutes (600s)
-  const percent = Math.min(94, Math.max(8, Math.round(8 + (elapsed / 600) * 86)))
+  // Progress rises based on active stage and elapsed seconds
+  const percent = useMemo(() => {
+    if (status === 'queued') return Math.min(30, Math.max(15, Math.round(15 + elapsed / 4)))
+    if (status === 'compiling' || status === 'compiliing') return Math.min(95, Math.max(82, Math.round(82 + elapsed / 10)))
+    return Math.min(78, Math.max(45, Math.round(45 + elapsed / 8))) // processing
+  }, [status, elapsed])
 
   const formatElapsed = (s) => {
     const mins = Math.floor(s / 60)
     const secs = s % 60
-    return `${mins}:${secs < 10 ? '0' : ''}${secs} (~8-10m)`
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`
   }
+
+  const stageHeaderInfo = useMemo(() => {
+    if (status === 'queued') {
+      return {
+        title: 'Queued for Document Generation',
+        badge: 'Queued',
+        desc: 'Request queued in pipeline. Processing starts momentarily...',
+      }
+    }
+    if (status === 'compiling' || status === 'compiliing') {
+      return {
+        title: 'Compiling Word Document (.docx)',
+        badge: 'Compiling',
+        desc: 'Packaging formatted article, typography & tables into DOCX...',
+      }
+    }
+    return {
+      title: 'Synthesizing Article & Research',
+      badge: 'Processing',
+      desc: 'Deep AI article synthesis with grounded source citations...',
+    }
+  }, [status])
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-[var(--surface)] p-4 sm:p-5 ring-1 ring-[var(--line)] shadow-sm">
@@ -1076,29 +1621,29 @@ function DocProcessingStages({ status, onRefresh }) {
           <div>
             <div className="flex items-center gap-2">
               <h4 className="text-xs sm:text-sm font-bold text-[var(--ink)]">
-                {status === 'queued' ? 'Queued for Document Generation' : 'Generating Technical Document'}
+                {stageHeaderInfo.title}
               </h4>
               <span className="rounded-full bg-[var(--lime)]/30 px-2 py-0.5 text-[10px] font-bold text-[#26320b] dark:text-[#c0df78]">
-                {status === 'queued' ? 'Queued' : 'Processing'}
+                {stageHeaderInfo.badge}
               </span>
             </div>
             <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-              {status === 'queued'
-                ? 'Registered in pipeline. Processing starts shortly...'
-                : 'AI deep-research drafting & packaging Word DOCX file (takes ~8–10 mins)'}
+              {stageHeaderInfo.desc}
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onRefresh}
-          title="Click to check status immediately"
-          className="flex items-center gap-2 font-mono text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)] bg-[var(--paper)] hover:bg-[var(--frame)] px-2.5 py-1 rounded-full ring-1 ring-[var(--line)] transition-all cursor-pointer active:scale-95"
-        >
-          <ArrowsClockwise size={13} className="animate-spin text-[var(--lime-dark)]" />
-          <span>{formatElapsed(elapsed)}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onRefresh}
+            title="Refresh status"
+            className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)] bg-[var(--paper)] hover:bg-[var(--frame)] px-2.5 py-1 rounded-full ring-1 ring-[var(--line)] transition-all cursor-pointer active:scale-95"
+          >
+            <ArrowsClockwise size={12} className="text-[var(--lime-dark)]" />
+            <span>{formatElapsed(elapsed)}</span>
+          </button>
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -1111,8 +1656,8 @@ function DocProcessingStages({ status, onRefresh }) {
         </div>
       </div>
 
-      {/* Stages Stepper List */}
-      <div className="relative mt-4 grid gap-2 sm:grid-cols-2">
+      {/* Stages Stepper List: Queued -> Processing -> Compiling */}
+      <div className="relative mt-4 grid gap-2 sm:grid-cols-3">
         {STAGES.map((step, idx) => {
           const isDone = idx < activeStage
           const isCurrent = idx === activeStage
@@ -1152,10 +1697,9 @@ function DocProcessingStages({ status, onRefresh }) {
         })}
       </div>
 
-      {/* Helpful 8-10 minute background notice */}
-      <div className="relative mt-3.5 flex flex-wrap items-center justify-between gap-1 border-t border-[var(--line)]/50 pt-2.5 text-[10px] text-[var(--muted)]">
-        <span>Full technical document compilation takes 8–10 minutes.</span>
-        <span>You can switch tabs or explore other ideas; polling runs in the background.</span>
+      {/* Notice */}
+      <div className="relative mt-3.5 flex items-center justify-between gap-1 border-t border-[var(--line)]/50 pt-2.5 text-[10px] text-[var(--muted)]">
+        <span>You can continue exploring or working; this post will update automatically.</span>
       </div>
     </div>
   )

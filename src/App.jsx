@@ -19,6 +19,7 @@ import NotFound from './pages/NotFound'
 import SessionLoader from './components/SessionLoader'
 import LoginIntro from './components/LoginIntro'
 import ScrollToTop from './components/ScrollToTop'
+import DocNotificationToast from './components/DocNotificationToast'
 import { useAuth } from './contexts/AuthContext'
 
 function ProtectedRoute({ children }) {
@@ -41,6 +42,7 @@ export default function App() {
 
   return <>
     <ScrollToTop />
+    <DocNotificationToast />
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
@@ -59,6 +61,8 @@ export default function App() {
       <Route path="/appscript" element={<ProtectedRoute><ComingSoon title="AppScript" subtitle="automation incoming." description="The AppScript workspace is being prepared for automation workflows and integrations." type="appscript" /></ProtectedRoute>} />
       <Route path="/llm" element={<ProtectedRoute><ComingSoon title="LLM" subtitle="intelligence incoming." description="The LLM workspace is being prepared for model tools, prompts, and experiments." type="llm" /></ProtectedRoute>} />
       <Route path="/wordpress" element={<ProtectedRoute><ComingSoon title="Wordpress" subtitle="publishing incoming." description="The Wordpress workspace is being prepared for publishing and site management workflows." type="wordpress" /></ProtectedRoute>} />
+      <Route path="/cloud" element={<ProtectedRoute><ComingSoon title="Cloud" subtitle="infrastructure incoming." description="The Cloud workspace is being prepared for cloud infrastructure, deployments, and server management." type="cloud" /></ProtectedRoute>} />
+      <Route path="/social" element={<ProtectedRoute><ComingSoon title="Social" subtitle="connections incoming." description="The Social workspace is being prepared for social media integrations, channels, and community feeds." type="social" /></ProtectedRoute>} />
       <Route path="/technews" element={<Navigate to="/tech-news" replace />} />
       <Route path="/news" element={<Navigate to="/tech-news" replace />} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

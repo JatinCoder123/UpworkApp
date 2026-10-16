@@ -5,7 +5,7 @@ import { Briefcase, Broadcast, ClockCounterClockwise, Funnel, GearSix, Heart, Ma
 import Shell from "../components/Shell";
 import JobCard from "../components/JobCard";
 import JobDrawer from "../components/JobDrawer";
-import { MoreFiltersMenu, SortMenu } from "../components/JobListControls";
+import { SortMenu } from "../components/JobListControls";
 import LogoLoader from "../components/LogoLoader";
 import HScroll from "../components/HScroll";
 import { AddJobDialog } from "../components/dialogs";
@@ -17,7 +17,7 @@ import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
 import { EMPTY_EXTRA_FILTERS, JOB_SORTS, loadDateFilter, loadExtraFilters, loadJobScope, loadJobSort, loadJobStatus, saveDateFilter, saveExtraFilters, saveJobScope, saveJobSort, saveJobStatus } from "../lib/preferences";
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from "../lib/dateRange";
-import { countExtraFilters, forgetSearch, loadRecentSearches, matchesExtraFilters, rememberSearch, skillStyle, useJobReactions } from "../lib/jobSignals";
+import { clientLocation, countExtraFilters, forgetSearch, loadRecentSearches, matchesExtraFilters, rememberSearch, skillStyle, useJobReactions } from "../lib/jobSignals";
 import { timeAgo, useNow } from "../lib/time";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -177,6 +177,8 @@ export default function Jobs() {
   const toggleSkill = (skill) => setSkills((current) => (current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill]));
   const changeTab = (item) => { const next = tab === item ? (item === "Favorites" || item === "Liked" ? "New" : "All") : item; setTab(next); saveJobStatus(next); };
   const jumpTo = (id) => document.getElementById(`job-${id}`)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  // The funnel dialog holds skills, job type and client location, so its badge counts all three.
+  const filterCount = skills.length + countExtraFilters(extraFilters);
   const hasFilters = skills.length > 0 || dateFilter.preset !== "all" || searchInput || countExtraFilters(extraFilters) > 0 || tab === "Favorites" || tab === "Liked";
   const searching = isFetching && !isFetchingNextPage && searchInput.trim() === search;
 
@@ -214,11 +216,10 @@ export default function Jobs() {
                   </div>}
                 </form>
                 <SortMenu value={sort} options={JOB_SORTS} onChange={changeSort} />
-                <MoreFiltersMenu value={extraFilters} onChange={setExtraFilters} />
                 <DateTimeRangeFilter value={dateFilter} onApply={setDateFilter} label="Job posting time" />
-                <button type="button" onClick={() => setSkillDialog(true)} aria-label="Open skill filters" className={`relative ${iconButton} ${skills.length ? "bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40" : ""}`}>
-                  <Funnel size={16} weight={skills.length ? "fill" : "regular"} />
-                  {skills.length > 0 && <span className="absolute -right-1 -top-1 grid size-4.5 place-items-center rounded-full bg-[var(--ink)] text-[9px] font-bold text-white">{skills.length}</span>}
+                <button type="button" onClick={() => setSkillDialog(true)} aria-label="Open job filters" title="Filters" className={`relative ${iconButton} ${filterCount ? "bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40" : ""}`}>
+                  <Funnel size={16} weight={filterCount ? "fill" : "regular"} />
+                  {filterCount > 0 && <span className="absolute -right-1 -top-1 grid size-4.5 place-items-center rounded-full bg-[var(--ink)] text-[9px] font-bold text-white">{filterCount}</span>}
                 </button>
                 <RefreshFilterButton onClick={() => { refetch(); refetchStats(); }} loading={isFetching || isFetchingStats} label="Refresh jobs" />
               </div>
@@ -272,7 +273,7 @@ export default function Jobs() {
               {tab === "Favorites" && <FilterChip onClear={() => changeTab("New")}>Favorites only</FilterChip>}
               {tab === "Liked" && <FilterChip onClear={() => changeTab("New")}>Liked only</FilterChip>}
               {extraFilters.jobType !== "any" && <FilterChip onClear={() => setExtraFilters({ ...extraFilters, jobType: "any" })}>{extraFilters.jobType === "hourly" ? "Hourly jobs" : "Fixed-price jobs"}</FilterChip>}
-              {extraFilters.usaOnly && <FilterChip onClear={() => setExtraFilters({ ...extraFilters, usaOnly: false })}>USA clients</FilterChip>}
+              {extraFilters.location !== "any" && <FilterChip onClear={() => setExtraFilters({ ...extraFilters, location: "any" })}>{`${clientLocation(extraFilters.location).label} clients`}</FilterChip>}
               <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} />
               <button type="button" onClick={() => { setSkills([]); setSearchInput(""); setDateFilter(EMPTY_DATE_RANGE); setExtraFilters(EMPTY_EXTRA_FILTERS); if (tab === "Favorites" || tab === "Liked") changeTab("New"); }} className="text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear all</button>
             </div>}
@@ -370,7 +371,7 @@ export default function Jobs() {
         {preview && <JobDrawer job={preview} jobs={filtered} onSelect={setPreview} onClose={() => setPreview(null)} />}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}
-        {skillDialog && <OpportunityFilterDialog skills={skills} skillRecords={skillRecords} isLoading={skillsLoading || isFetchingMoreSkills} error={skillsError ? skillsQueryError : null} onClose={() => setSkillDialog(false)} onApply={(nextSkills) => { setSkills(nextSkills); setSkillDialog(false); }} />}
+        {skillDialog && <OpportunityFilterDialog skills={skills} extraFilters={extraFilters} skillRecords={skillRecords} isLoading={skillsLoading || isFetchingMoreSkills} error={skillsError ? skillsQueryError : null} onClose={() => setSkillDialog(false)} onApply={({ skills: nextSkills, extraFilters: nextFilters }) => { setSkills(nextSkills); setExtraFilters(nextFilters); setSkillDialog(false); }} onRemove={({ skills: nextSkills, extraFilters: nextFilters }) => { setSkills(nextSkills); setExtraFilters(nextFilters); }} />}
       </main>
     </Shell>
   );

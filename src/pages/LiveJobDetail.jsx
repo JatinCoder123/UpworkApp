@@ -5,7 +5,7 @@ import { ArrowLeft, Briefcase, Broadcast, CalendarBlank, ChartBar, Clock, ClockC
 import Shell from '../components/Shell'
 import NotFound from './NotFound'
 import ExpandableText from '../components/ExpandableText'
-import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, ProfileSuggestions, card } from '../components/JobDetailParts'
+import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, card } from '../components/JobDetailParts'
 import { CompetitionMeter, freshnessTone } from '../components/LiveJobCard'
 import JobApplySection from '../components/JobApplySection'
 import ShareJobDialog from '../components/ShareJobDialog'
@@ -138,8 +138,6 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
         <Panel icon={Target} title="Skills and expertise" subtitle={`${job.skills.length} skill${job.skills.length === 1 ? '' : 's'} requested${matched.size ? ` · ${job.matchedSkills.join(', ')} matched your scan` : ''}`}>
           <div className="flex flex-wrap gap-2">{job.skills.map((skill) => <span key={skill} aria-pressed={matched.has(skill.toLowerCase())} className="skill-tag rounded-full px-3 py-1.5 text-xs font-semibold">{skill}</span>)}</div>
         </Panel>
-
-        <ProfileSuggestions job={job} />
 
         <CoverLetter job={job} onLetter={setCoverLetter} />
 

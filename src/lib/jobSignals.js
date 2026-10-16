@@ -142,15 +142,27 @@ export const previewClick = (onOpen) => (event) => {
 
 /* Extra list filters and "next similar", applied to jobs already loaded in the browser. */
 
-export const isUsaClient = (job) => /^(united states|usa|us|u\.s\.a?\.?)$|united states/i.test(String(job.clientStats?.country || '').trim())
+// Static client locations for the location filter; `match` runs against the client country the CRM or Upwork reports.
+export const CLIENT_LOCATIONS = [
+  { id: 'any', label: 'Any location' },
+  { id: 'us', label: 'United States', match: /^(usa|us|u\.s\.a?\.?)$|united states/i },
+  { id: 'gb', label: 'United Kingdom', match: /^(united kingdom|uk|u\.k\.|great britain|england|scotland|wales|northern ireland)$/i },
+  { id: 'ca', label: 'Canada', match: /^canada$/i },
+  { id: 'au', label: 'Australia', match: /^australia$/i },
+  { id: 'in', label: 'India', match: /^india$/i },
+  { id: 'de', label: 'Germany', match: /^(germany|deutschland)$/i },
+]
 
-export function matchesExtraFilters(job, { jobType = 'any', usaOnly = false } = {}) {
+export const clientLocation = (id) => CLIENT_LOCATIONS.find((item) => item.id === id) || CLIENT_LOCATIONS[0]
+
+export function matchesExtraFilters(job, { jobType = 'any', location = 'any' } = {}) {
   if (jobType === 'hourly' && job.type !== 'Hourly') return false
   if (jobType === 'fixed' && job.type === 'Hourly') return false
-  return !usaOnly || isUsaClient(job)
+  const { match } = clientLocation(location)
+  return !match || match.test(String(job.clientStats?.country || '').trim())
 }
 
-export const countExtraFilters = ({ jobType = 'any', usaOnly = false } = {}) => (jobType !== 'any' ? 1 : 0) + (usaOnly ? 1 : 0)
+export const countExtraFilters = ({ jobType = 'any', location = 'any' } = {}) => (jobType !== 'any' ? 1 : 0) + (location !== 'any' ? 1 : 0)
 
 const STOP_WORDS = new Set(['and', 'the', 'for', 'with', 'need', 'needed', 'looking', 'expert', 'developer', 'build', 'help', 'from', 'into', 'your', 'our'])
 const terms = (job) => new Set([

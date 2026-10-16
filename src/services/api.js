@@ -1,18 +1,36 @@
 import axios from "axios";
 import CryptoJS from "crypto-js";
 
-export const SMART_GATEWAY_URL = import.meta.env?.VITE_SMART_GATEWAY_URL || "https://upwork.outrightcrm.in/index.php?entryPoint=smart_gateway";
-export const JOBS_MODULE = "outr_upwork_jobs";
-export const USERS_MODULE = "Users";
-export const SKILLS_MODULE = "outr_skills";
+export const CRM_BASE_URL = (import.meta.env?.VITE_CRM_BASE_URL || "https://upwork.outrightcrm.in").replace(/\/$/, "");
+export const SMART_GATEWAY_URL = import.meta.env?.VITE_SMART_GATEWAY_URL || `${CRM_BASE_URL}/index.php?entryPoint=smart_gateway`;
+export const TECH_CONTENT_DOCX_URL = import.meta.env?.VITE_TECH_CONTENT_DOCX_URL || `${CRM_BASE_URL}/index.php?entryPoint=TechContentDocx`;
+export const DOWNLOAD_URL = import.meta.env?.VITE_DOWNLOAD_URL || `${CRM_BASE_URL}/index.php?entryPoint=download`;
+export const VIEW_DOC_URL = import.meta.env?.VITE_VIEW_DOC_URL || `${CRM_BASE_URL}/index.php?entryPoint=viewdoc`;
+
+export const JOBS_MODULE = import.meta.env?.VITE_JOBS_MODULE || "outr_upwork_jobs";
+export const USERS_MODULE = import.meta.env?.VITE_USERS_MODULE || "Users";
+export const SKILLS_MODULE = import.meta.env?.VITE_SKILLS_MODULE || "outr_skills";
 export const TECH_NEWS_MODULE = import.meta.env?.VITE_TECH_NEWS_MODULE || "daily_tech_news";
-export const VIDEO_FEEDS_MODULE = "video_feeds";
-export const SITE_CONTENT_MODULE = "sites_tech_content";
-export const DEFAULT_TECH_NEWS_PER_PAGE = 10;
+export const VIDEO_FEEDS_MODULE = import.meta.env?.VITE_VIDEO_FEEDS_MODULE || "video_feeds";
+export const SITE_CONTENT_MODULE = import.meta.env?.VITE_SITE_CONTENT_MODULE || "sites_tech_content";
+export const DEFAULT_TECH_NEWS_PER_PAGE = Number(import.meta.env?.VITE_TECH_NEWS_PER_PAGE) || 10;
+
+export function getDocumentDownloadUrl(noteId) {
+  if (!noteId) return "";
+  return `${DOWNLOAD_URL}&type=Notes&id=${encodeURIComponent(noteId)}`;
+}
+
+export function getDocumentViewUrl(noteId) {
+  if (!noteId) return "";
+  return `${VIEW_DOC_URL}&id=${encodeURIComponent(noteId)}`;
+}
+
 // Endpoint that generates a cover letter for a job. Set it in .env once the backend is ready.
 const COVER_LETTER_URL = import.meta.env?.VITE_COVER_LETTER_URL || "";
 // Endpoint that rewrites a cover letter from an instruction. Falls back to the generator endpoint.
 const COVER_LETTER_EDIT_URL = import.meta.env?.VITE_COVER_LETTER_EDIT_URL || COVER_LETTER_URL;
+// Endpoint that generates a fresh proposal strategy for a job. Set it in .env once the backend is ready.
+const STRATEGY_URL = import.meta.env?.VITE_STRATEGY_URL || "";
 
 const apiClient = axios.create({
   baseURL: SMART_GATEWAY_URL,
@@ -426,6 +444,34 @@ export async function editCoverLetterWithAi(job, letter, instruction) {
   const edited = decodeCoverLetter(typeof raw === "string" ? raw : "");
   if (!edited) throw createAppError("COVER_LETTER_EMPTY", "The endpoint did not return an edited cover letter.");
   return edited;
+}
+
+// Asks for a new strategy; the current one is sent along so the endpoint can offer a different angle.
+export async function fetchStrategy(job) {
+  if (!STRATEGY_URL) {
+    throw createAppError("STRATEGY_ENDPOINT_MISSING", "The strategy endpoint is not configured yet. Set VITE_STRATEGY_URL in .env.");
+  }
+  let response;
+  try {
+    response = await axios.post(STRATEGY_URL, {
+      id: job.id,
+      job_id: job.jobId,
+      title: job.title,
+      description: job.description,
+      skills: job.skills,
+      budget: job.budget,
+      level: job.level,
+      upwork_url: job.url,
+      current_strategy: job.pitch,
+    }, { timeout: 90_000, headers: { "Content-Type": "application/json", "X-Api-Token": generateToken() } });
+  } catch (err) {
+    throw createAppError("STRATEGY_FAILED", err?.response?.data?.message || "Could not generate a new strategy. Please try again.");
+  }
+  const data = response.data;
+  const raw = typeof data === "string" ? data : data?.strategy ?? data?.pitch ?? data?.data?.strategy ?? data?.data?.pitch ?? data?.content ?? data?.data ?? "";
+  const strategy = decodeHtml(typeof raw === "string" ? raw : "").trim();
+  if (!strategy) throw createAppError("STRATEGY_EMPTY", "The endpoint did not return a strategy.");
+  return strategy;
 }
 
 let teamMembersRequest = null;
@@ -1030,8 +1076,8 @@ export async function fetchNote(noteId, { timeout = 600_000 } = {}) {
     status: (rec.status || "queued").toLowerCase(),
     filename: rec.filename || "",
     fileMimeType: rec.file_mime_type || "",
-    documentUrl: rec.document_url || `https://upwork.outrightcrm.in/index.php?entryPoint=download&type=Notes&id=${rec.id}`,
-    viewUrl: rec.view_url || `https://upwork.outrightcrm.in/index.php?entryPoint=viewdoc&id=${rec.id}`,
+    documentUrl: rec.document_url || getDocumentDownloadUrl(rec.id),
+    viewUrl: rec.view_url || getDocumentViewUrl(rec.id),
     dateEntered: rec.date_entered_time_ago || rec.date_entered_uni_format || rec.date_entered || "",
     dateModified: rec.date_modified_time_ago || rec.date_modified_uni_format || rec.date_modified || "",
   };
@@ -1039,9 +1085,14 @@ export async function fetchNote(noteId, { timeout = 600_000 } = {}) {
 
 export async function generateTechContentDoc(contentId) {
   if (!contentId) throw createAppError("INVALID_ID", "Content ID is required");
-  const url = `https://upwork.outrightcrm.in/index.php?entryPoint=TechContentDocx&id=${encodeURIComponent(contentId)}`;
+  const baseEntryPoint = import.meta.env?.DEV
+    ? "/crm-entrypoint/index.php?entryPoint=TechContentDocx"
+    : TECH_CONTENT_DOCX_URL;
+  const separator = baseEntryPoint.includes("?") ? "&" : "?";
+  const url = `${baseEntryPoint}${separator}id=${encodeURIComponent(contentId)}`;
   const response = await fetch(url);
-  if (!response.ok) {
+  // HTTP 202 Accepted is the expected standard response for queued async jobs
+  if (!response.ok && response.status !== 202) {
     throw createAppError("DOC_GEN_FAILED", `Failed to initiate document generation (${response.status})`);
   }
   const result = await response.json();
@@ -1064,6 +1115,7 @@ export const api = {
   getCoverLetter: (job) => fetchCoverLetter(job),
   saveCoverLetter,
   editCoverLetter: editCoverLetterWithAi,
+  getStrategy: (job) => fetchStrategy(job),
   getTeamMembers: () => fetchTeamMembers(),
   getLiveJobs: (params) => fetchLiveUpworkJobs(params),
   getVideoFeeds: (options) => fetchVideoFeeds(options),

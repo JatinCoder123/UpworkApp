@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { Briefcase, Clock, Hourglass, Lightning, MapPin, SealCheck, Sparkle, Users } from '@phosphor-icons/react'
-import { JobCardAside } from './JobCard'
+import { Briefcase, Clock, Heart, Hourglass, Lightning, MapPin, SealCheck, Sparkle, Star, Users } from '@phosphor-icons/react'
+import { JobCardActions, JobCardAside } from './JobCard'
 import { previewClick } from '../lib/jobSignals'
 import { timeAgo } from '../lib/time'
 import { competition, isEarlyBird, minutesSince } from '../lib/liveJobs'
@@ -39,8 +39,9 @@ export default function LiveJobCard({ job, index, now, windowMinutes, justIn, li
   return <article id={`live-${job.id}`} data-card data-job-id={job.id} style={{ '--fresh': tone }} className={`live-card group scroll-mt-[calc(var(--shell-h)+1rem)] rounded-[1.6rem] bg-[var(--frame)] p-1 ring-1 ring-[var(--line)]/60 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(30,40,25,.1)] ${justIn ? 'live-just-in' : ''}`}>
     <span aria-hidden="true" className="absolute inset-y-6 left-0 z-10 w-1 rounded-r-full" style={{ background: tone }} />
     <div className="relative grid overflow-hidden rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] md:grid-cols-[minmax(0,1fr)_17rem]">
+      <div className="relative min-w-0">
       <Link to={`/live-jobs/${job.id}`} onClick={previewClick(onOpen)} className="block min-w-0 p-5 sm:p-6">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pr-28">
           {index != null && <span className="font-mono text-[11px] font-bold text-[var(--muted)]">{String(index + 1).padStart(2, '0')}</span>}
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-[#c8e875]"><span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#c8e875] opacity-70" /><span className="relative size-1.5 rounded-full bg-[#c8e875]" /></span>Live</span>
           {favorite && (
@@ -73,8 +74,10 @@ export default function LiveJobCard({ job, index, now, windowMinutes, justIn, li
         </div>
         <div className="mt-4 max-w-md"><CompetitionMeter applicants={job.applicants} /></div>
       </Link>
+      <JobCardActions job={job} liked={liked} favorite={favorite} onLike={onLike} onFavorite={onFavorite} />
+      </div>
 
-      <JobCardAside job={job} liked={liked} favorite={favorite} onLike={onLike} onFavorite={onFavorite} extra={(applied || dismissed) && <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] ${applied ? 'bg-[var(--lime)]/45 text-[#26320b]' : 'bg-[var(--bad-bg)] text-[var(--bad)]'}`}>{applied ? 'Applied' : 'Not a fit'}</span>} />
+      <JobCardAside job={job} extra={(applied || dismissed) && <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] ${applied ? 'bg-[var(--lime)]/45 text-[#26320b]' : 'bg-[var(--bad-bg)] text-[var(--bad)]'}`}>{applied ? 'Applied' : 'Not a fit'}</span>} />
     </div>
   </article>
 }

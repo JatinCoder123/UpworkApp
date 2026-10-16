@@ -1,178 +1,137 @@
-import { useState } from 'react'
-import { ArrowUpRight, Plus, X } from '@phosphor-icons/react'
+import { useState, useMemo } from 'react'
+import { Check, MagnifyingGlass, SquaresFour, X } from '@phosphor-icons/react'
 import { DialogHeader, Modal, primaryButton } from './ui'
-import { loadCustomTechNewsCategories, saveCustomTechNewsCategories } from '../lib/preferences'
 
 export default function CategoryFilterDialog({
   categories = [],
-  selectedCategories: initialPropSelected,
-  activeCategory,
-  onApply,
+  categoryCounts = {},
+  selectedCategory = 'All',
   onSelect,
-  onAddCustomCategory,
   onClose,
 }) {
-  const initialList = Array.isArray(initialPropSelected)
-    ? initialPropSelected
-    : activeCategory && activeCategory !== 'All'
-      ? [activeCategory]
-      : []
+  const [search, setSearch] = useState('')
 
-  const [selected, setSelected] = useState(initialList)
-  const [customCategories, setCustomCategories] = useState(loadCustomTechNewsCategories)
-  const [isAdding, setIsAdding] = useState(false)
-  const [newCategory, setNewCategory] = useState('')
-
-  const baseCategories = (categories || []).filter((cat) => cat && cat !== 'All')
-  const allCategories = [...new Set([...baseCategories, ...customCategories])]
-
-  const toggleCategory = (cat) => {
-    setSelected((current) =>
-      current.includes(cat)
-        ? current.filter((item) => item !== cat)
-        : [...current, cat]
-    )
-  }
-
-  const handleAddCategory = () => {
-    const trimmed = newCategory.trim()
-    if (!trimmed) return
-    const existing = allCategories.find((c) => c.toLowerCase() === trimmed.toLowerCase())
-    const categoryToUse = existing || trimmed
-
-    if (!existing) {
-      const updatedCustom = [...customCategories, categoryToUse]
-      setCustomCategories(updatedCustom)
-      saveCustomTechNewsCategories(updatedCustom)
-      if (onAddCustomCategory) onAddCustomCategory(updatedCustom)
-    }
-
-    if (!selected.includes(categoryToUse)) {
-      setSelected((current) => [...current, categoryToUse])
-    }
-
-    setNewCategory('')
-    setIsAdding(false)
-  }
-
-  const handleApply = () => {
-    if (onApply) {
-      onApply(selected)
-    } else if (onSelect) {
-      onSelect(selected.length === 1 ? selected[0] : selected.length === 0 ? 'All' : selected)
-    }
-    onClose()
-  }
+  const filteredCategories = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return categories
+    return categories.filter((cat) => cat.toLowerCase().includes(q))
+  }, [categories, search])
 
   return (
-    <Modal onClose={onClose} wide>
+    <Modal onClose={onClose}>
       <DialogHeader
-        eyebrow="Browse topics"
-        title="Filter your news list"
+        eyebrow="Content Filter"
+        title="Filter by Topic / Field"
         onClose={onClose}
       />
-      <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-        Choose one or more categories. Use the shared date control in the toolbar for publishing time.
+      <p className="mt-2 text-sm text-[var(--muted)] leading-relaxed">
+        Choose a content topic or field to filter your article ideas. Each category shows how many ideas are currently available.
       </p>
-      <div className="mt-7 rounded-2xl bg-[var(--paper)] p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] font-bold uppercase tracking-[.17em] text-[var(--muted)]">
-            All categories
-          </p>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsAdding((prev) => !prev)}
-              aria-label="Add custom category"
-              className="inline-flex items-center gap-1 rounded-full bg-[var(--raised)] px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-all duration-300 hover:ring-[var(--lime-dark)]"
-            >
-              <Plus size={11} weight="bold" />
-              <span>Add category</span>
-            </button>
-            {selected.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setSelected([])}
-                className="text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]"
-              >
-                Clear categories
-              </button>
-            )}
+
+      {/* Search Input */}
+      <div className="relative mt-5 flex items-center gap-2 rounded-2xl bg-[var(--paper)] px-3.5 py-2.5 ring-1 ring-[var(--line)]/60 focus-within:ring-[var(--lime-dark)] transition-shadow">
+        <MagnifyingGlass size={15} className="shrink-0 text-[var(--muted)]" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search categories or fields…"
+          aria-label="Search categories"
+          className="min-w-0 flex-1 bg-transparent text-xs font-semibold outline-none placeholder:text-[var(--muted)] placeholder:font-normal"
+          autoFocus
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch('')}
+            aria-label="Clear search"
+            className="grid size-5 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] hover:bg-black/15 dark:bg-white/10"
+          >
+            <X size={11} weight="bold" />
+          </button>
+        )}
+      </div>
+
+      {/* Categories Grid */}
+      <div className="mt-4 max-h-[50vh] overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {filteredCategories.length === 0 ? (
+          <div className="col-span-full py-8 text-center text-xs text-[var(--muted)]">
+            No categories match "{search}"
           </div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {allCategories.map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => toggleCategory(cat)}
-              className={`rounded-full px-3 py-2 text-[10px] font-semibold transition-all duration-300 ${
-                selected.includes(cat)
-                  ? 'bg-[var(--lime)] !text-[#26320b] ring-1 ring-[var(--lime-dark)]/30'
-                  : 'bg-[var(--surface)] text-[var(--muted)] ring-1 ring-black/5 hover:text-[var(--ink)]'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-          {isAdding ? (
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--raised)] py-1 pl-3 pr-1.5 ring-1 ring-[var(--lime-dark)]">
-              <input
-                autoFocus
-                type="text"
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleAddCategory()
-                  } else if (e.key === 'Escape') {
-                    setIsAdding(false)
-                    setNewCategory('')
-                  }
-                }}
-                placeholder="New category..."
-                className="w-28 bg-transparent text-[10px] font-semibold text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
-              />
+        ) : (
+          filteredCategories.map((item) => {
+            const isSelected = selectedCategory === item
+            const count = categoryCounts[item] ?? 0
+
+            return (
               <button
-                type="button"
-                onClick={handleAddCategory}
-                aria-label="Save category"
-                className="grid size-5 place-items-center rounded-full bg-[var(--lime)] text-[#26320b] transition-colors hover:brightness-95"
-              >
-                <Plus size={11} weight="bold" />
-              </button>
-              <button
+                key={item}
                 type="button"
                 onClick={() => {
-                  setIsAdding(false)
-                  setNewCategory('')
+                  onSelect(item)
+                  onClose()
                 }}
-                aria-label="Cancel"
-                className="grid size-5 place-items-center rounded-full bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)] hover:text-[var(--ink)]"
+                className={`group flex items-center justify-between gap-3 rounded-2xl p-3 text-left transition-all duration-200 ring-1 ${
+                  isSelected
+                    ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/40 shadow-sm'
+                    : 'bg-[var(--paper)] text-[var(--ink)] ring-[var(--line)]/60 hover:bg-[var(--surface)] hover:ring-[var(--line)]'
+                }`}
               >
-                <X size={10} weight="bold" />
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span
+                    className={`grid size-6 shrink-0 place-items-center rounded-full text-xs transition-colors ${
+                      isSelected
+                        ? 'bg-black/15 text-[#26320b]'
+                        : 'bg-[var(--surface)] text-[var(--muted)] group-hover:text-[var(--ink)]'
+                    }`}
+                  >
+                    {isSelected ? (
+                      <Check size={12} weight="bold" />
+                    ) : (
+                      <SquaresFour size={12} weight="light" />
+                    )}
+                  </span>
+                  <span className="truncate text-xs font-bold leading-tight">
+                    {item}
+                  </span>
+                </div>
+
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${
+                    isSelected
+                      ? 'bg-black/15 text-[#26320b]'
+                      : 'bg-[var(--surface)] text-[var(--muted)]'
+                  }`}
+                >
+                  {count}
+                </span>
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsAdding(true)}
-              aria-label="Add custom category"
-              title="Add custom category"
-              className="grid size-7 place-items-center rounded-full bg-[var(--raised)] text-[var(--ink)] ring-1 ring-[var(--line)] transition-all duration-300 hover:ring-[var(--lime-dark)]"
-            >
-              <Plus size={12} weight="bold" />
-            </button>
-          )}
-        </div>
+            )
+          })
+        )}
       </div>
-      <button type="button" onClick={handleApply} className={`${primaryButton} mt-7 w-full`}>
-        <span>Apply category filters</span>
-        <span className="ml-auto grid size-8 place-items-center rounded-full bg-white/10">
-          <ArrowUpRight size={15} />
-        </span>
-      </button>
+
+      {/* Actions Footer */}
+      <div className="mt-6 flex items-center justify-between border-t border-[var(--line)]/60 pt-4">
+        <button
+          type="button"
+          onClick={() => {
+            onSelect('All')
+            onClose()
+          }}
+          className="text-xs font-bold text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
+        >
+          Reset to All
+        </button>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className={`${primaryButton} text-xs py-2 px-6`}
+        >
+          Done
+        </button>
+      </div>
     </Modal>
   )
 }

@@ -1,3 +1,5 @@
+import { CLIENT_LOCATIONS } from './jobSignals'
+
 export const preferenceDefaults = {
   skills: ['React', 'TypeScript', 'GSAP', 'Product design', 'Figma', 'Design systems', 'QA'],
   minimumFixedBudget: 3000,
@@ -65,14 +67,15 @@ export function saveJobSort(sort) {
   localStorage.setItem(JOB_SORT_KEY, sort)
 }
 
-export const EMPTY_EXTRA_FILTERS = { jobType: 'any', usaOnly: false }
+export const EMPTY_EXTRA_FILTERS = { jobType: 'any', location: 'any' }
 
 export function loadExtraFilters(scope = 'jobs') {
   try {
     const saved = JSON.parse(localStorage.getItem(`${JOB_EXTRA_FILTERS_KEY}:${scope}`) || '{}')
     return {
       jobType: ['any', 'hourly', 'fixed'].includes(saved.jobType) ? saved.jobType : 'any',
-      usaOnly: Boolean(saved.usaOnly),
+      // Older saves stored a USA-only switch; carry it over as the United States location.
+      location: CLIENT_LOCATIONS.some((item) => item.id === saved.location) ? saved.location : saved.usaOnly ? 'us' : 'any',
     }
   } catch { return EMPTY_EXTRA_FILTERS }
 }

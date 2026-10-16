@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import gsap from 'gsap'
 import { Mark, iconButton } from './ui'
 import ThemeToggle from './ThemeToggle'
+import DocNotificationBell from './DocNotificationBell'
 import GridPattern from './GridPattern'
 import { userInitials } from '../lib/auth'
 import { useAuth } from '../contexts/AuthContext'
@@ -19,6 +20,8 @@ const navigationItems = [
   ['/appscript', 'AppScript'],
   ['/llm', 'LLM'],
   ['/wordpress', 'Wordpress'],
+  ['/cloud', 'Cloud'],
+  ['/social', 'Social'],
 ]
 
 export default function Shell({ children }) {
@@ -118,6 +121,7 @@ export default function Shell({ children }) {
             </span>
           </div>
           <ThemeToggle />
+          <DocNotificationBell />
           <div ref={menuRef} className="relative hidden xl:block">
             <button aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)} className={`${iconButton} size-9`} aria-label="Open profile menu"><User size={17} weight="light" /></button>
             {profileOpen && <div className="absolute right-0 top-12 w-72 rounded-[1.5rem] bg-black/5 p-1.5 ring-1 ring-black/5 shadow-[0_24px_70px_rgba(30,32,25,.18)]"><div className="rounded-[calc(1.5rem-.375rem)] bg-[var(--surface)] p-3">

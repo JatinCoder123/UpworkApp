@@ -20,36 +20,45 @@ function Fact({ icon: Icon, children }) {
 }
 
 function ReactionButton({ active, onClick, label, activeStyle, children }) {
-  return <button type="button" onClick={onClick} aria-pressed={active} aria-label={label} title={label} className={`grid size-10 place-items-center rounded-full ring-1 transition-all duration-300 active:scale-90 ${active ? (activeStyle || 'bg-[var(--ink)] text-white ring-[var(--ink)]') : 'bg-[var(--raised)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}>{children}</button>
+  return <button type="button" onClick={onClick} aria-pressed={active} aria-label={label} title={label} className={`grid size-7 place-items-center rounded-full transition-all duration-300 active:scale-90 ${active ? activeStyle : 'text-[var(--muted)] hover:bg-[var(--raised)] hover:text-[var(--ink)]'}`}>{children}</button>
 }
 
-// Right side of a list card: price at a glance plus quick like, favorite and Teams share.
-export function JobCardAside({ job, liked, favorite, onLike, onFavorite, extra }) {
+// Like, favorite and Teams share as one pill in the top-right corner of a card's main column.
+// The parent must be `relative`; the card header keeps right padding so its pills never run underneath.
+export function JobCardActions({ job, liked, favorite, onLike, onFavorite }) {
   const [sharing, setSharing] = useState(false)
-  return <aside className="flex flex-col gap-3 border-t border-[var(--line)]/70 bg-[var(--paper)]/45 p-5 md:border-l md:border-t-0">
-    <Price job={job} />
-    <Chips job={job} />
-    {extra}
-    <div className="mt-auto flex items-center gap-2 pt-2">
-      <ReactionButton
-        active={liked}
-        onClick={onLike}
-        label={liked ? 'Unlike job' : 'Like job'}
-        activeStyle="bg-[#fff1f2] text-[#e11d48] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/30"
-      >
-        <Heart size={17} weight={liked ? 'fill' : 'regular'} className={liked ? 'text-[#fb7185] dark:text-[#fda4af]' : ''} />
-      </ReactionButton>
-      <ReactionButton
-        active={favorite}
-        onClick={onFavorite}
-        label={favorite ? 'Remove from favorites' : 'Add to favorites'}
-        activeStyle="bg-[#fef9c3] text-[#b45309] ring-1 ring-[#fde047] dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/30"
-      >
-        <Star size={17} weight={favorite ? 'fill' : 'regular'} className={favorite ? 'text-[#f59e0b] dark:text-[#fde047]' : ''} />
-      </ReactionButton>
-      <ReactionButton active={false} onClick={() => setSharing(true)} label="Share in Teams"><MicrosoftTeamsLogo size={17} weight="fill" className="text-[#4b53bc]" /></ReactionButton>
-    </div>
+  return <div className="absolute right-4 top-4 z-10 flex items-center gap-1 rounded-full bg-[var(--paper)] p-1">
+    <ReactionButton
+      active={liked}
+      onClick={onLike}
+      label={liked ? 'Unlike job' : 'Like job'}
+      activeStyle="bg-[#fff1f2] text-[#e11d48] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/30"
+    >
+      <Heart size={15} weight={liked ? 'fill' : 'regular'} className={liked ? 'text-[#fb7185] dark:text-[#fda4af]' : ''} />
+    </ReactionButton>
+    <ReactionButton
+      active={favorite}
+      onClick={onFavorite}
+      label={favorite ? 'Remove from favorites' : 'Add to favorites'}
+      activeStyle="bg-[#fef9c3] text-[#b45309] ring-1 ring-[#fde047] dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/30"
+    >
+      <Star size={15} weight={favorite ? 'fill' : 'regular'} className={favorite ? 'text-[#f59e0b] dark:text-[#fde047]' : ''} />
+    </ReactionButton>
+    <ReactionButton active={false} onClick={() => setSharing(true)} label="Share in Teams"><MicrosoftTeamsLogo size={15} weight="fill" className="text-[#4b53bc]" /></ReactionButton>
     {sharing && <ShareJobDialog job={job} mode="teams" onClose={() => setSharing(false)} />}
+  </div>
+}
+
+// Right side of a list card: price at a glance.
+// Price and its chips stay together as one budget block; `score` sits below that block.
+export function JobCardAside({ job, score, extra }) {
+  return <aside className="flex flex-col gap-3 border-t border-[var(--line)]/70 bg-[var(--paper)]/45 p-5 md:border-l md:border-t-0">
+    <div className="min-w-0 space-y-2.5">
+      <Price job={job} />
+      <Chips job={job} />
+    </div>
+    {score}
+    {extra}
   </aside>
 }
 
@@ -66,8 +75,9 @@ export default function JobCard({ job, index, now, liked, favorite, onLike, onFa
   return <article id={`job-${job.id}`} data-card data-job-id={job.id} className="group relative scroll-mt-[calc(var(--shell-h)+1rem)] rounded-[1.6rem] bg-[var(--frame)] p-1 ring-1 ring-[var(--line)]/60 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(30,40,25,.1)]">
     <span aria-hidden="true" className="absolute inset-y-6 left-0 w-1 rounded-r-full" style={{ background: matchTone(score) }} />
     <div className="grid overflow-hidden rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] md:grid-cols-[minmax(0,1fr)_17rem]">
+      <div className="relative min-w-0">
       <Link to={`/jobs/${job.id}`} onClick={previewClick(onOpen)} className="block min-w-0 p-5 sm:p-6">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pr-28">
           {index != null && <span className="font-mono text-[11px] font-bold text-[var(--muted)]">{String(index + 1).padStart(2, '0')}</span>}
           <StatusPill status={job.status} />
           {favorite && (
@@ -97,13 +107,18 @@ export default function JobCard({ job, index, now, liked, favorite, onLike, onFa
           {visibleSkills.map((skill) => <span key={skill} style={skillStyle(skill)} className="skill-chip max-w-44 truncate rounded-full px-2.5 py-1 text-[11px] font-semibold">{skill}</span>)}
           {skills.length > visibleSkills.length && <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)]">+{skills.length - visibleSkills.length}</span>}
         </div>
-        <div className="mt-4 max-w-md">
-          <div className="flex items-center justify-between gap-3 text-[11px] font-bold"><span className="flex items-center gap-1 text-[var(--muted)]"><Target size={12} weight="bold" />{job.match > 0 ? 'AI score' : 'Fit'}{matchLabel && <span className="truncate font-medium" title={matchLabel}>· {matchLabel}</span>}</span><span>{score}%</span></div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-black/[.07] dark:bg-white/10"><div className="h-full rounded-full" style={{ width: `${score}%`, background: matchTone(score) }} /></div>
-        </div>
       </Link>
+      <JobCardActions job={job} liked={liked} favorite={favorite} onLike={onLike} onFavorite={onFavorite} />
+      </div>
 
-      <JobCardAside job={job} liked={liked} favorite={favorite} onLike={onLike} onFavorite={onFavorite} />
+      <JobCardAside job={job} score={<div className="min-w-0 rounded-2xl bg-[var(--surface)] p-3 ring-1 ring-[var(--line)]/70">
+        <div className="flex items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]"><Target size={12} weight="bold" className="shrink-0" />{job.match > 0 ? 'AI score' : 'Fit score'}</span>
+          <span className="text-sm font-bold tabular-nums tracking-[-.02em]">{score}%</span>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/[.07] dark:bg-white/10"><div className="h-full rounded-full" style={{ width: `${score}%`, background: matchTone(score) }} /></div>
+        {matchLabel && <p className="mt-2 truncate text-[11px] font-medium text-[var(--muted)]" title={matchLabel}>{matchLabel}</p>}
+      </div>} />
     </div>
   </article>
 }
