@@ -61,14 +61,12 @@ export default function Video() {
     if (isLoading || !root.current) return undefined
     const ctx = gsap.context(() => {
       if (reduceMotion()) return
-      gsap.fromTo('[data-hero-word]', { yPercent: 110, rotate: 4 }, { yPercent: 0, rotate: 0, duration: 1.1, stagger: .08, ease: 'expo.out' })
       gsap.fromTo('[data-hero-fade]', { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .8, stagger: .08, delay: .35, ease: 'power3.out' })
       gsap.utils.toArray('[data-count]').forEach((node) => {
         const target = Number(node.dataset.count) || 0
         const counter = { value: 0 }
         gsap.to(counter, { value: target, duration: 1.4, delay: .4, ease: 'power3.out', onUpdate: () => { node.textContent = Math.round(counter.value) } })
       })
-      gsap.to('[data-hero-title]', { yPercent: -18, autoAlpha: .25, ease: 'none', scrollTrigger: { trigger: '[data-hero]', start: 'top top', end: 'bottom top', scrub: true } })
     }, root)
     return () => ctx.revert()
   }, [isLoading])
@@ -101,17 +99,9 @@ export default function Video() {
   return (
     <Shell>
       <div className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[3px]"><div data-scroll-progress className="h-full origin-left scale-x-0 bg-[var(--lime-dark)]" /></div>
-      <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-28 pt-9 sm:px-6 md:pt-12">
-        <header data-hero className="relative">
-          <div data-hero-title>
-            <p data-hero-fade className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.17em] text-[var(--muted)]"><VideoCamera size={15} weight="duotone" />Video feed · content briefs</p>
-            <h1 className="mt-4 max-w-4xl text-[clamp(2.8rem,6.6vw,6.2rem)] font-semibold leading-[.92] tracking-[-.07em]">
-              <span className="block overflow-hidden pb-1"><span data-hero-word className="inline-block">Ideas</span> <span data-hero-word className="inline-block">worth</span></span>
-              <span className="block overflow-hidden pb-2"><span data-hero-word className="inline-block font-serif font-medium italic">filming.</span></span>
-            </h1>
-            <p data-hero-fade className="mt-5 max-w-xl text-sm leading-6 text-[var(--muted)]">Researched video ideas with a run sheet, the search demand behind them and why each one made the cut. Scroll to walk through every brief.</p>
-          </div>
-          <dl data-hero-fade className="mt-9 grid max-w-3xl grid-cols-2 gap-px overflow-hidden rounded-[1.6rem] bg-[var(--line)]/70 ring-1 ring-[var(--line)]/70 sm:grid-cols-4">
+      <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-28 pt-6 sm:px-6 md:pt-8">
+        <header className="relative">
+          <dl data-hero-fade className="grid max-w-3xl grid-cols-2 gap-px overflow-hidden rounded-[1.6rem] bg-[var(--line)]/70 ring-1 ring-[var(--line)]/70 sm:grid-cols-4">
             {[['Briefs', stats.total, FilmSlate], ['Priority 1', stats.p1, Lightning], ['Hurry up', stats.urgent, Fire], ['Avg match %', stats.match, Sparkle]].map(([label, value, Icon]) => <div key={label} className="bg-[var(--surface)] px-5 py-4">
               <dt className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]"><Icon size={13} weight="duotone" />{label}</dt>
               <dd data-count={value} className="mt-2 text-3xl font-semibold tabular-nums tracking-[-.05em]">{value}</dd>
