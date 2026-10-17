@@ -15,7 +15,8 @@ import { StatusPill } from '../components/ui'
 import { api } from '../services/api'
 import JobDetailSkeleton, { DrawerDetailSkeleton } from '../components/JobDetailSkeleton'
 import { timeAgo, useNow } from '../lib/time'
-import { skillStyle, useJobReactions } from '../lib/jobSignals'
+import { skillStyle } from '../lib/jobSignals'
+import { useCrmReactions } from '../lib/crmReactions'
 import { useJobStatus } from '../lib/jobStatus'
 import { useAuth } from '../contexts/AuthContext'
 import { asArray, asObject } from '../lib/safe'
@@ -48,9 +49,9 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
   const [share, setShare] = useState(null), root = useRef(null), seenJob = useRef(null), queryClient = useQueryClient()
   const { user } = useAuth()
   const status = useJobStatus()
-  const reactions = useJobReactions(user?.email)
+  const reactions = useCrmReactions(user)
   const now = useNow()
-  const { data: job, isLoading, isError, error, refetch } = useQuery({ queryKey: ['job', id], queryFn: () => api.getJob(id), enabled: Boolean(id), retry: false, placeholderData: initialJob })
+  const { data: job, isLoading, isError, error, refetch } = useQuery({ queryKey: ['job', id], queryFn: () => api.getJob(id, user?.email), enabled: Boolean(id), retry: false, placeholderData: initialJob })
   const jobId = job?.id
   const { mutate: markJobSeen } = useMutation({
     mutationFn: () => api.updateStatus({ id, status: 'Seen' }),
@@ -100,8 +101,8 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
     resolved={job.status === 'Applied' ? 'applied' : job.status === 'Rejected' ? 'rejected' : null}
     onUndo={() => status.undo(job)}
     undoing={status.pendingId === job.id}
-    liked={reactions.isLiked(job.id)}
-    favorite={reactions.isFavorite(job.id)}
+    liked={reactions.isLiked(job.id, job)}
+    favorite={reactions.isFavorite(job.id, job)}
     onLike={() => reactions.toggleLike(job.id, job)}
     onFavorite={() => reactions.toggleFavorite(job.id, job)}
     onShare={setShare}
@@ -120,12 +121,12 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
           <div className="relative p-5 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill status={job.status} />
-              {reactions.isFavorite(job.id) && (
+              {reactions.isFavorite(job.id, job) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#fef9c3] px-2.5 py-1 text-[11px] font-bold text-[#92400e] ring-1 ring-[#fde047]/60 dark:bg-[#fef08a]/15 dark:text-[#fde047] dark:ring-[#fde047]/30">
                   <Star size={12} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" /> Favorited
                 </span>
               )}
-              {reactions.isLiked(job.id) && (
+              {reactions.isLiked(job.id, job) && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#ffe4e6] px-2.5 py-1 text-[11px] font-bold text-[#be123c] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/15 dark:text-[#fda4af] dark:ring-[#fda4af]/30">
                   <Heart size={12} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" /> Liked
                 </span>

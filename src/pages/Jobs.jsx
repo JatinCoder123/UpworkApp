@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
 import gsap from "gsap";
 import { Briefcase, Broadcast, CaretDown, Check, ClockCounterClockwise, Funnel, Heart, MagnifyingGlass, Plus, SlidersHorizontal, Star, X } from "@phosphor-icons/react";
 import Shell from "../components/Shell";
@@ -17,7 +17,8 @@ import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
 import { EMPTY_EXTRA_FILTERS, EMPTY_REACTION_FILTER, JOB_SORTS, loadDateFilter, loadExtraFilters, loadJobScope, loadJobSort, loadJobStatus, loadReactionFilter, saveDateFilter, saveExtraFilters, saveJobScope, saveJobSort, saveJobStatus, saveReactionFilter } from "../lib/preferences";
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from "../lib/dateRange";
-import { clientLocation, countExtraFilters, forgetSearch, loadRecentSearches, matchesExtraFilters, rememberSearch, skillStyle, useJobReactions, usePreviewParam } from "../lib/jobSignals";
+import { clientLocation, countExtraFilters, forgetSearch, loadRecentSearches, matchesExtraFilters, rememberSearch, skillStyle, usePreviewParam } from "../lib/jobSignals";
+import { useCrmReactions } from "../lib/crmReactions";
 import { useJobStatus } from "../lib/jobStatus";
 import ErrorBoundary, { CardError } from "../components/ErrorBoundary";
 import { timeAgo, useNow } from "../lib/time";
@@ -51,6 +52,9 @@ function StatusTab({ active, onClick, count, ariaProps, children }) {
   </button>;
 }
 
+// The job's own engagement flag when it was fetched with one, otherwise the user's id list.
+const reactedTo = (job, flag, ids) => (typeof job?.engagement?.[flag] === "boolean" ? job.engagement[flag] : ids.includes(job?.id));
+
 function FilterChip({ children, onClear }) {
   return <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1.5 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
     {children}
@@ -61,7 +65,7 @@ function FilterChip({ children, onClear }) {
 export default function Jobs() {
   const { user } = useAuth();
   const now = useNow();
-  const reactions = useJobReactions(user?.email);
+  const reactions = useCrmReactions(user);
   const jobStatus = useJobStatus();
   const [dateFilter, setDateFilter] = useState(() => loadDateFilter("jobs"));
   const gatewayDateFilter = useMemo(() => toGatewayDateFilter(dateFilter), [dateFilter]);
@@ -69,7 +73,11 @@ export default function Jobs() {
   const [tab, setTab] = useState(() => (loadJobStatus() === "Seen" ? "New" : loadJobStatus()));
   // Independent of the status tab, so e.g. Rejected + Favorites + Liked narrow the list together.
   const [reactionFilter, setReactionFilter] = useState(loadReactionFilter);
-  const { favorites: favoritesOnly, liked: likedOnly } = reactionFilter;
+  // The Applied tab lists every applied job on its own: Favorites / Liked stay selected but do not narrow it.
+  const reactionsApply = tab !== "Applied";
+  const favoritesOnly = reactionFilter.favorites && reactionsApply;
+  const likedOnly = reactionFilter.liked && reactionsApply;
+  const reactionView = favoritesOnly || likedOnly;
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounced(searchInput.trim(), 450);
   const [recentSearches, setRecentSearches] = useState(() => loadRecentSearches(user?.email));
@@ -164,27 +172,33 @@ export default function Jobs() {
     [skillRecords, skillCounts],
   );
 
+  // With Favorites or Liked on, the user's jobs from the CRM are shown even when they are outside the loaded pages.
+  const loadedJobs = useMemo(
+    () => asArray(jobPages?.pages).flatMap((page) => asArray(page?.records)).filter((job, index, records) => records.findIndex((item) => item.id === job.id) === index),
+    [jobPages],
+  );
+  const reactionIds = useMemo(
+    () => [...new Set([...(favoritesOnly ? reactions.favorites : []), ...(likedOnly ? reactions.liked : [])])],
+    [favoritesOnly, likedOnly, reactions.favorites, reactions.liked],
+  );
+  const missingReactionIds = reactionIds.filter((id) => !loadedJobs.some((job) => job.id === id));
+  const reactionJobQueries = useQueries({
+    queries: missingReactionIds.map((id) => ({ queryKey: ["job", id], queryFn: () => api.getJob(id, user?.email), retry: false, staleTime: 60_000 })),
+  });
+  const reactionJobs = reactionJobQueries.map((query) => query.data).filter((job) => job?.id);
+  const reactionJobsKey = reactionJobs.map((job) => `${job.id}:${job.status}`).join("|");
   const allDisplayJobs = useMemo(() => {
-    const baseJobs = asArray(jobPages?.pages).flatMap((page) => asArray(page?.records)).filter((job, index, records) => records.findIndex((item) => item.id === job.id) === index);
-    const baseIds = new Set(baseJobs.map((j) => j.id));
-    const extraFromReactions = [];
-    const relevantIds = favoritesOnly || likedOnly
-      ? [...(favoritesOnly ? reactions.favorites : []), ...(likedOnly ? reactions.liked : [])]
-      : [...reactions.favorites, ...reactions.liked];
-    for (const id of relevantIds) {
-      if (!baseIds.has(id) && reactions.jobRecords?.[id]) {
-        extraFromReactions.push(reactions.jobRecords[id]);
-        baseIds.add(id);
-      }
-    }
-    return [...baseJobs, ...extraFromReactions];
-  }, [jobPages, favoritesOnly, likedOnly, reactions.favorites, reactions.liked, reactions.jobRecords]);
+    const loadedIds = new Set(loadedJobs.map((job) => job.id));
+    return [...loadedJobs, ...reactionJobs.filter((job) => !loadedIds.has(job.id))];
+    // reactionJobs is a new array each render; its key says when its contents change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedJobs, reactionJobsKey]);
 
   // A refreshed or shared ?job= link can point at a job outside the loaded pages; fetch that one on its own.
   const listedPreview = previewId ? allDisplayJobs.find((job) => job.id === previewId) : null;
   const { data: fetchedPreview, isError: previewMissing } = useQuery({
     queryKey: ["job", previewId],
-    queryFn: () => api.getJob(previewId),
+    queryFn: () => api.getJob(previewId, user?.email),
     enabled: Boolean(previewId) && !listedPreview,
     retry: false,
   });
@@ -195,13 +209,16 @@ export default function Jobs() {
   // Every active filter must match, so they all combine.
   const filtered = useMemo(
     () => allDisplayJobs.filter((job) => {
-      if (tab === "New") {
-        if (!["New", "Seen"].includes(job.status)) return false;
-      } else if (tab !== "All") {
-        if (job.status !== tab) return false;
+      // Favorites / Liked show every saved job whatever its status; the status tab only narrows the plain list.
+      if (!favoritesOnly && !likedOnly) {
+        if (tab === "New") {
+          if (!["New", "Seen"].includes(job.status)) return false;
+        } else if (tab !== "All") {
+          if (job.status !== tab) return false;
+        }
       }
-      if (favoritesOnly && !reactions.favorites.includes(job.id)) return false;
-      if (likedOnly && !reactions.liked.includes(job.id)) return false;
+      if (favoritesOnly && !reactedTo(job, "saved", reactions.favorites)) return false;
+      if (likedOnly && !reactedTo(job, "liked", reactions.liked)) return false;
       return matchesExtraFilters(job, extraFilters) &&
         (!skills.length || skills.some((skill) => asArray(job.skills).some((jobSkill) => asText(jobSkill).toLowerCase() === skill.toLowerCase()) || `${job.title} ${job.description}`.toLowerCase().includes(skill.toLowerCase())));
     }),
@@ -293,10 +310,10 @@ export default function Jobs() {
               </div>
               <span aria-hidden="true" className="hidden h-6 w-px bg-[var(--line)] sm:block" />
               <div role="tablist" aria-label="Job status" className="flex items-stretch gap-1 self-stretch">
-                {mainTabs.map((item) => <StatusTab key={item} active={tab === item} onClick={() => changeTab(item)} count={isFetchingStats && pipelineCounts[item] == null ? "…" : pipelineCounts[item] ?? 0}>{item}</StatusTab>)}
+                {mainTabs.map((item) => <StatusTab key={item} active={tab === item && !reactionView} onClick={() => changeTab(item)} count={isFetchingStats && pipelineCounts[item] == null ? "…" : pipelineCounts[item] ?? 0}>{item}</StatusTab>)}
                 <div ref={moreTabsRef} className="relative flex">
                   {(() => {
-                    const current = moreTabs.find((item) => item === tab);
+                    const current = reactionView ? null : moreTabs.find((item) => item === tab);
                     return <StatusTab active={Boolean(current)} onClick={() => setMoreTabsOpen((open) => !open)} count={current ? (pipelineCounts[current] ?? 0) : null} ariaProps={{ "aria-haspopup": "menu", "aria-expanded": moreTabsOpen }}>
                       {current || "More"}<CaretDown size={12} weight="bold" className={`transition-transform ${moreTabsOpen ? "rotate-180" : ""}`} />
                     </StatusTab>;
@@ -324,11 +341,11 @@ export default function Jobs() {
             {/* Row 3: favorites, liked and skills, with Clear and the skill settings at the end. */}
             <div className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-6 lg:flex-nowrap">
               <div className="flex shrink-0 items-center gap-2">
-                <button type="button" aria-pressed={favoritesOnly} onClick={() => toggleReactionFilter("favorites")} title="Show favorite jobs" className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 ${favoritesOnly ? "bg-[#fef9c3] text-[#b45309] ring-[#fde047] shadow-sm dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[#fde047]/70"}`}>
+                <button type="button" aria-pressed={favoritesOnly} onClick={() => toggleReactionFilter("favorites")} title={reactionsApply ? "Show favorite jobs" : "Not used on the Applied tab, which shows every applied job"} disabled={!reactionsApply} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-45 ${favoritesOnly ? "bg-[#fef9c3] text-[#b45309] ring-[#fde047] shadow-sm dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[#fde047]/70"}`}>
                   <Star size={14} weight={favoritesOnly || reactions.favorites.length > 0 ? "fill" : "regular"} className={favoritesOnly || reactions.favorites.length > 0 ? "text-[#f59e0b] dark:text-[#fde047]" : "text-[#b45309]"} />Favorites
                   {reactions.favorites.length > 0 && <span className={`font-mono text-[10px] tabular-nums ${favoritesOnly ? "opacity-75" : "text-[var(--muted)]"}`}>{reactions.favorites.length}</span>}
                 </button>
-                <button type="button" aria-pressed={likedOnly} onClick={() => toggleReactionFilter("liked")} title="Show liked jobs" className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 ${likedOnly ? "bg-[#ffe4e6] text-[#e11d48] ring-[#fecdd3] shadow-sm dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[#fecdd3]"}`}>
+                <button type="button" aria-pressed={likedOnly} onClick={() => toggleReactionFilter("liked")} title={reactionsApply ? "Show liked jobs" : "Not used on the Applied tab, which shows every applied job"} disabled={!reactionsApply} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-45 ${likedOnly ? "bg-[#ffe4e6] text-[#e11d48] ring-[#fecdd3] shadow-sm dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[#fecdd3]"}`}>
                   <Heart size={14} weight={likedOnly || reactions.liked.length > 0 ? "fill" : "regular"} className={likedOnly || reactions.liked.length > 0 ? "text-[#fb7185] dark:text-[#fda4af]" : "text-[#e11d48]"} />Liked
                   {reactions.liked.length > 0 && <span className={`font-mono text-[10px] tabular-nums ${likedOnly ? "opacity-75" : "text-[var(--muted)]"}`}>{reactions.liked.length}</span>}
                 </button>
@@ -406,8 +423,8 @@ export default function Jobs() {
                           <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--muted)]">
                             <span>{timeAgo(job.postedAt, now)}</span>
                             {job.status === "New" && <span className="inline-block size-1.5 rounded-full bg-[var(--accent)] align-middle" />}
-                            {reactions.isFavorite(job.id) && <Star size={10} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" />}
-                            {reactions.isLiked(job.id) && <Heart size={10} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" />}
+                            {reactions.isFavorite(job.id, job) && <Star size={10} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" />}
+                            {reactions.isLiked(job.id, job) && <Heart size={10} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" />}
                           </span>
                         </span>
                       </button>
@@ -415,7 +432,7 @@ export default function Jobs() {
                   </div>
                 </nav>
                 <div className="min-w-0">
-                  <section className="space-y-4">{filtered.map((job, index) => <ErrorBoundary key={job.id} name="job-card" fallback={CardError} resetKey={job}><JobCard job={job} index={index} now={now} liked={reactions.isLiked(job.id)} favorite={reactions.isFavorite(job.id)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} onOpen={() => openPreview(job.id)}
+                  <section className="space-y-4">{filtered.map((job, index) => <ErrorBoundary key={job.id} name="job-card" fallback={CardError} resetKey={job}><JobCard job={job} index={index} now={now} liked={reactions.isLiked(job.id, job)} favorite={reactions.isFavorite(job.id, job)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} onOpen={() => openPreview(job.id)}
                     onUndo={job.status === "Applied" || job.status === "Rejected" ? () => jobStatus.undo(job) : undefined}
                     undoing={jobStatus.pendingId === job.id}
                     undoError={jobStatus.errorId === job.id ? jobStatus.error?.message || "Could not undo. Try again." : ""} /></ErrorBoundary>)}</section>

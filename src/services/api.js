@@ -280,6 +280,8 @@ export function mapGatewayJob(input) {
     pitch: decodeHtml(record.pitch || ""),
     coverLetter: decodeCoverLetter(record.cover_letter),
     clientStats,
+    // The signed-in user's like/save state, when the job was fetched with engagement.
+    engagement: mapEngagement(record.engagement),
     activity: Array.isArray(changes.activity) ? changes.activity : [`Job imported as ${record.job_id || record.name}`, `Last updated ${record.date_modified_time_ago || "recently"}`],
     raw: record,
     ...changes,
@@ -331,7 +333,7 @@ export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEm
     page,
     per_page: perPage,
   };
-  const filters = { ai_processed: 1 };
+  const filters = { ai_processed: 1, ...(await engagementFilters(userEmail)) };
   if (assignedUserId) filters.assigned_user_id = assignedUserId;
   if (status) filters.status = status;
   if (Object.keys(filters).length) query.filters = filters;
@@ -349,6 +351,24 @@ export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEm
     perPage: Number(data.per_page) || perPage,
     total: Number(data.total) || records.length,
     totalPages: Number(data.total_pages) || Math.max(1, Math.ceil((Number(data.total) || records.length) / perPage)),
+  };
+}
+
+// With engagement on, the gateway adds the user's like/save state and the like/save totals to every job.
+// It does not narrow the list. A user missing from the CRM just gets jobs without it.
+async function engagementFilters(userEmail) {
+  if (!userEmail) return {};
+  const userId = await findGatewayUserIdByEmail(userEmail).catch(() => "");
+  return userId ? { engagement: true, user_id: userId } : {};
+}
+
+function mapEngagement(value) {
+  if (!value || typeof value !== "object") return null;
+  return {
+    liked: Boolean(value.liked),
+    saved: Boolean(value.saved),
+    likesCount: Number(value.likes_count) || 0,
+    savesCount: Number(value.saves_count) || 0,
   };
 }
 
@@ -404,9 +424,9 @@ export async function fetchJobs(options = {}) {
 }
 
 // Looked up by id alone, so a job opens the same way from My Jobs and All Jobs.
-export async function fetchJobById(id) {
+export async function fetchJobById(id, userEmail) {
   if (!id || !String(id).trim()) throw createAppError("JOB_NOT_FOUND", "Job not found");
-  const data = await smartGateway({ action: "fetch", module: JOBS_MODULE, filters: { id }, page: 1, per_page: 1 });
+  const data = await smartGateway({ action: "fetch", module: JOBS_MODULE, filters: { id, ...(await engagementFilters(userEmail)) }, page: 1, per_page: 1 });
   const record = asArray(data.records).find((item) => item?.id === id);
   if (!record) throw createAppError("JOB_NOT_FOUND", "Job not found");
   return mapGatewayJob(record);
@@ -633,6 +653,53 @@ function statusActivity(from, to) {
   if (from === to || (from === "New" && to === "Seen")) return "";
   if (to === "Seen" && (from === "Applied" || from === "Rejected")) return `Undo ${from}`;
   return to;
+}
+
+// ----------------------------------------------------
+// Likes and favorites (one CRM record per user and job)
+// ----------------------------------------------------
+
+// Likes live in outr_likes, favorites in outr_saves; each record is { user_id, content_id, content_module }.
+const REACTION_MODULES = { liked: "outr_likes", favorites: "outr_saves" };
+
+// The CRM user id from the signed-in session when it carries one, otherwise looked up by email.
+// The session's own `id` is the login provider's id, not a CRM user, so it is never used here.
+async function reactionUserId(user) {
+  const sessionId = asText(user?.crmUserId || user?.crm_user_id || user?.crmUser?.id || user?.crm_user?.id).trim();
+  return sessionId || findGatewayUserIdByEmail(user?.email);
+}
+
+async function fetchReactionRecords(module, filters) {
+  const perPage = 200;
+  const first = await smartGateway({ action: "fetch", module, filters, page: 1, per_page: perPage });
+  const totalPages = Math.max(1, Number(first.total_pages) || 1);
+  const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => smartGateway({ action: "fetch", module, filters, page: index + 2, per_page: perPage })));
+  return [first, ...rest].flatMap((page) => asArray(page?.records)).filter((record) => record && record.deleted !== "1" && record.content_id);
+}
+
+// { liked: [jobId], favorites: [jobId] } for the signed-in user, newest first.
+export async function fetchJobReactions(user) {
+  const userId = await reactionUserId(user);
+  const [liked, favorites] = await Promise.all(Object.values(REACTION_MODULES).map((module) =>
+    fetchReactionRecords(module, { user_id: userId, content_module: JOBS_MODULE })
+      .then((records) => [...new Set(records.sort((a, b) => Date.parse(parseEnteredAt(b)) - Date.parse(parseEnteredAt(a))).map((record) => record.content_id))])));
+  return { liked, favorites };
+}
+
+// Adds or removes the user's like/favorite on a job. Adding skips a record that already exists;
+// removing deletes every matching record, so a double click elsewhere cannot leave one behind.
+export async function setJobReaction(user, kind, jobId, on) {
+  const module = REACTION_MODULES[kind];
+  if (!module || !jobId) throw createAppError("REACTION_INVALID", "This job could not be updated.");
+  const userId = await reactionUserId(user);
+  const filters = { user_id: userId, content_id: jobId, content_module: JOBS_MODULE };
+  const existing = await fetchReactionRecords(module, filters);
+  if (on) {
+    if (!existing.length) await smartGateway({ action: "create", module, data: filters });
+  } else {
+    await Promise.all(existing.map((record) => smartGateway({ action: "delete", module, id: record.id })));
+  }
+  return on;
 }
 
 // ----------------------------------------------------
@@ -1345,12 +1412,14 @@ export const api = {
   getJobsPage: (params) => fetchJobsPage(params),
   getJobStats: (params) => fetchJobStats(params),
   getSkillCounts: (params) => fetchSkillCounts(params),
-  getJob: (id) => fetchJobById(id),
+  getJob: (id, userEmail) => fetchJobById(id, userEmail),
   getCoverLetter: (job) => fetchCoverLetter(job),
   saveCoverLetter,
   editCoverLetter: editCoverLetterWithAi,
   getStrategy: (job) => fetchStrategy(job),  getTeamMembers: () => fetchTeamMembers(),
   getLiveJobs: (params) => fetchLiveUpworkJobs(params),
+  getJobReactions: fetchJobReactions,
+  setJobReaction,
   saveLiveJobToCrm,
   getVideoFeeds: (options) => fetchVideoFeeds(options),
   getSiteContent: (options) => fetchSiteContent(options),
