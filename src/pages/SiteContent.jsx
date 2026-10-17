@@ -31,7 +31,7 @@ import LogoLoader from '../components/LogoLoader'
 import HScroll from '../components/HScroll'
 import { Modal, primaryButton, stickyBand } from '../components/ui'
 import CategoryFilterDialog from '../components/CategoryFilterDialog'
-import { api, getDocumentViewUrl } from '../services/api'
+import { api, getDocumentViewUrl, resolveCrmUser } from '../services/api'
 import {
   subscribeDocStatus,
   getCachedDocStatus,
@@ -39,6 +39,7 @@ import {
   recordDocStartTime,
   resetDocStartTime,
   saveDocInProgress,
+  getDocInProgress,
   clearDocInProgress,
 } from '../services/docSocket'
 import { recordDocNotification } from '../services/docNotifications'
@@ -785,6 +786,8 @@ function IdeaCard({ item, selected, onSelect }) {
 function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
   const panel = useRef(null)
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const [crmUser, setCrmUser] = useState({ userName: '', userId: '' })
   const [copied, setCopied] = useState('')
   const [activeNoteId, setActiveNoteId] = useState(item.notesId || '')
   const [isTriggering, setIsTriggering] = useState(false)
@@ -794,7 +797,24 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
     const cached = getCachedDocStatus(item.notesId, item.id)
     return cached?.status || null
   })
+  const [liveUserName, setLiveUserName] = useState(() => {
+    const cached = getCachedDocStatus(item.notesId, item.id)
+    return cached?.userName || ''
+  })
   const [liveNoteFields, setLiveNoteFields] = useState(null)
+
+  // Resolve logged-in CRM user details
+  useEffect(() => {
+    let active = true
+    resolveCrmUser(user).then((res) => {
+      if (active && res) {
+        setCrmUser(res)
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [user])
 
   // Keep state in sync with selected item
   useEffect(() => {
@@ -805,6 +825,9 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
     setTriggerError('')
     setJustCompleted(false)
     setLiveSocketStatus(cached?.status || null)
+    if (cached?.userName) {
+      setLiveUserName(cached.userName)
+    }
     if (cached?.filename || cached?.viewUrl || cached?.documentUrl) {
       setLiveNoteFields({
         filename: cached.filename,
@@ -855,6 +878,10 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
         setLiveSocketStatus(event.status)
       }
 
+      if (event.userName) {
+        setLiveUserName(event.userName)
+      }
+
       if (event.filename || event.viewUrl || event.documentUrl) {
         setLiveNoteFields((prev) => ({
           ...prev,
@@ -889,9 +916,10 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
     return {
       ...base,
       ...liveNoteFields,
+      userName: liveUserName || liveNoteFields?.userName || base?.userName || crmUser.userName || '',
       status: liveSocketStatus || liveNoteFields?.status || base?.status || '',
     }
-  }, [fetchedNote, liveNoteFields, liveSocketStatus])
+  }, [fetchedNote, liveNoteFields, liveSocketStatus, liveUserName, crmUser.userName])
 
   // When note generation finishes, notify parent to refresh item list badges
   useEffect(() => {
@@ -904,28 +932,40 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
   }, [note?.status, isTriggering, onDocUpdated, item.id, activeNoteId])
 
   // Generate / Regenerate handler:
-  // Calls entryPoint=TechContentDocx&id=${item.id} using the specific content module ID!
+  // Calls entryPoint=TechContentDocx&id=${item.id} with userName and userId!
   const handleGenerateDoc = async (_isRegen = false) => {
     try {
       setIsTriggering(true)
       setTriggerError('')
       setLiveSocketStatus('queued')
       const now = Date.now()
+
+      // Resolve CRM user identity to send to generation endpoint
+      const resolved = await resolveCrmUser(user)
+      const effectiveUserName = resolved?.userName || user?.name || user?.email?.split('@')[0] || 'User'
+      const effectiveUserId = resolved?.userId || user?.crmUserId || user?.id || ''
+      setLiveUserName(effectiveUserName)
+
       resetDocStartTime(item.id, activeNoteId, now)
       saveDocInProgress(item.id, {
         noteId: activeNoteId,
         status: 'queued',
         startTime: now,
         title: item.headline,
+        userName: effectiveUserName,
       })
       recordDocNotification({
         contentId: item.id,
         noteId: activeNoteId,
         status: 'queued',
         title: item.headline,
+        userName: effectiveUserName,
         timestamp: now,
       })
-      const res = await api.generateTechContentDoc(item.id)
+      const res = await api.generateTechContentDoc(item.id, {
+        userName: effectiveUserName,
+        userId: effectiveUserId,
+      })
       if (res?.note_id) {
         setActiveNoteId(res.note_id)
         recordDocStartTime(item.id, res.note_id, now)
@@ -934,12 +974,14 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
           status: 'queued',
           startTime: now,
           title: item.headline,
+          userName: effectiveUserName,
         })
         recordDocNotification({
           contentId: item.id,
           noteId: res.note_id,
           status: 'queued',
           title: item.headline,
+          userName: effectiveUserName,
           timestamp: now,
         })
         onDocUpdated?.()
@@ -1060,6 +1102,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
           item={item}
           note={note}
           activeNoteId={activeNoteId}
+          userName={liveUserName || note?.userName || crmUser.userName}
           isTriggering={isTriggering}
           triggerError={triggerError}
           justCompleted={justCompleted}
@@ -1203,6 +1246,7 @@ function DocSection({
   item,
   note,
   activeNoteId,
+  userName,
   isTriggering,
   triggerError,
   justCompleted,
@@ -1218,6 +1262,8 @@ function DocSection({
   const isCompleted = currentStatus === 'completed'
   const isFailed = currentStatus === 'failed'
 
+  const effectiveUserName = userName || note?.userName || ''
+
   const [isDownloading, setIsDownloading] = useState(false)
 
   // CASE 1: QUEUED, PROCESSING, OR COMPILING -> Live WebSocket animated pipeline stages
@@ -1228,6 +1274,7 @@ function DocSection({
         itemId={item.id}
         noteId={activeNoteId || note?.id || item.notesId}
         noteDateEntered={note?.dateEntered}
+        userName={effectiveUserName}
         onRefresh={onRefresh}
       />
     )
@@ -1299,6 +1346,11 @@ function DocSection({
                     Ready
                   </span>
                 </div>
+                {effectiveUserName && (
+                  <p className="mt-0.5 text-[11px] font-semibold text-[var(--ok)]">
+                    This is generated by {effectiveUserName}
+                  </p>
+                )}
                 <p className="mt-0.5 truncate text-[11px] text-[var(--ink)]">
                   Your document has finished compiling. You can now view it online or download the Word file below.
                 </p>
@@ -1338,6 +1390,11 @@ function DocSection({
                 >
                   {note?.filename || `${asText(item.headline).slice(0, 48)}.docx`}
                 </p>
+                {effectiveUserName && (
+                  <p className="mt-0.5 text-[11px] font-semibold text-[var(--lime-dark)] dark:text-[#c0df78]">
+                    This is generated by {effectiveUserName}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1456,7 +1513,10 @@ function DocSection({
   )
 }
 
-function DocProcessingStages({ status, itemId, noteId, noteDateEntered, onRefresh }) {
+function DocProcessingStages({ status, itemId, noteId, noteDateEntered, userName, onRefresh }) {
+  const inProg = getDocInProgress(itemId, noteId)
+  const effectiveUserName = userName || inProg?.userName || ''
+
   const STAGES = [
     {
       key: 'queued',
@@ -1600,6 +1660,11 @@ function DocProcessingStages({ status, itemId, noteId, noteDateEntered, onRefres
                 {stageHeaderInfo.badge}
               </span>
             </div>
+            {effectiveUserName && (
+              <p className="mt-0.5 text-[11px] font-semibold text-[var(--lime-dark)] dark:text-[#c0df78]">
+                This is generated by {effectiveUserName}
+              </p>
+            )}
             <p className="mt-0.5 text-[11px] text-[var(--muted)]">
               {stageHeaderInfo.desc}
             </p>

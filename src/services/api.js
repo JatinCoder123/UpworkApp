@@ -529,7 +529,7 @@ const userNameCache = new Map();
 const pendingActivity = new Map();
 
 // CRM user's display name by id, fetched once per id.
-function fetchUserName(userId) {
+export function fetchUserName(userId) {
   if (!userId) return Promise.resolve("");
   if (!userNameCache.has(userId)) {
     const request = smartGateway({ action: "fetch", module: USERS_MODULE, filters: { id: userId }, page: 1, per_page: 1 })
@@ -544,6 +544,51 @@ function fetchUserName(userId) {
     userNameCache.set(userId, request);
   }
   return userNameCache.get(userId);
+}
+
+const crmUserResolutionCache = new Map();
+
+/**
+ * Resolves CRM user details (userName and userId) based on the logged-in user session
+ */
+export async function resolveCrmUser(user) {
+  if (!user) return { userName: "User", userId: "" };
+  const emailKey = String(user.email || user.name || "").trim().toLowerCase();
+  if (emailKey && crmUserResolutionCache.has(emailKey)) {
+    return crmUserResolutionCache.get(emailKey);
+  }
+
+  const promise = (async () => {
+    let resolvedId = user.crmUserId || user.crm_user_id || user.id || "";
+    let resolvedName = "";
+
+    if (!resolvedId && user.email) {
+      try {
+        resolvedId = await findGatewayUserIdByEmail(user.email);
+      } catch {
+        // user not matched in CRM Users table by email
+      }
+    }
+
+    if (resolvedId) {
+      try {
+        resolvedName = await fetchUserName(resolvedId);
+      } catch {
+        // fetch failed
+      }
+    }
+
+    const finalName = resolvedName || user.name || user.user_name || user.userName || user.email?.split("@")[0] || "User";
+    return { userName: finalName, userId: resolvedId };
+  })();
+
+  if (emailKey) crmUserResolutionCache.set(emailKey, promise);
+  try {
+    return await promise;
+  } catch {
+    if (emailKey) crmUserResolutionCache.delete(emailKey);
+    return { userName: user?.name || user?.email?.split("@")[0] || "User", userId: "" };
+  }
 }
 
 // Activity on a CRM job, newest first, each with the name of the user who did it.
@@ -1254,19 +1299,31 @@ export async function fetchNote(noteId, { timeout = 600_000 } = {}) {
     fileMimeType: rec.file_mime_type || "",
     documentUrl: rec.document_url || getDocumentDownloadUrl(rec.id),
     viewUrl: rec.view_url || getDocumentViewUrl(rec.id),
+    userName: rec.user_name || rec.created_by_name || rec.assigned_user_name || "",
     dateEntered: rec.date_entered_time_ago || rec.date_entered_uni_format || rec.date_entered || "",
     dateModified: rec.date_modified_time_ago || rec.date_modified_uni_format || rec.date_modified || "",
   };
 }
 
-export async function generateTechContentDoc(contentId) {
+export async function generateTechContentDoc(contentId, options = {}) {
   if (!contentId) throw createAppError("INVALID_ID", "Content ID is required");
+  const userName = typeof options === "string" ? options : (options?.userName || options?.user_name || options?.username || "");
+  const userId = typeof options === "object" ? (options?.userId || options?.user_id || "") : "";
   const baseEntryPoint = import.meta.env?.DEV
     ? "/crm-entrypoint/index.php?entryPoint=TechContentDocx"
     : TECH_CONTENT_DOCX_URL;
   const separator = baseEntryPoint.includes("?") ? "&" : "?";
-  const url = `${baseEntryPoint}${separator}id=${encodeURIComponent(contentId)}`;
-  const response = await fetch(url);
+  let url = `${baseEntryPoint}${separator}id=${encodeURIComponent(contentId)}`;
+  if (userName) {
+    url += `&user_name=${encodeURIComponent(userName)}&username=${encodeURIComponent(userName)}&user=${encodeURIComponent(userName)}`;
+  }
+  if (userId) {
+    url += `&user_id=${encodeURIComponent(userId)}&assigned_user_id=${encodeURIComponent(userId)}`;
+  }
+  const headers = {};
+  if (userName) headers["X-User-Name"] = userName;
+  if (userId) headers["X-User-Id"] = userId;
+  const response = await fetch(url, { headers });
   // HTTP 202 Accepted is the expected standard response for queued async jobs
   if (!response.ok && response.status !== 202) {
     throw createAppError("DOC_GEN_FAILED", `Failed to initiate document generation (${response.status})`);
@@ -1298,7 +1355,8 @@ export const api = {
   getVideoFeeds: (options) => fetchVideoFeeds(options),
   getSiteContent: (options) => fetchSiteContent(options),
   getNote: (id) => fetchNote(id),
-  generateTechContentDoc: (contentId) => generateTechContentDoc(contentId),
+  generateTechContentDoc: (contentId, options) => generateTechContentDoc(contentId, options),
+  resolveCrmUser: (user) => resolveCrmUser(user),
   getSkills: (params) => fetchSkills(params),
   createSkill,
   updateSkill,

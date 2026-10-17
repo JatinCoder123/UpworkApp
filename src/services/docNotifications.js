@@ -50,6 +50,7 @@ export function recordDocNotification(event) {
   const now = Date.now();
   const savedRecord = getDocInProgress(event.contentId, event.noteId);
   const title = event.title || savedRecord?.title || 'Technical Content Document';
+  const userName = event.userName || savedRecord?.userName || '';
   const noteId = event.noteId || savedRecord?.noteId || '';
   const viewUrl = event.viewUrl || (noteId ? getDocumentViewUrl(noteId) : '');
   const documentUrl = event.documentUrl || '';
@@ -69,6 +70,7 @@ export function recordDocNotification(event) {
       noteId: noteId || existing.noteId,
       contentId: event.contentId || existing.contentId,
       title: title || existing.title,
+      userName: userName || existing.userName || '',
       viewUrl: viewUrl || existing.viewUrl,
       documentUrl: documentUrl || existing.documentUrl,
       timestamp: now,
@@ -86,6 +88,7 @@ export function recordDocNotification(event) {
       contentId: event.contentId || '',
       noteId,
       title,
+      userName: userName || '',
       status: event.status,
       viewUrl,
       documentUrl,

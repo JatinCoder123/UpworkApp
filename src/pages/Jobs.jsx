@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import gsap from "gsap";
-import { Briefcase, Broadcast, Check, ClockCounterClockwise, Funnel, GearSix, Heart, MagnifyingGlass, Plus, Star, X } from "@phosphor-icons/react";
+import { Briefcase, Broadcast, CaretDown, Check, ClockCounterClockwise, Funnel, Heart, MagnifyingGlass, Plus, SlidersHorizontal, Star, X } from "@phosphor-icons/react";
 import Shell from "../components/Shell";
 import JobCard from "../components/JobCard";
 import JobDrawer from "../components/JobDrawer";
@@ -26,9 +26,13 @@ import { asArray, asObject, asText } from "../lib/safe";
 
 const scopes = ["My Jobs", "All Jobs"];
 const pipeline = ["New", "Applied", "Rejected"];
+// The first tabs show in the row; the rest sit under "More".
+const mainTabs = pipeline.slice(0, 2);
+const moreTabs = pipeline.slice(2);
 // "New" covers New and Seen, which the gateway cannot OR together, so only the other tabs filter on the server.
 const serverStatus = (tab) => (tab === "Applied" || tab === "Rejected" ? tab : "");
 const label = "text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]";
+const searchShortcut = typeof navigator !== "undefined" && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent) ? "⌘K" : "Ctrl K";
 
 function useDebounced(value, delay) {
   const [debounced, setDebounced] = useState(value);
@@ -37,6 +41,14 @@ function useDebounced(value, delay) {
     return () => window.clearTimeout(timer);
   }, [value, delay]);
   return debounced;
+}
+
+// Underlined status tab; `count` shows as a badge, lime when the tab is active.
+function StatusTab({ active, onClick, count, ariaProps, children }) {
+  return <button type="button" role="tab" aria-selected={active} onClick={onClick} {...ariaProps} className={`-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-sm font-semibold transition-colors duration-300 ${active ? "border-[var(--text)] text-[var(--text)]" : "border-transparent text-[var(--muted)] hover:text-[var(--text)]"}`}>
+    {children}
+    {count != null && <span className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums ${active ? "bg-[var(--lime)] !text-[#26320b]" : "bg-[var(--paper)] text-[var(--muted)]"}`}>{count}</span>}
+  </button>;
 }
 
 function FilterChip({ children, onClear }) {
@@ -70,6 +82,9 @@ export default function Jobs() {
   const [extraFilters, setExtraFilters] = useState(() => loadExtraFilters("jobs"));
   const { previewId, openPreview, closePreview } = usePreviewParam();
   const [searchFocused, setSearchFocused] = useState(false);
+  const searchRef = useRef(null);
+  const [moreTabsOpen, setMoreTabsOpen] = useState(false);
+  const moreTabsRef = useRef(null);
   const showAllJobs = scope === "All Jobs";
   const status = serverStatus(tab);
   const order = JOB_SORTS.find((item) => item.id === sort) || JOB_SORTS[0];
@@ -112,6 +127,21 @@ export default function Jobs() {
   useEffect(() => saveDateFilter("jobs", dateFilter), [dateFilter]);
   useEffect(() => saveExtraFilters("jobs", extraFilters), [extraFilters]);
   useEffect(() => saveReactionFilter(reactionFilter), [reactionFilter]);
+  useEffect(() => {
+    const focusSearch = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchRef.current?.focus(); }
+    };
+    document.addEventListener("keydown", focusSearch);
+    return () => document.removeEventListener("keydown", focusSearch);
+  }, []);
+  useEffect(() => {
+    if (!moreTabsOpen) return undefined;
+    const dismiss = (event) => { if (!moreTabsRef.current?.contains(event.target)) setMoreTabsOpen(false); };
+    const closeOnEscape = (event) => { if (event.key === "Escape") setMoreTabsOpen(false); };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", closeOnEscape); };
+  }, [moreTabsOpen]);
   useEffect(() => {
     if (hasMoreSkills && !isFetchingMoreSkills) fetchMoreSkills();
   }, [fetchMoreSkills, hasMoreSkills, isFetchingMoreSkills]);
@@ -219,54 +249,94 @@ export default function Jobs() {
   const filterCount = skills.length + countExtraFilters(extraFilters);
   const hasFilters = skills.length > 0 || dateFilter.preset !== "all" || searchInput || countExtraFilters(extraFilters) > 0 || favoritesOnly || likedOnly;
   const searching = isFetching && !isFetchingNextPage && searchInput.trim() === search;
+  const clearAllFilters = () => { setSkills([]); setSearchInput(""); setDateFilter(EMPTY_DATE_RANGE); setExtraFilters(EMPTY_EXTRA_FILTERS); setReactionFilter(EMPTY_REACTION_FILTER); };
 
   return (
     <Shell>
       <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">
         <section className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
-          <div className="space-y-4 rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-4 sm:p-5">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-              <HScroll className="xl:max-w-[56%]" innerClassName="items-center gap-2" label="job filters">
-                <div className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--paper)] p-1" aria-label="Job scope">
-                  {scopes.map((item) => <button key={item} type="button" aria-pressed={scope === item} onClick={() => { setScope(item); saveJobScope(item); }} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition-all duration-300 ${scope === item ? "bg-[var(--lime)] !text-[#26320b] shadow-[0_4px_18px_rgba(105,130,32,.14)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}>
-                    {item}<span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] tabular-nums ${scope === item ? "bg-black/10" : "bg-black/5 dark:bg-white/10"}`}>{isFetchingStats && scopeCounts[item] == null ? "…" : scopeCounts[item] ?? 0}</span>
-                  </button>)}
-                </div>
-                <div className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--paper)] p-1" aria-label="Job status">
-                  {pipeline.map((item) => <button key={item} type="button" aria-pressed={tab === item} onClick={() => changeTab(item)} className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition-all duration-300 ${tab === item ? "bg-[var(--ink)] text-white" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}>
-                    {item}<span className={`rounded-full px-1.5 py-0.5 text-[9px] tabular-nums ${tab === item ? "bg-white/15" : "bg-black/5 dark:bg-white/10"}`}>{isFetchingStats && pipelineCounts[item] == null ? "…" : pipelineCounts[item] ?? 0}</span>
-                  </button>)}
-                </div>
-              </HScroll>
-              <div className="flex flex-1 items-center gap-2">
-                <form onSubmit={(event) => { event.preventDefault(); commitSearch(); setSearchFocused(false); }} className="job-search relative flex min-w-0 flex-1 items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-4">
-                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--lime)]/40 text-[var(--accent-strong)] dark:bg-[var(--lime)]/15">{searching ? <span className="size-3.5 animate-spin rounded-full border-2 border-[var(--lime-dark)]/25 border-t-[var(--lime-dark)]" /> : <MagnifyingGlass size={14} weight="bold" />}</span>
-                  <input value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setSearchFocused(true); }} onFocus={() => setSearchFocused(true)} onBlur={() => { setSearchFocused(false); if (searchInput.trim()) commitSearch(); }} onKeyDown={(event) => event.key === "Escape" && setSearchFocused(false)} placeholder="Search title, description, skills…" aria-label="Search jobs" aria-expanded={searchFocused && searchHistory.length > 0} aria-controls="job-search-history" autoComplete="off" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
-                  {searchInput && <button type="button" onClick={() => setSearchInput("")} aria-label="Clear search" className="grid size-5 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] hover:bg-black/15 dark:bg-white/10"><X size={11} weight="bold" /></button>}
-                  {searchFocused && searchHistory.length > 0 && <div id="job-search-history" onMouseDown={(event) => event.preventDefault()} className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5">
-                    <div className="rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
-                      <div className="flex items-center justify-between px-2 pb-1.5 pt-1"><span className={label}>Recent searches</span><button type="button" onClick={() => { recentSearches.forEach((term) => forgetSearch(user?.email, term)); setRecentSearches([]); }} className="text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear history</button></div>
-                      <ul>{searchHistory.map((term) => <li key={term} className="group/term flex items-center rounded-xl hover:bg-[var(--paper)]">
-                        <button type="button" onClick={() => applySearch(term)} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-[var(--muted)] group-hover/term:text-[var(--ink)]"><ClockCounterClockwise size={14} className="shrink-0" /><span className="truncate">{term}</span></button>
-                        <button type="button" onClick={() => setRecentSearches(forgetSearch(user?.email, term))} aria-label={`Forget search ${term}`} className="mr-1.5 grid size-6 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-black/10 hover:text-[var(--ink)]"><X size={11} /></button>
-                      </li>)}</ul>
+          <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)]">
+            {/* Row 1: title, search and the main actions. */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[var(--line)]/70 px-4 py-4 sm:px-6">
+              <h1 className="flex shrink-0 items-baseline gap-2 text-2xl font-semibold tracking-[-.04em]">Jobs<span className="font-mono text-xs font-semibold tracking-normal text-[var(--muted)] tabular-nums">{isFetchingStats && scopeCounts[scope] == null ? "…" : scopeCounts[scope] ?? 0} total</span></h1>
+              <form onSubmit={(event) => { event.preventDefault(); commitSearch(); setSearchFocused(false); }} className="job-search relative order-last flex w-full min-w-0 items-center gap-2.5 rounded-full py-1.5 pl-4 pr-1.5 md:order-none md:w-auto md:max-w-xl md:flex-1">
+                {searching ? <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-[var(--lime-dark)]/25 border-t-[var(--lime-dark)]" aria-label="Searching" /> : <MagnifyingGlass size={16} className="shrink-0 text-[var(--muted)]" />}
+                <input ref={searchRef} value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setSearchFocused(true); }} onFocus={() => setSearchFocused(true)} onBlur={() => { setSearchFocused(false); if (searchInput.trim()) commitSearch(); }} onKeyDown={(event) => event.key === "Escape" && (searchInput ? setSearchFocused(false) : event.currentTarget.blur())} placeholder="Search title, description, skills…" aria-label="Search jobs" aria-keyshortcuts="Control+K Meta+K" aria-expanded={searchFocused && searchHistory.length > 0} aria-controls="job-search-history" autoComplete="off" className="min-w-0 flex-1 bg-transparent py-1.5 text-sm outline-none placeholder:text-[var(--muted)]" />
+                {searchInput
+                  ? <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearchInput(""); searchRef.current?.focus(); }} aria-label="Clear search" className="grid size-7 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] hover:bg-black/15 hover:text-[var(--ink)] dark:bg-white/10"><X size={12} weight="bold" /></button>
+                  : <kbd className="hidden shrink-0 rounded-lg bg-[var(--surface)] px-2 py-1 font-mono text-[10px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)] sm:inline-block">{searchShortcut}</kbd>}
+                {searchFocused && searchHistory.length > 0 && <div id="job-search-history" onMouseDown={(event) => event.preventDefault()} className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5">
+                  <div className="rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
+                    <div className="flex items-center justify-between px-2 pb-1.5 pt-1"><span className={label}>Recent searches</span><button type="button" onClick={() => { recentSearches.forEach((term) => forgetSearch(user?.email, term)); setRecentSearches([]); }} className="text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear history</button></div>
+                    <ul>{searchHistory.map((term) => <li key={term} className="group/term flex items-center rounded-xl hover:bg-[var(--paper)]">
+                      <button type="button" onClick={() => applySearch(term)} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left text-xs font-semibold text-[var(--muted)] group-hover/term:text-[var(--ink)]"><ClockCounterClockwise size={14} className="shrink-0" /><span className="truncate">{term}</span></button>
+                      <button type="button" onClick={() => setRecentSearches(forgetSearch(user?.email, term))} aria-label={`Forget search ${term}`} className="mr-1.5 grid size-6 shrink-0 place-items-center rounded-full text-[var(--muted)] hover:bg-black/10 hover:text-[var(--ink)]"><X size={11} /></button>
+                    </li>)}</ul>
+                  </div>
+                </div>}
+              </form>
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <button type="button" onClick={() => setLiveSearching(true)} className="inline-flex items-center gap-2 rounded-full bg-[var(--lime)] px-4 py-2.5 text-xs font-bold !text-[#26320b] ring-1 ring-[var(--lime-dark)]/35 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(105,130,32,.22)]">
+                  <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#3f5a12] opacity-60" /><span className="relative inline-flex size-2 rounded-full bg-[#3f5a12]" /></span>
+                  <Broadcast size={14} weight="bold" />Live search
+                </button>
+                <button type="button" onClick={() => setAdding(true)} className={`${primaryButton} !py-2.5 !pl-4 !pr-5`}><Plus size={14} weight="bold" /><span>Add job</span></button>
+              </div>
+            </div>
+
+            {/* Row 2: scope, status tabs and the list controls. */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--line)]/70 px-4 sm:px-6">
+              <div className="my-3 flex shrink-0 items-center gap-1 rounded-full bg-[var(--paper)] p-1" aria-label="Job scope">
+                {scopes.map((item) => <button key={item} type="button" aria-pressed={scope === item} onClick={() => { setScope(item); saveJobScope(item); }} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition-all duration-300 ${scope === item ? "bg-[var(--raised)] text-[var(--text)] shadow-sm ring-1 ring-[var(--line)]" : "text-[var(--muted)] hover:text-[var(--text)]"}`}>
+                  {item}<span className="ml-1.5 font-mono text-[10px] tabular-nums text-[var(--muted)]">{isFetchingStats && scopeCounts[item] == null ? "…" : scopeCounts[item] ?? 0}</span>
+                </button>)}
+              </div>
+              <span aria-hidden="true" className="hidden h-6 w-px bg-[var(--line)] sm:block" />
+              <div role="tablist" aria-label="Job status" className="flex items-stretch gap-1 self-stretch">
+                {mainTabs.map((item) => <StatusTab key={item} active={tab === item} onClick={() => changeTab(item)} count={isFetchingStats && pipelineCounts[item] == null ? "…" : pipelineCounts[item] ?? 0}>{item}</StatusTab>)}
+                <div ref={moreTabsRef} className="relative flex">
+                  {(() => {
+                    const current = moreTabs.find((item) => item === tab);
+                    return <StatusTab active={Boolean(current)} onClick={() => setMoreTabsOpen((open) => !open)} count={current ? (pipelineCounts[current] ?? 0) : null} ariaProps={{ "aria-haspopup": "menu", "aria-expanded": moreTabsOpen }}>
+                      {current || "More"}<CaretDown size={12} weight="bold" className={`transition-transform ${moreTabsOpen ? "rotate-180" : ""}`} />
+                    </StatusTab>;
+                  })()}
+                  {moreTabsOpen && <div className="absolute left-0 top-[calc(100%-.25rem)] z-50 w-52 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5">
+                    <div role="menu" aria-label="More statuses" className="rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
+                      {moreTabs.map((item) => <button key={item} type="button" role="menuitem" onClick={() => { changeTab(item); setMoreTabsOpen(false); }} className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${tab === item ? "bg-[var(--lime)] !text-[#26320b]" : "text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]"}`}>
+                        {item}<span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] tabular-nums dark:bg-white/10">{pipelineCounts[item] ?? 0}</span>
+                      </button>)}
                     </div>
                   </div>}
-                </form>
+                </div>
+              </div>
+              <div className="ml-auto flex shrink-0 items-center gap-2 py-3">
                 <SortMenu value={sort} options={JOB_SORTS} onChange={changeSort} />
                 <DateTimeRangeFilter value={dateFilter} onApply={setDateFilter} label="Job posting time" />
                 <button type="button" onClick={() => setSkillDialog(true)} aria-label="Open job filters" title="Filters" className={`relative ${iconButton} ${filterCount ? "bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40" : ""}`}>
                   <Funnel size={16} weight={filterCount ? "fill" : "regular"} />
-                  {filterCount > 0 && <span className="absolute -right-1 -top-1 grid size-4.5 place-items-center rounded-full bg-[var(--ink)] text-[9px] font-bold text-white">{filterCount}</span>}
+                  {filterCount > 0 && <span className="absolute -right-1 -top-1 grid size-4.5 place-items-center rounded-full bg-[var(--text)] text-[9px] font-bold text-[var(--paper)] ring-2 ring-[var(--surface)]">{filterCount}</span>}
                 </button>
                 <RefreshFilterButton onClick={() => { refetch(); refetchStats(); refetchSkillCounts(); }} loading={isFetching || isFetchingStats || isFetchingSkillCounts} label="Refresh jobs" />
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
+            {/* Row 3: favorites, liked and skills, with Clear and the skill settings at the end. */}
+            <div className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-6 lg:flex-nowrap">
+              <div className="flex shrink-0 items-center gap-2">
+                <button type="button" aria-pressed={favoritesOnly} onClick={() => toggleReactionFilter("favorites")} title="Show favorite jobs" className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 ${favoritesOnly ? "bg-[#fef9c3] text-[#b45309] ring-[#fde047] shadow-sm dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[#fde047]/70"}`}>
+                  <Star size={14} weight={favoritesOnly || reactions.favorites.length > 0 ? "fill" : "regular"} className={favoritesOnly || reactions.favorites.length > 0 ? "text-[#f59e0b] dark:text-[#fde047]" : "text-[#b45309]"} />Favorites
+                  {reactions.favorites.length > 0 && <span className={`font-mono text-[10px] tabular-nums ${favoritesOnly ? "opacity-75" : "text-[var(--muted)]"}`}>{reactions.favorites.length}</span>}
+                </button>
+                <button type="button" aria-pressed={likedOnly} onClick={() => toggleReactionFilter("liked")} title="Show liked jobs" className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 ${likedOnly ? "bg-[#ffe4e6] text-[#e11d48] ring-[#fecdd3] shadow-sm dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[#fecdd3]"}`}>
+                  <Heart size={14} weight={likedOnly || reactions.liked.length > 0 ? "fill" : "regular"} className={likedOnly || reactions.liked.length > 0 ? "text-[#fb7185] dark:text-[#fda4af]" : "text-[#e11d48]"} />Liked
+                  {reactions.liked.length > 0 && <span className={`font-mono text-[10px] tabular-nums ${likedOnly ? "opacity-75" : "text-[var(--muted)]"}`}>{reactions.liked.length}</span>}
+                </button>
+              </div>
+              <span aria-hidden="true" className="hidden h-6 w-px shrink-0 bg-[var(--line)] sm:block" />
               <span className={`${label} shrink-0`}>Skills</span>
-              {/* Fixed width shows about five skills; the ‹ › arrows scroll through the rest, most jobs first. */}
-              <HScroll className="min-w-0 flex-[0_1_36rem]" innerClassName="gap-1.5" label="skills">
+              {/* Skills fill the row; the ‹ › arrows scroll through the rest, most jobs first. */}
+              <HScroll className="min-w-0 flex-1 basis-[60%] lg:basis-0" innerClassName="gap-1.5" label="skills">
                 {rankedSkillRecords.map(({ id, name }) => {
                   const selected = skills.includes(name);
                   const count = skillCounts[name];
@@ -277,51 +347,17 @@ export default function Jobs() {
                 })}
                 {skillsLoading && <span className="skeleton-bone h-7 w-40 shrink-0 rounded-full" />}
               </HScroll>
-              <button type="button" onClick={() => setSkillDialog(true)} aria-label="Skill settings" title="Skill settings" className="grid size-8 shrink-0 place-items-center rounded-full text-[var(--muted)] ring-1 ring-[var(--line)] transition-all duration-300 hover:rotate-45 hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]"><GearSix size={16} weight="bold" /></button>
-              <div className="ml-auto flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  aria-pressed={favoritesOnly}
-                  onClick={() => toggleReactionFilter("favorites")}
-                  title={reactions.favorites.length > 0 ? `Favorites (${reactions.favorites.length})` : "Favorites"}
-                  aria-label="Favorites"
-                  className={`grid size-8 shrink-0 place-items-center rounded-full transition-all duration-300 hover:-translate-y-0.5 ${
-                    favoritesOnly
-                      ? "bg-[#fef9c3] text-[#b45309] ring-1 ring-[#fde047] shadow-sm dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/40"
-                      : "bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)] hover:bg-[#fef9c3]/60 hover:text-[#b45309] hover:ring-[#fde047]/70"
-                  }`}
-                >
-                  <Star size={16} weight={favoritesOnly || reactions.favorites.length > 0 ? "fill" : "regular"} className={favoritesOnly ? "text-[#d97706] dark:text-[#fde047]" : reactions.favorites.length > 0 ? "text-[#f59e0b] dark:text-[#fde047]" : "currentColor"} />
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={likedOnly}
-                  onClick={() => toggleReactionFilter("liked")}
-                  title={reactions.liked.length > 0 ? `Liked jobs (${reactions.liked.length})` : "Liked jobs"}
-                  aria-label="Liked jobs"
-                  className={`grid size-8 shrink-0 place-items-center rounded-full transition-all duration-300 hover:-translate-y-0.5 ${
-                    likedOnly
-                      ? "bg-[#ffe4e6] text-[#e11d48] ring-1 ring-[#fecdd3] shadow-sm dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/40"
-                      : "bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)] hover:bg-[#ffe4e6]/60 hover:text-[#e11d48] hover:ring-[#fecdd3]/70"
-                  }`}
-                >
-                  <Heart size={16} weight={likedOnly || reactions.liked.length > 0 ? "fill" : "regular"} className={likedOnly ? "text-[#e11d48] dark:text-[#fda4af]" : reactions.liked.length > 0 ? "text-[#fb7185] dark:text-[#fda4af]" : "currentColor"} />
-                </button>
-                <button type="button" onClick={() => setLiveSearching(true)} className="inline-flex items-center gap-2 rounded-full bg-[var(--lime)]/30 py-2 pl-3 pr-4 text-xs font-bold text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/35 transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--lime)]/55">
-                  <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--lime-dark)] opacity-70" /><span className="relative inline-flex size-2 rounded-full bg-[var(--lime-dark)]" /></span>
-                  <Broadcast size={14} weight="bold" />Live search
-                </button>
-                <button type="button" onClick={() => setAdding(true)} className={`${primaryButton} !py-1.5 !pl-4`}><span>Add job</span><span className="grid size-7 place-items-center rounded-full bg-white/10"><Plus size={14} /></span></button>
+              <div className="ml-auto flex shrink-0 items-center gap-3">
+                {hasFilters && <button type="button" onClick={clearAllFilters} className="text-xs font-semibold text-[var(--ink)] underline decoration-[var(--line)] underline-offset-4 transition-colors hover:decoration-[var(--lime-dark)]">Clear</button>}
+                <button type="button" onClick={() => setSkillDialog(true)} aria-label="Skill settings" title="Skill settings" className="grid size-8 shrink-0 place-items-center rounded-full text-[var(--muted)] transition-colors duration-300 hover:bg-[var(--paper)] hover:text-[var(--ink)]"><SlidersHorizontal size={17} weight="bold" /></button>
               </div>
             </div>
 
-            {hasFilters && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/[.06] pt-4 dark:border-white/[.08]">
-              {favoritesOnly && <FilterChip onClear={() => toggleReactionFilter("favorites")}>Favorites only</FilterChip>}
-              {likedOnly && <FilterChip onClear={() => toggleReactionFilter("liked")}>Liked only</FilterChip>}
+            {/* Filters set in the funnel or date picker, so it is clear why the list is narrower. */}
+            {(countExtraFilters(extraFilters) > 0 || dateFilter.preset !== "all") && <div className="flex flex-wrap items-center gap-2 border-t border-[var(--line)]/70 px-4 py-3 sm:px-6">
               {extraFilters.jobType !== "any" && <FilterChip onClear={() => setExtraFilters({ ...extraFilters, jobType: "any" })}>{extraFilters.jobType === "hourly" ? "Hourly jobs" : "Fixed-price jobs"}</FilterChip>}
               {extraFilters.location !== "any" && <FilterChip onClear={() => setExtraFilters({ ...extraFilters, location: "any" })}>{`${clientLocation(extraFilters.location).label} clients`}</FilterChip>}
               <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} />
-              <button type="button" onClick={() => { setSkills([]); setSearchInput(""); setDateFilter(EMPTY_DATE_RANGE); setExtraFilters(EMPTY_EXTRA_FILTERS); setReactionFilter(EMPTY_REACTION_FILTER); }} className="text-[11px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear all</button>
             </div>}
           </div>
         </section>
