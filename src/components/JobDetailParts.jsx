@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { ArrowClockwise, Briefcase, Check, Clock, Copy, CurrencyDollar, FilePdf, FileText, FloppyDisk, Hourglass, Lightbulb, MagicWand, PencilSimple, SealCheck, Sparkle, Star, Target, User, Users, WarningCircle, X } from '@phosphor-icons/react'
+import { useEffect, useRef, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { ArrowClockwise, ArrowCounterClockwise, Briefcase, Check, Clock, Copy, CurrencyDollar, FilePdf, FileText, FloppyDisk, Hourglass, Lightbulb, MagicWand, PencilSimple, SealCheck, Sparkle, Star, Target, User, Users, WarningCircle, X } from '@phosphor-icons/react'
 import ExpandableText from './ExpandableText'
 import { api } from '../services/api'
 import { downloadCoverLetterPdf } from '../lib/coverLetterPdf'
 import { asObject, asText } from '../lib/safe'
+import { useAuth } from '../contexts/AuthContext'
 
 // Building blocks shared by the CRM job detail and the live Upwork job detail.
 export const card = 'rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 sm:p-7'
@@ -107,35 +108,66 @@ const AI_SUGGESTIONS = [
   'Add one smart question for the client',
 ]
 
+// Activity entries a cover letter change records; JobActivity shows them as "<user> generated the cover letter" etc.
+export const COVER_LETTER_ACTIVITY = {
+  generated: 'Cover letter generated',
+  written: 'Cover letter written',
+  edited: 'Cover letter edited',
+  ai: 'Cover letter edited with AI',
+  undone: 'Cover letter AI change undone',
+}
+
 export function CoverLetter({ job, onLetter }) {
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
   const [copied, copy] = useCopied()
   const [draft, setDraft] = useState(null)
   const [instruction, setInstruction] = useState('')
   const [suggestion, setSuggestion] = useState(null)
+  // The letter before the last accepted AI change, for Undo.
+  const [previous, setPrevious] = useState(null)
+  const aiRequest = useRef(null)
   const editing = draft != null
   const current = editing ? draft : asText(job.coverLetter)
-  const fetchLetter = useMutation({ mutationFn: () => api.getCoverLetter(job), onSuccess: onLetter })
-  const save = useMutation({ mutationFn: (letter) => api.saveCoverLetter(job, letter), onSuccess: (letter) => { onLetter(letter); setDraft(null) } })
-  const aiEdit = useMutation({ mutationFn: (prompt) => api.editCoverLetter(job, current, prompt), onSuccess: (letter, prompt) => setSuggestion({ letter, prompt }) })
+  // Every change (generated, typed, AI, undo) is saved to the CRM job and logged in its activity.
+  // The letter sits in the editor while it saves, so a failed save keeps it there with the error and Save to retry.
+  const save = useMutation({
+    mutationFn: ({ letter, activity }) => api.saveCoverLetter(job, letter, { userEmail: user?.email, activity }),
+    onSuccess: (letter) => { onLetter(letter); setDraft(null); queryClient.invalidateQueries({ queryKey: ['job-activity', job.id] }) },
+  })
+  const commit = (letter, activity) => { const value = asText(letter).trim(); if (!value) return; setDraft(value); save.mutate({ letter: value, activity }) }
+  const fetchLetter = useMutation({ mutationFn: () => api.getCoverLetter(job), onSuccess: (letter) => commit(letter, COVER_LETTER_ACTIVITY.generated) })
+  // POST /api/ai/cover-letter with the letter on screen; a newer request or leaving the job cancels the old one.
+  const aiEdit = useMutation({
+    mutationFn: (prompt) => {
+      aiRequest.current?.abort()
+      aiRequest.current = new AbortController()
+      return api.editCoverLetter(current, prompt, { signal: aiRequest.current.signal })
+    },
+    onSuccess: (result, prompt) => setSuggestion({ letter: result.coverLetter, summary: result.summary, prompt }),
+  })
+  useEffect(() => () => aiRequest.current?.abort(), [job.id])
   const pdf = useMutation({ mutationFn: () => downloadCoverLetterPdf(current, job.title) })
   const runAi = (prompt) => { const value = prompt.trim(); if (value && current.trim() && !aiEdit.isPending) aiEdit.mutate(value) }
-  const accept = () => { setDraft(asText(suggestion.letter)); setSuggestion(null); setInstruction('') }
+  const accept = () => { setPrevious(current); commit(suggestion.letter, COVER_LETTER_ACTIVITY.ai); setSuggestion(null); setInstruction('') }
+  const undo = () => { commit(previous, COVER_LETTER_ACTIVITY.undone); setPrevious(null) }
   const pill = 'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[var(--line)] transition-colors disabled:pointer-events-none disabled:opacity-45'
 
   const action = <div className="flex flex-wrap justify-end gap-2">
     {current && <button type="button" onClick={() => copy('letter', current)} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>{copied === 'letter' ? <Check size={13} weight="bold" /> : <Copy size={13} />}{copied === 'letter' ? 'Copied' : 'Copy'}</button>}
     {current.trim() && <button type="button" disabled={pdf.isPending} onClick={() => pdf.mutate()} title={pdf.isError ? pdf.error?.message : 'Download as PDF'} className={`${pill} ${pdf.isError ? 'text-[var(--bad)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{pdf.isPending ? <span className="size-3 animate-spin rounded-full border-2 border-current/30 border-t-current" /> : <FilePdf size={13} />}{pdf.isPending ? 'Generating…' : pdf.isError ? 'Retry PDF' : 'PDF'}</button>}
+    {previous != null && !save.isPending && <button type="button" onClick={undo} title="Go back to the letter before the last AI change" className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}><ArrowCounterClockwise size={13} />Undo AI change</button>}
     {job.coverLetter && !editing && <button type="button" onClick={() => setDraft(asText(job.coverLetter))} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}><PencilSimple size={13} />Edit</button>}
   </div>
 
-  return <Panel icon={FileText} title="Cover letter" subtitle={editing ? 'Editing · changes are not saved yet' : job.coverLetter ? 'Tailored for this job' : 'Not written yet'} action={action}>
+  return <Panel icon={FileText} title="Cover letter" subtitle={save.isPending ? 'Saving to CRM…' : editing ? 'Editing · changes are not saved yet' : job.coverLetter ? 'Tailored for this job · saved in CRM' : 'Not written yet'} action={action}>
     {editing
       ? <div className="space-y-3">
         <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={12} aria-label="Cover letter" className="w-full resize-y rounded-2xl bg-[var(--paper)] p-5 text-sm leading-7 outline-none ring-1 ring-[var(--line)] focus:ring-[var(--lime-dark)]" />
         {save.isError && <p role="alert" className="flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{save.error?.message}</p>}
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <button type="button" onClick={() => { setDraft(null); setSuggestion(null); save.reset() }} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>Cancel</button>
-          <button type="button" disabled={!draft.trim() || save.isPending || draft === job.coverLetter} onClick={() => save.mutate(draft.trim())} className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--ink)] px-4 text-xs font-semibold text-white transition-opacity disabled:opacity-50">{save.isPending ? <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <FloppyDisk size={14} />}{save.isPending ? 'Saving…' : 'Save letter'}</button>
+          <button type="button" onClick={() => { setDraft(null); setSuggestion(null); setPrevious(null); save.reset() }} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>Cancel</button>
+          <button type="button" disabled={!draft.trim() || save.isPending || draft === job.coverLetter} onClick={() => commit(draft, job.coverLetter ? COVER_LETTER_ACTIVITY.edited : COVER_LETTER_ACTIVITY.written)} className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--ink)] px-4 text-xs font-semibold text-white transition-opacity disabled:opacity-50">{save.isPending ? <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <FloppyDisk size={14} />}{save.isPending ? 'Saving…' : 'Save letter'}</button>
         </div>
       </div>
       : job.coverLetter
@@ -163,9 +195,10 @@ export function CoverLetter({ job, onLetter }) {
         <input value={instruction} disabled={aiEdit.isPending} onChange={(event) => setInstruction(event.target.value)} placeholder="Tell AI what to change, e.g. mention our Shopify work" aria-label="AI edit instruction" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
         <button type="submit" disabled={!instruction.trim() || aiEdit.isPending} className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--ink)] px-3.5 text-[11px] font-semibold text-white disabled:opacity-45">{aiEdit.isPending ? <span className="size-3 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <Sparkle size={12} weight="fill" />}{aiEdit.isPending ? 'Rewriting…' : 'Edit with AI'}</button>
       </form>
-      {aiEdit.isError && <p role="alert" className="mt-2 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{aiEdit.error?.message}</p>}
+      {aiEdit.isError && aiEdit.error?.code !== 'ABORTED' && <p role="alert" className="mt-2 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{aiEdit.error?.message}</p>}
       {suggestion && <div className="mt-4 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
         <p className="text-[11px] font-semibold text-[var(--muted)]">AI suggestion · “{suggestion.prompt}”</p>
+        {suggestion.summary && <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-[var(--lime)]/[.14] px-3 py-2 text-xs leading-5 text-[var(--ink)]"><Sparkle size={13} weight="fill" className="mt-0.5 shrink-0 text-[var(--accent-strong)]" />{suggestion.summary}</p>}
         <ExpandableText className="mt-2" collapsedHeight="9rem"><p className="whitespace-pre-wrap break-words text-sm leading-7">{suggestion.letter}</p></ExpandableText>
         <div className="mt-3 flex flex-wrap justify-end gap-2">
           <button type="button" onClick={() => setSuggestion(null)} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}><X size={13} />Discard</button>

@@ -9,6 +9,12 @@ const ACTIONS = {
   Rejected: 'marked it as not a fit',
   'Undo Applied': 'undid applied',
   'Undo Rejected': 'undid not a fit',
+  // Cover letter changes (see COVER_LETTER_ACTIVITY in JobDetailParts).
+  'Cover letter generated': 'generated the cover letter',
+  'Cover letter written': 'wrote the cover letter',
+  'Cover letter edited': 'edited the cover letter',
+  'Cover letter edited with AI': 'edited the cover letter with AI',
+  'Cover letter AI change undone': 'undid an AI change to the cover letter',
 }
 
 const Dot = ({ active }) => <span className={`absolute -left-[1.3rem] top-1.5 size-2 rounded-full ring-2 ring-[var(--surface)] ${active ? 'bg-[var(--lime-dark)]' : 'bg-[var(--line)]'}`} />

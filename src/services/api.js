@@ -1,6 +1,7 @@
 import axios from "axios";
 import CryptoJS from "crypto-js";
 import { asArray, asObject, asText } from "../lib/safe";
+import { AUTH_ORIGIN } from "../lib/auth";
 
 export const CRM_BASE_URL = (import.meta.env?.VITE_CRM_BASE_URL || "https://upwork.outrightcrm.in").replace(/\/$/, "");
 export const SMART_GATEWAY_URL = import.meta.env?.VITE_SMART_GATEWAY_URL || `${CRM_BASE_URL}/index.php?entryPoint=smart_gateway`;
@@ -29,8 +30,6 @@ export function getDocumentViewUrl(noteId) {
 
 // Endpoint that generates a cover letter for a job. Set it in .env once the backend is ready.
 const COVER_LETTER_URL = import.meta.env?.VITE_COVER_LETTER_URL || "";
-// Endpoint that rewrites a cover letter from an instruction. Falls back to the generator endpoint.
-const COVER_LETTER_EDIT_URL = import.meta.env?.VITE_COVER_LETTER_EDIT_URL || COVER_LETTER_URL;
 // Endpoint that generates a fresh proposal strategy for a job. Set it in .env once the backend is ready.
 const STRATEGY_URL = import.meta.env?.VITE_STRATEGY_URL || "";
 const apiClient = axios.create({
@@ -456,38 +455,57 @@ export async function fetchCoverLetter(job) {
   return letter;
 }
 
-// Saves an edited cover letter on the CRM job. Live Upwork jobs have no CRM record, so they stay local.
-export async function saveCoverLetter(job, letter) {
+// Saves a cover letter on the CRM job through the gateway, then records `activity` (e.g. "Cover letter edited with AI")
+// for the signed-in user. A failed activity entry does not undo the save. Live Upwork jobs have no CRM record, so they stay local.
+export async function saveCoverLetter(job, letter, { userEmail, activity } = {}) {
   if (job.status === "Live") return letter;
   await smartGateway({ action: "update", module: JOBS_MODULE, id: job.id, data: { cover_letter: letter } });
   localChanges.set(job.id, { ...(localChanges.get(job.id) || {}), coverLetter: letter });
+  if (activity && userEmail) await logJobActivity({ jobId: job.id, userEmail, description: activity }).catch((error) => console.warn("Could not record cover letter activity", error));
   return letter;
 }
 
-export async function editCoverLetterWithAi(job, letter, instruction) {
-  if (!COVER_LETTER_EDIT_URL) {
-    throw createAppError("COVER_LETTER_ENDPOINT_MISSING", "The AI edit endpoint is not configured yet. Set VITE_COVER_LETTER_EDIT_URL (or VITE_COVER_LETTER_URL) in .env.");
-  }
+// ----------------------------------------------------
+// AI endpoints (Claude on the auth backend; they need the login session cookie)
+// ----------------------------------------------------
+
+async function postAi(path, body, signal) {
   let response;
   try {
-    response = await axios.post(COVER_LETTER_EDIT_URL, {
-      id: job.id,
-      job_id: job.jobId,
-      title: job.title,
-      description: job.description,
-      skills: job.skills,
-      upwork_url: job.url,
-      cover_letter: letter,
-      instruction,
-    }, { timeout: 90_000, headers: { "Content-Type": "application/json", "X-Api-Token": generateToken() } });
+    response = await fetch(`${AUTH_ORIGIN}${path}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
   } catch (err) {
-    throw createAppError("COVER_LETTER_FAILED", err?.response?.data?.message || "Could not edit the cover letter. Please try again.");
+    if (err?.name === "AbortError") throw createAppError("ABORTED", "Request cancelled");
+    throw createAppError("NETWORK_ERROR", "Unable to reach the AI service. Please check your internet connection.");
   }
-  const data = response.data;
-  const raw = typeof data === "string" ? data : data?.cover_letter ?? data?.data?.cover_letter ?? data?.content ?? data?.data ?? "";
-  const edited = decodeCoverLetter(typeof raw === "string" ? raw : "");
-  if (!edited) throw createAppError("COVER_LETTER_EMPTY", "The endpoint did not return an edited cover letter.");
-  return edited;
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    // The backend's `message` is written to be shown to the user.
+    if (response.status === 401) throw createAppError("UNAUTHORIZED", data?.message || "Your session has expired. Please sign in again.", { status: 401 });
+    throw createAppError(asText(data?.error) || "AI_FAILED", data?.message || "The AI could not answer right now. Please try again.", { status: response.status });
+  }
+  return asObject(data);
+}
+
+// Explains `text` (a selection from a job) the way `prompt` asks; with no prompt, in simple words.
+export async function askAi(text, prompt = "", { signal } = {}) {
+  const data = await postAi("/api/ai/ask", { text, prompt }, signal);
+  const answer = asText(data.answer).trim();
+  if (!answer) throw createAppError("AI_EMPTY", "The AI did not return an answer. Please try again.");
+  return answer;
+}
+
+// Rewrites a cover letter from the user's instructions. The server keeps no history, so send the latest letter each time.
+export async function editCoverLetterWithAi(letter, prompt, { signal } = {}) {
+  const data = await postAi("/api/ai/cover-letter", { coverLetter: letter, prompt }, signal);
+  const coverLetter = asText(data.coverLetter).trim();
+  if (!coverLetter) throw createAppError("COVER_LETTER_EMPTY", "The AI did not return a cover letter. Please try again.");
+  return { coverLetter, summary: asText(data.summary).trim() };
 }
 
 // Asks for a new strategy; the current one is sent along so the endpoint can offer a different angle.
@@ -1416,6 +1434,7 @@ export const api = {
   getCoverLetter: (job) => fetchCoverLetter(job),
   saveCoverLetter,
   editCoverLetter: editCoverLetterWithAi,
+  askAi,
   getStrategy: (job) => fetchStrategy(job),  getTeamMembers: () => fetchTeamMembers(),
   getLiveJobs: (params) => fetchLiveUpworkJobs(params),
   getJobReactions: fetchJobReactions,

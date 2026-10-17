@@ -6,6 +6,7 @@ import { ArrowLeft, BookmarkSimple, Briefcase, CalendarBlank, ChartBar, Clock, C
 import Shell from '../components/Shell'
 import NotFound from './NotFound'
 import ExpandableText from '../components/ExpandableText'
+import AskAiSelection from '../components/AskAiSelection'
 import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, Tips, card } from '../components/JobDetailParts'
 import JobApplySection from '../components/JobApplySection'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -182,7 +183,9 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
     </div>
     {share && <ShareJobDialog job={job} mode={share} onClose={() => setShare(null)} />}
   </div>
-  return embedded ? content : <Shell><main>{content}</main></Shell>
+  // Selecting any text in the job offers "Ask AI" about it.
+  const page = <AskAiSelection>{content}</AskAiSelection>
+  return embedded ? page : <Shell><main>{page}</main></Shell>
 }
 
 export default function JobDetail() {
