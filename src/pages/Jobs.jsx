@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
 import gsap from "gsap";
-import { Briefcase, Broadcast, CaretDown, Check, ClockCounterClockwise, Funnel, Heart, MagnifyingGlass, Plus, SlidersHorizontal, Star, X } from "@phosphor-icons/react";
+import { BookmarkSimple, Briefcase, Broadcast, CaretDown, Check, ClockCounterClockwise, Funnel, Heart, MagnifyingGlass, Plus, SlidersHorizontal, X } from "@phosphor-icons/react";
 import Shell from "../components/Shell";
 import JobCard from "../components/JobCard";
 import JobDrawer from "../components/JobDrawer";
@@ -71,13 +71,13 @@ export default function Jobs() {
   const gatewayDateFilter = useMemo(() => toGatewayDateFilter(dateFilter), [dateFilter]);
   const [scope, setScope] = useState(loadJobScope);
   const [tab, setTab] = useState(() => (loadJobStatus() === "Seen" ? "New" : loadJobStatus()));
-  // Independent of the status tab, so e.g. Rejected + Favorites + Liked narrow the list together.
+  // Independent of the status tab, so e.g. Rejected + Saved + Liked narrow the list together.
   const [reactionFilter, setReactionFilter] = useState(loadReactionFilter);
-  // The Applied tab lists every applied job on its own: Favorites / Liked stay selected but do not narrow it.
+  // The Applied tab lists every applied job on its own: Saved / Liked stay selected but do not narrow it.
   const reactionsApply = tab !== "Applied";
-  const favoritesOnly = reactionFilter.favorites && reactionsApply;
+  const savedOnly = reactionFilter.saved && reactionsApply;
   const likedOnly = reactionFilter.liked && reactionsApply;
-  const reactionView = favoritesOnly || likedOnly;
+  const reactionView = savedOnly || likedOnly;
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounced(searchInput.trim(), 450);
   const [recentSearches, setRecentSearches] = useState(() => loadRecentSearches(user?.email));
@@ -172,14 +172,14 @@ export default function Jobs() {
     [skillRecords, skillCounts],
   );
 
-  // With Favorites or Liked on, the user's jobs from the CRM are shown even when they are outside the loaded pages.
+  // With Saved or Liked on, the user's jobs from the CRM are shown even when they are outside the loaded pages.
   const loadedJobs = useMemo(
     () => asArray(jobPages?.pages).flatMap((page) => asArray(page?.records)).filter((job, index, records) => records.findIndex((item) => item.id === job.id) === index),
     [jobPages],
   );
   const reactionIds = useMemo(
-    () => [...new Set([...(favoritesOnly ? reactions.favorites : []), ...(likedOnly ? reactions.liked : [])])],
-    [favoritesOnly, likedOnly, reactions.favorites, reactions.liked],
+    () => [...new Set([...(savedOnly ? reactions.saved : []), ...(likedOnly ? reactions.liked : [])])],
+    [savedOnly, likedOnly, reactions.saved, reactions.liked],
   );
   const missingReactionIds = reactionIds.filter((id) => !loadedJobs.some((job) => job.id === id));
   const reactionJobQueries = useQueries({
@@ -205,24 +205,24 @@ export default function Jobs() {
   const preview = listedPreview || (fetchedPreview?.id === previewId ? fetchedPreview : null);
   useEffect(() => { if (previewMissing) closePreview(); }, [previewMissing, closePreview]);
 
-  // Text search runs on the gateway; status "New" (New + Seen), favorites/liked and multi-skill selection are applied to the loaded pages.
+  // Text search runs on the gateway; status "New" (New + Seen), saved/liked and multi-skill selection are applied to the loaded pages.
   // Every active filter must match, so they all combine.
   const filtered = useMemo(
     () => allDisplayJobs.filter((job) => {
-      // Favorites / Liked show every saved job whatever its status; the status tab only narrows the plain list.
-      if (!favoritesOnly && !likedOnly) {
+      // Saved / Liked show every such job whatever its status; the status tab only narrows the plain list.
+      if (!savedOnly && !likedOnly) {
         if (tab === "New") {
           if (!["New", "Seen"].includes(job.status)) return false;
         } else if (tab !== "All") {
           if (job.status !== tab) return false;
         }
       }
-      if (favoritesOnly && !reactedTo(job, "saved", reactions.favorites)) return false;
+      if (savedOnly && !reactedTo(job, "saved", reactions.saved)) return false;
       if (likedOnly && !reactedTo(job, "liked", reactions.liked)) return false;
       return matchesExtraFilters(job, extraFilters) &&
         (!skills.length || skills.some((skill) => asArray(job.skills).some((jobSkill) => asText(jobSkill).toLowerCase() === skill.toLowerCase()) || `${job.title} ${job.description}`.toLowerCase().includes(skill.toLowerCase())));
     }),
-    [allDisplayJobs, tab, favoritesOnly, likedOnly, skills, extraFilters, reactions.favorites, reactions.liked],
+    [allDisplayJobs, tab, savedOnly, likedOnly, skills, extraFilters, reactions.saved, reactions.liked],
   );
 
   useEffect(() => {
@@ -259,12 +259,12 @@ export default function Jobs() {
   const toggleSkill = (skill) => setSkills((current) => (current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill]));
   const changeTab = (item) => { const next = tab === item ? "All" : item; setTab(next); saveJobStatus(next); };
   const toggleReactionFilter = (key) => setReactionFilter((current) => ({ ...current, [key]: !current[key] }));
-  const noFavoritesYet = favoritesOnly && !reactions.favorites.length;
+  const noSavedYet = savedOnly && !reactions.saved.length;
   const noLikedYet = likedOnly && !reactions.liked.length;
   const jumpTo = (id) => document.getElementById(`job-${id}`)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   // The funnel dialog holds skills, job type and client location, so its badge counts all three.
   const filterCount = skills.length + countExtraFilters(extraFilters);
-  const hasFilters = skills.length > 0 || dateFilter.preset !== "all" || searchInput || countExtraFilters(extraFilters) > 0 || favoritesOnly || likedOnly;
+  const hasFilters = skills.length > 0 || dateFilter.preset !== "all" || searchInput || countExtraFilters(extraFilters) > 0 || savedOnly || likedOnly;
   const searching = isFetching && !isFetchingNextPage && searchInput.trim() === search;
   const clearAllFilters = () => { setSkills([]); setSearchInput(""); setDateFilter(EMPTY_DATE_RANGE); setExtraFilters(EMPTY_EXTRA_FILTERS); setReactionFilter(EMPTY_REACTION_FILTER); };
 
@@ -276,8 +276,10 @@ export default function Jobs() {
             {/* Row 1: title, search and the main actions. */}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[var(--line)]/70 px-4 py-4 sm:px-6">
               <h1 className="flex shrink-0 items-baseline gap-2 text-2xl font-semibold tracking-[-.04em]">Jobs<span className="font-mono text-xs font-semibold tracking-normal text-[var(--muted)] tabular-nums">{isFetchingStats && scopeCounts[scope] == null ? "…" : scopeCounts[scope] ?? 0} total</span></h1>
-              <form onSubmit={(event) => { event.preventDefault(); commitSearch(); setSearchFocused(false); }} className="job-search relative order-last flex w-full min-w-0 items-center gap-2.5 rounded-full py-1.5 pl-4 pr-1.5 md:order-none md:w-auto md:max-w-xl md:flex-1">
-                {searching ? <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-[var(--lime-dark)]/25 border-t-[var(--lime-dark)]" aria-label="Searching" /> : <MagnifyingGlass size={16} className="shrink-0 text-[var(--muted)]" />}
+              <form onSubmit={(event) => { event.preventDefault(); commitSearch(); setSearchFocused(false); }} className="job-search relative order-last flex w-full min-w-0 items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-1.5 md:order-none md:w-auto md:max-w-xl md:flex-1">
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--lime)] text-[#26320b] shadow-[0_2px_8px_color-mix(in_srgb,var(--lime-dark)_35%,transparent)]">
+                  {searching ? <span className="size-4 animate-spin rounded-full border-2 border-[#26320b]/25 border-t-[#26320b]" aria-label="Searching" /> : <MagnifyingGlass size={15} weight="bold" />}
+                </span>
                 <input ref={searchRef} value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setSearchFocused(true); }} onFocus={() => setSearchFocused(true)} onBlur={() => { setSearchFocused(false); if (searchInput.trim()) commitSearch(); }} onKeyDown={(event) => event.key === "Escape" && (searchInput ? setSearchFocused(false) : event.currentTarget.blur())} placeholder="Search title, description, skills…" aria-label="Search jobs" aria-keyshortcuts="Control+K Meta+K" aria-expanded={searchFocused && searchHistory.length > 0} aria-controls="job-search-history" autoComplete="off" className="min-w-0 flex-1 bg-transparent py-1.5 text-sm outline-none placeholder:text-[var(--muted)]" />
                 {searchInput
                   ? <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearchInput(""); searchRef.current?.focus(); }} aria-label="Clear search" className="grid size-7 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] hover:bg-black/15 hover:text-[var(--ink)] dark:bg-white/10"><X size={12} weight="bold" /></button>
@@ -338,16 +340,16 @@ export default function Jobs() {
               </div>
             </div>
 
-            {/* Row 3: favorites, liked and skills, with Clear and the skill settings at the end. */}
+            {/* Row 3: liked, saved and skills, with Clear and the skill settings at the end. */}
             <div className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-6 lg:flex-nowrap">
               <div className="flex shrink-0 items-center gap-2">
-                <button type="button" aria-pressed={favoritesOnly} onClick={() => toggleReactionFilter("favorites")} title={reactionsApply ? "Show favorite jobs" : "Not used on the Applied tab, which shows every applied job"} disabled={!reactionsApply} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-45 ${favoritesOnly ? "bg-[#fef9c3] text-[#b45309] ring-[#fde047] shadow-sm dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[#fde047]/70"}`}>
-                  <Star size={14} weight={favoritesOnly || reactions.favorites.length > 0 ? "fill" : "regular"} className={favoritesOnly || reactions.favorites.length > 0 ? "text-[#f59e0b] dark:text-[#fde047]" : "text-[#b45309]"} />Favorites
-                  {reactions.favorites.length > 0 && <span className={`font-mono text-[10px] tabular-nums ${favoritesOnly ? "opacity-75" : "text-[var(--muted)]"}`}>{reactions.favorites.length}</span>}
-                </button>
                 <button type="button" aria-pressed={likedOnly} onClick={() => toggleReactionFilter("liked")} title={reactionsApply ? "Show liked jobs" : "Not used on the Applied tab, which shows every applied job"} disabled={!reactionsApply} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-45 ${likedOnly ? "bg-[#ffe4e6] text-[#e11d48] ring-[#fecdd3] shadow-sm dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[#fecdd3]"}`}>
                   <Heart size={14} weight={likedOnly || reactions.liked.length > 0 ? "fill" : "regular"} className={likedOnly || reactions.liked.length > 0 ? "text-[#fb7185] dark:text-[#fda4af]" : "text-[#e11d48]"} />Liked
                   {reactions.liked.length > 0 && <span className={`font-mono text-[10px] tabular-nums ${likedOnly ? "opacity-75" : "text-[var(--muted)]"}`}>{reactions.liked.length}</span>}
+                </button>
+                <button type="button" aria-pressed={savedOnly} onClick={() => toggleReactionFilter("saved")} title={reactionsApply ? "Show saved jobs" : "Not used on the Applied tab, which shows every applied job"} disabled={!reactionsApply} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-45 ${savedOnly ? "bg-[#e0f2fe] text-[#0369a1] ring-[#bae6fd] shadow-sm dark:bg-[#7dd3fc]/20 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[#bae6fd]"}`}>
+                  <BookmarkSimple size={14} weight={savedOnly || reactions.saved.length > 0 ? "fill" : "regular"} className={savedOnly || reactions.saved.length > 0 ? "text-[#0284c7] dark:text-[#7dd3fc]" : "text-[#0369a1]"} />Saved
+                  {reactions.saved.length > 0 && <span className={`font-mono text-[10px] tabular-nums ${savedOnly ? "opacity-75" : "text-[var(--muted)]"}`}>{reactions.saved.length}</span>}
                 </button>
               </div>
               <span aria-hidden="true" className="hidden h-6 w-px shrink-0 bg-[var(--line)] sm:block" />
@@ -390,17 +392,17 @@ export default function Jobs() {
               : filtered.length ? <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
                 <nav aria-label="Jump to job" className="hidden lg:block">
                   <div className="sticky top-[calc(var(--shell-h)+1rem)] max-h-[calc(100dvh-var(--shell-h)-2rem)] overflow-y-auto overscroll-contain rounded-[1.5rem] bg-[var(--surface)] p-3 ring-1 ring-[var(--line)]/70 [scrollbar-width:thin]">
-                    {favoritesOnly && !likedOnly ? (
+                    {savedOnly && !likedOnly ? (
                       <div className="mb-2 flex items-center justify-between border-b border-[var(--line)]/70 px-2 pb-2">
-                        <p className={`${label} flex items-center gap-1.5 text-[#b45309] dark:text-[#fde047]`}>
-                          <Star size={12} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" />
-                          <span>Favorites</span>
+                        <p className={`${label} flex items-center gap-1.5 text-[#0369a1] dark:text-[#7dd3fc]`}>
+                          <BookmarkSimple size={12} weight="fill" className="text-[#0284c7] dark:text-[#7dd3fc]" />
+                          <span>Saved jobs</span>
                         </p>
-                        <span className="rounded-full bg-[#fef9c3] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[#92400e] ring-1 ring-[#fde047]/60 dark:bg-[#fef08a]/15 dark:text-[#fde047] dark:ring-[#fde047]/30">
+                        <span className="rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[#075985] ring-1 ring-[#bae6fd] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30">
                           {search ? `${filtered.length} matched` : `${filtered.length} ${filtered.length === 1 ? "job" : "jobs"}`}
                         </span>
                       </div>
-                    ) : likedOnly && !favoritesOnly ? (
+                    ) : likedOnly && !savedOnly ? (
                       <div className="mb-2 flex items-center justify-between border-b border-[var(--line)]/70 px-2 pb-2">
                         <p className={`${label} flex items-center gap-1.5 text-[#be123c] dark:text-[#fda4af]`}>
                           <Heart size={12} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" />
@@ -423,8 +425,8 @@ export default function Jobs() {
                           <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--muted)]">
                             <span>{timeAgo(job.postedAt, now)}</span>
                             {job.status === "New" && <span className="inline-block size-1.5 rounded-full bg-[var(--accent)] align-middle" />}
-                            {reactions.isFavorite(job.id, job) && <Star size={10} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" />}
                             {reactions.isLiked(job.id, job) && <Heart size={10} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" />}
+                            {reactions.isSaved(job.id, job) && <BookmarkSimple size={10} weight="fill" className="text-[#0284c7] dark:text-[#7dd3fc]" />}
                           </span>
                         </span>
                       </button>
@@ -432,7 +434,7 @@ export default function Jobs() {
                   </div>
                 </nav>
                 <div className="min-w-0">
-                  <section className="space-y-4">{filtered.map((job, index) => <ErrorBoundary key={job.id} name="job-card" fallback={CardError} resetKey={job}><JobCard job={job} index={index} now={now} liked={reactions.isLiked(job.id, job)} favorite={reactions.isFavorite(job.id, job)} onLike={() => reactions.toggleLike(job.id, job)} onFavorite={() => reactions.toggleFavorite(job.id, job)} onOpen={() => openPreview(job.id)}
+                  <section className="space-y-4">{filtered.map((job, index) => <ErrorBoundary key={job.id} name="job-card" fallback={CardError} resetKey={job}><JobCard job={job} index={index} now={now} liked={reactions.isLiked(job.id, job)} saved={reactions.isSaved(job.id, job)} onLike={() => reactions.toggleLike(job.id, job)} onSave={() => reactions.toggleSave(job.id, job)} onOpen={() => openPreview(job.id)}
                     onUndo={job.status === "Applied" || job.status === "Rejected" ? () => jobStatus.undo(job) : undefined}
                     undoing={jobStatus.pendingId === job.id}
                     undoError={jobStatus.errorId === job.id ? jobStatus.error?.message || "Could not undo. Try again." : ""} /></ErrorBoundary>)}</section>
@@ -445,26 +447,26 @@ export default function Jobs() {
                 : <section ref={loadMoreRef} className="py-24 text-center">
                   <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--ink)]/5">
                     {isFetchingNextPage || isFetching ? <span className="size-5 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />
-                      : favoritesOnly ? <Star size={24} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" />
+                      : savedOnly ? <BookmarkSimple size={24} weight="fill" className="text-[#0284c7] dark:text-[#7dd3fc]" />
                       : likedOnly ? <Heart size={24} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" />
                       : <Briefcase size={22} />}
                   </div>
                   <h3 className="mt-5 text-xl font-semibold">
-                    {noFavoritesYet ? "No favorite jobs yet"
+                    {noSavedYet ? "No saved jobs yet"
                       : noLikedYet ? "No liked jobs yet"
-                      : favoritesOnly || likedOnly ? "No saved jobs match these filters"
+                      : savedOnly || likedOnly ? "No liked or saved jobs match these filters"
                       : hasNextPage || isFetching ? "Looking for matching jobs"
                       : "No matching jobs"}
                   </h3>
                   <p className="mt-2 text-sm text-[var(--muted)]">
-                    {noFavoritesYet ? "Click the star icon on any job card to save it here for fast review."
+                    {noSavedYet ? "Click the bookmark icon on any job card to save it here for fast review."
                       : noLikedYet ? "Click the heart icon on any job card to save it to your liked jobs list."
-                      : favoritesOnly || likedOnly ? "Try another status tab, skill or time window, or turn off Favorites or Liked."
+                      : savedOnly || likedOnly ? "Try another status tab, skill or time window, or turn off Saved or Liked."
                       : hasNextPage ? "Loading more results from the next page."
                       : search ? `Nothing matches “${search}”. Try another word.`
                       : "Try another skill, time window, or search term."}
                   </p>
-                  {(favoritesOnly || likedOnly) && (
+                  {(savedOnly || likedOnly) && (
                     <button type="button" onClick={() => setReactionFilter(EMPTY_REACTION_FILTER)} className={`${primaryButton} mt-5`}>
                       Browse all jobs
                     </button>

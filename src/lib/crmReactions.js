@@ -2,15 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../services/api'
 import { asArray } from './safe'
 
-const EMPTY = { liked: [], favorites: [] }
+const EMPTY = { liked: [], saved: [] }
 // Which engagement flag and total each reaction changes on a job.
-const ENGAGEMENT = { liked: ['liked', 'likesCount'], favorites: ['saved', 'savesCount'] }
+const ENGAGEMENT = { liked: ['liked', 'likesCount'], saved: ['saved', 'savesCount'] }
 
 /**
- * Likes and favorites on CRM jobs, stored per user in the CRM (outr_likes / outr_saves),
+ * Likes and saves on CRM jobs, stored per user in the CRM (outr_likes / outr_saves),
  * so they follow the user to any browser.
  * A job fetched with engagement carries the user's own liked/saved flags, which win for that job;
- * the full id lists (for the Favorites / Liked filters and counts) come from the user's records.
+ * the full id lists (for the Saved / Liked filters and the user's own counts) come from the user's records.
  * Toggles show at once and roll back if the CRM rejects them.
  */
 export function useCrmReactions(user) {
@@ -23,7 +23,7 @@ export function useCrmReactions(user) {
     staleTime: 60_000,
   })
   const liked = asArray(data.liked)
-  const favorites = asArray(data.favorites)
+  const saved = asArray(data.saved)
 
   const mutation = useMutation({
     mutationFn: ({ kind, id, on }) => api.setJobReaction(user, kind, id, on),
@@ -49,6 +49,14 @@ export function useCrmReactions(user) {
       context.previous.jobs.forEach(([key, pages]) => queryClient.setQueryData(key, pages))
       queryClient.setQueryData(['job', id], context.previous.job)
     },
+    // The optimistic count only covers this user's click; re-read the job so the totals include every user's likes and saves.
+    onSuccess: async (_result, { id }) => {
+      const fresh = await api.getJob(id, user?.email).catch(() => null)
+      if (!fresh?.engagement) return
+      const sync = (job) => (job?.id === id ? { ...job, engagement: fresh.engagement } : job)
+      queryClient.setQueriesData({ queryKey: ['jobs'] }, (pages) => (asArray(pages?.pages).length ? { ...pages, pages: pages.pages.map((page) => ({ ...page, records: asArray(page?.records).map(sync) })) } : pages))
+      queryClient.setQueryData(['job', id], (job) => (job ? sync(job) : job))
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
   })
 
@@ -56,7 +64,7 @@ export function useCrmReactions(user) {
   const has = (kind, id, job) => {
     const flag = ENGAGEMENT[kind][0]
     if (job?.id === id && typeof job.engagement?.[flag] === 'boolean') return job.engagement[flag]
-    return (kind === 'liked' ? liked : favorites).includes(id)
+    return (kind === 'liked' ? liked : saved).includes(id)
   }
   const toggle = (kind, id, job) => {
     if (!id || !user?.email) return
@@ -65,11 +73,11 @@ export function useCrmReactions(user) {
 
   return {
     liked,
-    favorites,
+    saved,
     isLiked: (id, job) => has('liked', id, job),
-    isFavorite: (id, job) => has('favorites', id, job),
+    isSaved: (id, job) => has('saved', id, job),
     toggleLike: (id, job) => toggle('liked', id, job),
-    toggleFavorite: (id, job) => toggle('favorites', id, job),
+    toggleSave: (id, job) => toggle('saved', id, job),
     error: mutation.error || loadError,
   }
 }

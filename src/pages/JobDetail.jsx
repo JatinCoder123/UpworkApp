@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import gsap from 'gsap'
-import { ArrowLeft, Briefcase, CalendarBlank, ChartBar, Clock, CurrencyDollar, Heart, Hourglass, MapPin, SealCheck, Sparkle, Star, Tag, Target, WarningCircle } from '@phosphor-icons/react'
+import { ArrowLeft, BookmarkSimple, Briefcase, CalendarBlank, ChartBar, Clock, CurrencyDollar, Heart, Hourglass, MapPin, SealCheck, Sparkle, Star, Tag, Target, WarningCircle } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import NotFound from './NotFound'
 import ExpandableText from '../components/ExpandableText'
@@ -102,9 +102,11 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
     onUndo={() => status.undo(job)}
     undoing={status.pendingId === job.id}
     liked={reactions.isLiked(job.id, job)}
-    favorite={reactions.isFavorite(job.id, job)}
     onLike={() => reactions.toggleLike(job.id, job)}
-    onFavorite={() => reactions.toggleFavorite(job.id, job)}
+    likeCount={job.engagement?.likesCount}
+    saved={reactions.isSaved(job.id, job)}
+    onSave={() => reactions.toggleSave(job.id, job)}
+    saveCount={job.engagement?.savesCount}
     onShare={setShare}
     showApply={!embedded && job.status !== 'Applied'}
   /></ErrorBoundary>
@@ -121,9 +123,9 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
           <div className="relative p-5 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill status={job.status} />
-              {reactions.isFavorite(job.id, job) && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#fef9c3] px-2.5 py-1 text-[11px] font-bold text-[#92400e] ring-1 ring-[#fde047]/60 dark:bg-[#fef08a]/15 dark:text-[#fde047] dark:ring-[#fde047]/30">
-                  <Star size={12} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" /> Favorited
+              {reactions.isSaved(job.id, job) && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#e0f2fe] px-2.5 py-1 text-[11px] font-bold text-[#075985] ring-1 ring-[#bae6fd] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30">
+                  <BookmarkSimple size={12} weight="fill" className="text-[#0284c7] dark:text-[#7dd3fc]" /> Saved
                 </span>
               )}
               {reactions.isLiked(job.id, job) && (

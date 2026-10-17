@@ -656,11 +656,11 @@ function statusActivity(from, to) {
 }
 
 // ----------------------------------------------------
-// Likes and favorites (one CRM record per user and job)
+// Likes and saves (one CRM record per user and job)
 // ----------------------------------------------------
 
-// Likes live in outr_likes, favorites in outr_saves; each record is { user_id, content_id, content_module }.
-const REACTION_MODULES = { liked: "outr_likes", favorites: "outr_saves" };
+// Likes live in outr_likes, saves in outr_saves; each record is { user_id, content_id, content_module }.
+const REACTION_MODULES = { liked: "outr_likes", saved: "outr_saves" };
 
 // The CRM user id from the signed-in session when it carries one, otherwise looked up by email.
 // The session's own `id` is the login provider's id, not a CRM user, so it is never used here.
@@ -677,16 +677,16 @@ async function fetchReactionRecords(module, filters) {
   return [first, ...rest].flatMap((page) => asArray(page?.records)).filter((record) => record && record.deleted !== "1" && record.content_id);
 }
 
-// { liked: [jobId], favorites: [jobId] } for the signed-in user, newest first.
+// { liked: [jobId], saved: [jobId] } for the signed-in user, newest first.
 export async function fetchJobReactions(user) {
   const userId = await reactionUserId(user);
-  const [liked, favorites] = await Promise.all(Object.values(REACTION_MODULES).map((module) =>
+  const [liked, saved] = await Promise.all(Object.values(REACTION_MODULES).map((module) =>
     fetchReactionRecords(module, { user_id: userId, content_module: JOBS_MODULE })
       .then((records) => [...new Set(records.sort((a, b) => Date.parse(parseEnteredAt(b)) - Date.parse(parseEnteredAt(a))).map((record) => record.content_id))])));
-  return { liked, favorites };
+  return { liked, saved };
 }
 
-// Adds or removes the user's like/favorite on a job. Adding skips a record that already exists;
+// Adds or removes the user's like/save on a job. Adding skips a record that already exists;
 // removing deletes every matching record, so a double click elsewhere cannot leave one behind.
 export async function setJobReaction(user, kind, jobId, on) {
   const module = REACTION_MODULES[kind];

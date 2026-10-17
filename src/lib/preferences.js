@@ -62,16 +62,17 @@ export function saveJobStatus(status) {
 
 const JOB_REACTION_FILTER_KEY = 'pitchflow-job-reaction-filter'
 
-export const EMPTY_REACTION_FILTER = { favorites: false, liked: false }
+export const EMPTY_REACTION_FILTER = { saved: false, liked: false }
 
 // Favorites-only and liked-only toggles that combine with the status tab and every other filter.
 export function loadReactionFilter() {
   try {
     const saved = JSON.parse(localStorage.getItem(JOB_REACTION_FILTER_KEY) || 'null')
-    if (saved && typeof saved === 'object') return { favorites: Boolean(saved.favorites), liked: Boolean(saved.liked) }
+    // `favorites` is the older name for the Saved toggle.
+    if (saved && typeof saved === 'object') return { saved: Boolean(saved.saved ?? saved.favorites), liked: Boolean(saved.liked) }
   } catch { /* fall through to the older status-tab value */ }
   const status = localStorage.getItem(JOB_STATUS_KEY)
-  return { favorites: status === 'Favorites', liked: status === 'Liked' }
+  return { saved: status === 'Favorites', liked: status === 'Liked' }
 }
 
 export function saveReactionFilter(filter) {

@@ -5,7 +5,7 @@ export const BACKEND_SOCKET_URL = (
   import.meta.env?.VITE_DOC_SOCKET_URL ||
   import.meta.env?.VITE_BACKEND_URL ||
   import.meta.env?.VITE_AUTH_BASE_URL ||
-  'https://upworkapp.backend.outrightcrm.in'
+  ''
 ).replace(/\/$/, '');
 
 const DOC_START_TIMES_KEY = 'upworkapp_doc_start_times';

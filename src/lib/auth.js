@@ -1,4 +1,6 @@
-export const AUTH_ORIGIN ="https://upworkapp.backend.outrightcrm.in".replace(/\/$/, "");
+// Auth and domain API backend, from VITE_AUTH_BASE_URL in .env.
+export const AUTH_ORIGIN = String(import.meta.env.VITE_AUTH_BASE_URL || "").replace(/\/$/, "");
+if (!AUTH_ORIGIN) console.error("VITE_AUTH_BASE_URL is not set. Add it to .env (see .env.example); sign-in will not work without it.");
 const LOGIN_INTRO_KEY = "outrightfeedportal-login-intro";
 
 export function startMicrosoftLogin() {

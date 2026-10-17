@@ -134,9 +134,11 @@ button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
 .upwork-apply-button:hover::before { translate: 520% 0; }
 .upwork-apply-button:active, .upwork-view-button:active { transform: translateY(0) scale(.98); }
 /* Jobs search box: raised with a lime edge so it reads as the main control, and a lime glow while typing. */
-.job-search { background: var(--raised); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lime-dark) 35%, var(--line)), 0 6px 20px color-mix(in srgb, var(--lime-dark) 10%, transparent); transition: box-shadow 300ms ease; }
-.job-search:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lime-dark) 60%, var(--line)), 0 8px 24px color-mix(in srgb, var(--lime-dark) 14%, transparent); }
-.job-search:focus-within { box-shadow: inset 0 0 0 1.5px var(--lime-dark), 0 0 0 4px color-mix(in srgb, var(--lime) 30%, transparent), 0 10px 28px color-mix(in srgb, var(--lime-dark) 16%, transparent); }
+/* Lime-tinted search pill: brand colour at rest, a stronger ring and glow on hover and focus. */
+.job-search { background: linear-gradient(100deg, color-mix(in srgb, var(--lime) 30%, var(--raised)), color-mix(in srgb, var(--lime) 10%, var(--raised)) 60%, var(--raised)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--lime-dark) 65%, var(--line)), 0 6px 22px color-mix(in srgb, var(--lime-dark) 18%, transparent); transition: box-shadow 300ms ease, background 300ms ease; }
+.job-search:hover { box-shadow: inset 0 0 0 1.5px var(--lime-dark), 0 8px 26px color-mix(in srgb, var(--lime-dark) 24%, transparent); }
+.job-search:focus-within { background: linear-gradient(100deg, color-mix(in srgb, var(--lime) 38%, var(--raised)), color-mix(in srgb, var(--lime) 16%, var(--raised)) 60%, var(--raised)); box-shadow: inset 0 0 0 2px var(--lime-dark), 0 0 0 4px color-mix(in srgb, var(--lime) 40%, transparent), 0 10px 30px color-mix(in srgb, var(--lime-dark) 26%, transparent); }
+.job-search input::placeholder { color: color-mix(in srgb, var(--accent) 70%, var(--muted)); }
 .job-detail-title { max-width: 52rem; font-size: clamp(1.75rem, 2.9vw, 2.9rem); font-weight: 600; line-height: 1.1; letter-spacing: -.035em; text-wrap: balance; overflow-wrap: anywhere; }
 /* Live Upwork scanner */
 .live-hero { position: relative; isolation: isolate; overflow: hidden; color: #f4f7ea; background: radial-gradient(120% 90% at 85% 10%, #3a5229 0%, transparent 55%), radial-gradient(90% 80% at 0% 100%, #1e2c1c 0%, transparent 60%), #172015; }
