@@ -25,8 +25,27 @@ function saveStoredNotifications(list) {
   }
 }
 
-let memoryNotifications = loadStoredNotifications();
+// Only docs this user started are kept; notifications saved before ownership was tracked are dropped.
+let memoryNotifications = loadStoredNotifications().filter((n) => n.mine);
 const listeners = new Set();
+// Socket events that belong to one of this user's docs, so the toast can show only those.
+const ownEvents = new WeakSet();
+
+const isFinal = (status) => status === 'completed' || status === 'failed';
+
+// The user's own notification this event updates. The socket broadcasts every user's docs, so an event
+// counts only when it matches a doc this user started: same note, or the same content while that
+// generation is still running and its note id is not known on one side yet.
+function findOwnIndex(event) {
+  return memoryNotifications.findIndex((n) => n.mine && (
+    (event.noteId && n.noteId === event.noteId) ||
+    (event.contentId && n.contentId === event.contentId && (!event.noteId || !n.noteId) && !isFinal(n.status))
+  ));
+}
+
+export function isOwnDocEvent(event) {
+  return Boolean(event && typeof event === 'object' && ownEvents.has(event));
+}
 
 function emitChange() {
   listeners.forEach((listener) => {
@@ -39,7 +58,8 @@ function emitChange() {
 }
 
 /**
- * Add or update notification from a doc-status event
+ * Add or update a notification. `mine: true` marks a doc this user just started;
+ * socket events only update those and are ignored for other users' docs.
  */
 export function recordDocNotification(event) {
   if (!event || !event.status) return;
@@ -47,17 +67,20 @@ export function recordDocNotification(event) {
   const docKey = event.contentId || event.noteId;
   if (!docKey) return;
 
+  const ownIndex = findOwnIndex(event);
+  if (!event.mine && ownIndex < 0) return;
+  if (typeof event === 'object') ownEvents.add(event);
+
   const now = Date.now();
   const savedRecord = getDocInProgress(event.contentId, event.noteId);
   const title = event.title || savedRecord?.title || 'Technical Content Document';
   const userName = event.userName || savedRecord?.userName || '';
-  const noteId = event.noteId || savedRecord?.noteId || '';
+  // A new generation has no note yet; the saved record may still hold the previous note's id.
+  const noteId = event.noteId || (event.mine ? '' : savedRecord?.noteId) || '';
   const viewUrl = event.viewUrl || (noteId ? getDocumentViewUrl(noteId) : '');
   const documentUrl = event.documentUrl || '';
 
-  const existingIndex = memoryNotifications.findIndex(
-    (n) => (event.contentId && n.contentId === event.contentId) || (event.noteId && n.noteId === event.noteId)
-  );
+  const existingIndex = ownIndex;
 
   if (existingIndex >= 0) {
     const existing = memoryNotifications[existingIndex];
@@ -85,6 +108,7 @@ export function recordDocNotification(event) {
   } else {
     const newNotif = {
       id: `${docKey}-${now}`,
+      mine: true,
       contentId: event.contentId || '',
       noteId,
       title,

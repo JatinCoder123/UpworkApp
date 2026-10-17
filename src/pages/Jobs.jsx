@@ -53,7 +53,6 @@ function StatusTab({ active, onClick, count, ariaProps, children }) {
 }
 
 // The job's own engagement flag when it was fetched with one, otherwise the user's id list.
-const reactedTo = (job, flag, ids) => (typeof job?.engagement?.[flag] === "boolean" ? job.engagement[flag] : ids.includes(job?.id));
 
 function FilterChip({ children, onClear }) {
   return <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1.5 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
@@ -217,11 +216,14 @@ export default function Jobs() {
           if (job.status !== tab) return false;
         }
       }
-      if (savedOnly && !reactedTo(job, "saved", reactions.saved)) return false;
-      if (likedOnly && !reactedTo(job, "liked", reactions.liked)) return false;
+      // Same check as the heart and bookmark, so un-liking or un-saving here drops the job on that click.
+      if (savedOnly && !reactions.isSaved(job.id, job)) return false;
+      if (likedOnly && !reactions.isLiked(job.id, job)) return false;
       return matchesExtraFilters(job, extraFilters) &&
         (!skills.length || skills.some((skill) => asArray(job.skills).some((jobSkill) => asText(jobSkill).toLowerCase() === skill.toLowerCase()) || `${job.title} ${job.description}`.toLowerCase().includes(skill.toLowerCase())));
     }),
+    // Every like/save click updates reactions.saved / reactions.liked, so they stand in for isSaved / isLiked here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [allDisplayJobs, tab, savedOnly, likedOnly, skills, extraFilters, reactions.saved, reactions.liked],
   );
 

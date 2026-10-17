@@ -12,6 +12,8 @@ import {
   DownloadSimple,
 } from '@phosphor-icons/react'
 import { subscribeDocStatus } from '../services/docSocket'
+// Importing it also subscribes the notification store first, so it has judged each event before the toast sees it.
+import { isOwnDocEvent } from '../services/docNotifications'
 import { getDocumentViewUrl } from '../services/api'
 import { asText } from '../lib/safe'
 
@@ -117,7 +119,8 @@ export default function DocNotificationToast() {
 
   useEffect(() => {
     const unsubscribe = subscribeDocStatus((event) => {
-      if (!event.status) return
+      // The socket broadcasts every user's docs; toast, chime and desktop alert are only for the user's own.
+      if (!event.status || !isOwnDocEvent(event)) return
 
       const cfg = STATUS_CONFIG[event.status] || STATUS_CONFIG.processing
       const toastId = `${event.noteId || event.contentId || 'doc'}-${event.status}-${Date.now()}`

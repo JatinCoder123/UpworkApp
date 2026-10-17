@@ -831,7 +831,6 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
   const panel = useRef(null)
   const queryClient = useQueryClient()
   const { user } = useAuth()
-  const [crmUser, setCrmUser] = useState({ userName: '', userId: '' })
   const [copied, setCopied] = useState('')
   const [activeNoteId, setActiveNoteId] = useState(item.notesId || '')
   const [isTriggering, setIsTriggering] = useState(false)
@@ -847,19 +846,6 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
   })
   const [liveNoteFields, setLiveNoteFields] = useState(null)
 
-  // Resolve logged-in CRM user details
-  useEffect(() => {
-    let active = true
-    resolveCrmUser(user).then((res) => {
-      if (active && res) {
-        setCrmUser(res)
-      }
-    })
-    return () => {
-      active = false
-    }
-  }, [user])
-
   // Keep state in sync with selected item
   useEffect(() => {
     const cached = getCachedDocStatus(item.notesId, item.id)
@@ -869,9 +855,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
     setTriggerError('')
     setJustCompleted(false)
     setLiveSocketStatus(cached?.status || null)
-    if (cached?.userName) {
-      setLiveUserName(cached.userName)
-    }
+    setLiveUserName(cached?.userName || '')
     if (cached?.filename || cached?.viewUrl || cached?.documentUrl) {
       setLiveNoteFields({
         filename: cached.filename,
@@ -960,10 +944,11 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
     return {
       ...base,
       ...liveNoteFields,
-      userName: liveUserName || liveNoteFields?.userName || base?.userName || crmUser.userName || '',
+      // Only who actually generated it (socket event or the note); never the signed-in user as a stand-in.
+      userName: liveUserName || liveNoteFields?.userName || base?.userName || '',
       status: liveSocketStatus || liveNoteFields?.status || base?.status || '',
     }
-  }, [fetchedNote, liveNoteFields, liveSocketStatus, liveUserName, crmUser.userName])
+  }, [fetchedNote, liveNoteFields, liveSocketStatus, liveUserName])
 
   // When note generation finishes, notify parent to refresh item list badges
   useEffect(() => {
@@ -999,8 +984,10 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
         userName: effectiveUserName,
       })
       recordDocNotification({
+        mine: true,
         contentId: item.id,
-        noteId: activeNoteId,
+        // A regenerate gets a new note; it is filled in when the endpoint (or the socket) returns it.
+        noteId: '',
         status: 'queued',
         title: item.headline,
         userName: effectiveUserName,
@@ -1021,6 +1008,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
           userName: effectiveUserName,
         })
         recordDocNotification({
+          mine: true,
           contentId: item.id,
           noteId: res.note_id,
           status: 'queued',
@@ -1149,7 +1137,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
           item={item}
           note={note}
           activeNoteId={activeNoteId}
-          userName={liveUserName || note?.userName || crmUser.userName}
+          userName={liveUserName || note?.userName}
           isTriggering={isTriggering}
           triggerError={triggerError}
           justCompleted={justCompleted}
