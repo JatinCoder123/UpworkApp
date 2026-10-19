@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import gsap from 'gsap'
-import { ArrowSquareOut, DotsThree, Eye, Shuffle, WarningCircle, X } from '@phosphor-icons/react'
+import { ArrowSquareOut, DotsThree, Shuffle, WarningCircle, X } from '@phosphor-icons/react'
 import { JobDetailView } from '../pages/JobDetail'
 import { LiveJobDetailView } from '../pages/LiveJobDetail'
 import { nextSimilarJob } from '../lib/jobSignals'
@@ -77,9 +77,7 @@ export default function JobDrawer({ job, jobs = [], live = false, onSelect, onCl
             {menuOpen && <div className="absolute right-0 top-11 z-50 w-64 rounded-[1.5rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5">
               <div role="menu" aria-label="Job preview actions" className="rounded-[calc(1.5rem-.375rem)] bg-[var(--surface)] p-2">
                 <button type="button" role="menuitem" onClick={goNext} disabled={!similar} title={similar ? `Next similar: ${similar.title}` : undefined} className={menuItem}><Shuffle size={15} weight="bold" className="shrink-0" /><span className="min-w-0 flex-1"><span className="block">Next similar</span>{!similar && <span className="block text-[10px] font-medium">No more similar jobs loaded</span>}</span></button>
-                <button type="button" role="menuitem" onClick={openInNewWindow} className={menuItem}><ArrowSquareOut size={15} weight="bold" className="shrink-0" />Open in new window</button>
-                {job.url && <a role="menuitem" href={job.url} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)} className={menuItem}><Eye size={15} weight="bold" className="shrink-0" />View job on Upwork</a>}
-              </div>
+                <button type="button" role="menuitem" onClick={openInNewWindow} className={menuItem}><ArrowSquareOut size={15} weight="bold" className="shrink-0" />Open in new window</button>              </div>
             </div>}
           </div>
           <button type="button" onClick={onClose} aria-label="Close preview" className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--ink)] text-white transition-transform hover:scale-105"><X size={15} weight="bold" /></button>

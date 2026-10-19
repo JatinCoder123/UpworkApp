@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUUpLeft, BookmarkSimple, Briefcase, Clock, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Star, Target } from '@phosphor-icons/react'
+import { ArrowUUpLeft, BookmarkSimple, Briefcase, Clock, Eye, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Star, Target } from '@phosphor-icons/react'
 import { StatusPill } from './ui'
 import { Chips, Price } from './JobApplySection'
 import ShareJobDialog from './ShareJobDialog'
@@ -34,22 +34,24 @@ const SAVE_STYLE = 'bg-[#e0f2fe] text-[#0369a1] ring-1 ring-[#bae6fd] dark:bg-[#
 const FAVORITE_STYLE = 'bg-[#fef9c3] text-[#b45309] ring-1 ring-[#fde047] dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/30'
 
 // Like, save (or favorite, on live jobs) and Teams share as one pill in the top-right corner of a card's main column.
-// CRM jobs pass `onSave` and the like/save totals; live jobs pass `onFavorite` and have no totals.
+// CRM jobs pass `onLike`, `onSave` and the total likes from every user; saves are private and show no count.
+// Without `onLike` / `onSave` / `onFavorite` (live jobs) only Teams share and the Upwork link show.
 // The parent must be `relative`; the card header keeps right padding so its pills never run underneath.
-export function JobCardActions({ job, liked, onLike, likeCount, saved, onSave, saveCount, favorite, onFavorite }) {
+export function JobCardActions({ job, liked, onLike, likeCount, saved, onSave, favorite, onFavorite }) {
   const [sharing, setSharing] = useState(false)
   return <div className="absolute right-4 top-4 z-10 flex items-center gap-1 rounded-full bg-[var(--paper)] p-1">
-    <ReactionButton active={liked} onClick={onLike} label={liked ? 'Unlike job' : 'Like job'} count={likeCount} activeStyle={LIKE_STYLE}>
+    {onLike && <ReactionButton active={liked} onClick={onLike} label={liked ? 'Unlike job' : 'Like job'} count={likeCount} activeStyle={LIKE_STYLE}>
       <Heart size={15} weight={liked ? 'fill' : 'regular'} className={liked ? 'text-[#fb7185] dark:text-[#fda4af]' : ''} />
-    </ReactionButton>
+    </ReactionButton>}
     {onSave
-      ? <ReactionButton active={saved} onClick={onSave} label={saved ? 'Unsave job' : 'Save job'} count={saveCount} activeStyle={SAVE_STYLE}>
+      ? <ReactionButton active={saved} onClick={onSave} label={saved ? 'Unsave job' : 'Save job'} activeStyle={SAVE_STYLE}>
         <BookmarkSimple size={15} weight={saved ? 'fill' : 'regular'} className={saved ? 'text-[#0284c7] dark:text-[#7dd3fc]' : ''} />
       </ReactionButton>
-      : <ReactionButton active={favorite} onClick={onFavorite} label={favorite ? 'Remove from favorites' : 'Add to favorites'} activeStyle={FAVORITE_STYLE}>
+      : onFavorite && <ReactionButton active={favorite} onClick={onFavorite} label={favorite ? 'Remove from favorites' : 'Add to favorites'} activeStyle={FAVORITE_STYLE}>
         <Star size={15} weight={favorite ? 'fill' : 'regular'} className={favorite ? 'text-[#f59e0b] dark:text-[#fde047]' : ''} />
       </ReactionButton>}
     <ReactionButton active={false} onClick={() => setSharing(true)} label="Share in Teams"><MicrosoftTeamsLogo size={15} weight="fill" className="text-[#4b53bc]" /></ReactionButton>
+    {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="View job on Upwork" title="View job on Upwork" className="grid size-7 place-items-center rounded-full text-[var(--muted)] transition-all duration-300 hover:bg-[var(--raised)] hover:text-[var(--ink)] active:scale-90"><Eye size={15} weight="bold" /></a>}
     {sharing && <ShareJobDialog job={job} mode="teams" onClose={() => setSharing(false)} />}
   </div>
 }
@@ -83,7 +85,7 @@ export default function JobCard({ job, index, now, liked, saved, onLike, onSave,
     <div className="grid overflow-hidden rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] md:grid-cols-[minmax(0,1fr)_17rem]">
       <div className="relative min-w-0">
       <Link to={`/jobs/${job.id}`} onClick={previewClick(onOpen)} className="block min-w-0 p-5 sm:p-6">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pr-40">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pr-48">
           {index != null && <span className="font-mono text-[11px] font-bold text-[var(--muted)]">{String(index + 1).padStart(2, '0')}</span>}
           <StatusPill status={job.status} />
           {saved && (
@@ -112,7 +114,7 @@ export default function JobCard({ job, index, now, liked, saved, onLike, onSave,
           {skills.length > visibleSkills.length && <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)]">+{skills.length - visibleSkills.length}</span>}
         </div>
       </Link>
-      <JobCardActions job={job} liked={liked} onLike={onLike} likeCount={job.engagement?.likesCount} saved={saved} onSave={onSave} saveCount={job.engagement?.savesCount} />
+      <JobCardActions job={job} liked={liked} onLike={onLike} likeCount={job.engagement?.likesCount} saved={saved} onSave={onSave} />
       </div>
 
       <JobCardAside job={job} score={<div className="min-w-0 rounded-2xl bg-[var(--surface)] p-3 ring-1 ring-[var(--line)]/70">

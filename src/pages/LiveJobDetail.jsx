@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import gsap from 'gsap'
-import { ArrowLeft, Briefcase, Broadcast, CalendarBlank, ChartBar, Clock, ClockCounterClockwise, CurrencyDollar, GlobeHemisphereWest, Heart, Hourglass, Lightning, MapPin, SealCheck, Star, Tag, Target, UsersThree } from '@phosphor-icons/react'
+import { ArrowLeft, Briefcase, Broadcast, CalendarBlank, ChartBar, Clock, ClockCounterClockwise, CurrencyDollar, GlobeHemisphereWest, Hourglass, Lightning, MapPin, SealCheck, Tag, Target, UsersThree } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import NotFound from './NotFound'
 import ExpandableText from '../components/ExpandableText'
@@ -37,12 +37,7 @@ function ActionPanel({ job, reactions, onShare, showApply }) {
     onApplied={() => { if (!applied) reactions.toggleApplied(job.id) }}
     onDismiss={() => reactions.toggleDismissed(job.id)}
     resolved={applied ? 'applied' : dismissed ? 'rejected' : null}
-    onUndo={() => (applied ? reactions.toggleApplied(job.id) : reactions.toggleDismissed(job.id))}
-    liked={reactions.isLiked(job.id)}
-    favorite={reactions.isFavorite(job.id)}
-    onLike={() => reactions.toggleLike(job.id, job)}
-    onFavorite={() => reactions.toggleFavorite(job.id, job)}
-    onShare={onShare}
+    onUndo={() => (applied ? reactions.toggleApplied(job.id) : reactions.toggleDismissed(job.id))}    onShare={onShare}
     showApply={showApply}
   />
 }
@@ -105,16 +100,6 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
           <div className="relative p-5 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <LivePill />
-              {reactions.isFavorite(job.id) && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#fef9c3] px-2.5 py-1 text-[11px] font-bold text-[#92400e] ring-1 ring-[#fde047]/60 dark:bg-[#fef08a]/15 dark:text-[#fde047] dark:ring-[#fde047]/30">
-                  <Star size={12} weight="fill" className="text-[#f59e0b] dark:text-[#fde047]" /> Favorited
-                </span>
-              )}
-              {reactions.isLiked(job.id) && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#ffe4e6] px-2.5 py-1 text-[11px] font-bold text-[#be123c] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/15 dark:text-[#fda4af] dark:ring-[#fda4af]/30">
-                  <Heart size={12} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" /> Liked
-                </span>
-              )}
               {earlyBird && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--warn)]"><Lightning size={12} weight="fill" />Early bird</span>}              {tags[0] && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]"><Tag size={12} weight="bold" />{tags[0]}</span>}
               <time dateTime={job.postedAt} title={clock(job.postedAt)} className="ml-auto inline-flex items-center gap-1 text-xs font-semibold" style={{ color: tone }}><Clock size={13} weight="bold" />Posted {timeAgo(job.postedAt, now)}</time>
             </div>

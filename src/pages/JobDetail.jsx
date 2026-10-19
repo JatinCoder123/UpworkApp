@@ -106,9 +106,7 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
     onLike={() => reactions.toggleLike(job.id, job)}
     likeCount={job.engagement?.likesCount}
     saved={reactions.isSaved(job.id, job)}
-    onSave={() => reactions.toggleSave(job.id, job)}
-    saveCount={job.engagement?.savesCount}
-    onShare={setShare}
+    onSave={() => reactions.toggleSave(job.id, job)}    onShare={setShare}
     showApply={!embedded && job.status !== 'Applied'}
   /></ErrorBoundary>
   const skillsCard = <ErrorBoundary name="skills" resetKey={job.id}><SkillsCard skills={skills} /></ErrorBoundary>

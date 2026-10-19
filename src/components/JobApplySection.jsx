@@ -19,8 +19,10 @@ export function Chips({ job }) {
   return <div className="flex flex-wrap gap-1.5">{chips.map((chip) => <span key={chip} className="rounded-full bg-[var(--frame)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)]">{chip}</span>)}</div>
 }
 
-// Total likes or saves from every user; hidden at zero and on live jobs, which have no totals.
+// Total likes from every user; hidden at zero and on live jobs, which have no totals. Saves are private and show no count.
 const Count = ({ value }) => (Number.isFinite(value) && value > 0 ? <span className="font-mono text-xs font-bold tabular-nums">{value}</span> : null)
+// Static class names, so Tailwind generates them: 3 share buttons plus like, save/favorite and the Upwork link when present.
+const GRID_COLS = { 3: 'grid-cols-3', 4: 'grid-cols-4', 5: 'grid-cols-5', 6: 'grid-cols-6' }
 const squareButton = (active, activeStyle) => `grid h-11 min-w-11 place-items-center rounded-2xl ring-1 transition-all duration-300 active:scale-90 ${active ? (activeStyle || 'bg-[var(--ink)] text-white ring-[var(--ink)]') : 'bg-[var(--raised)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`
 
 /**
@@ -29,7 +31,7 @@ const squareButton = (active, activeStyle) => `grid h-11 min-w-11 place-items-ce
  */
 // `onApplied` runs when Apply on Upwork is clicked; the separate Applied button is commented out below.
 // `resolved` ('applied' | 'rejected') swaps Not a fit for that status and an Undo button wired to `onUndo`.
-export default function JobApplySection({ job, statusLabel, dismissed, onApplied, onDismiss, liked, onLike, likeCount, saved, onSave, saveCount, favorite, onFavorite, onShare, showApply = true, statusError, resolved = null, onUndo, undoing = false }) {
+export default function JobApplySection({ job, statusLabel, dismissed, onApplied, onDismiss, liked, onLike, likeCount, saved, onSave, favorite, onFavorite, onShare, showApply = true, statusError, resolved = null, onUndo, undoing = false }) {
   const [copied, copy] = useCopied()
   const segment = (active, tone) => `flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 text-xs font-semibold transition-colors ${active ? tone : 'text-[var(--muted)] hover:text-[var(--ink)]'}`
 
@@ -38,7 +40,6 @@ export default function JobApplySection({ job, statusLabel, dismissed, onApplied
       {job.applyUrl
         ? <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={onApplied} className="upwork-apply-button flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl text-sm font-bold"><span className="relative z-10 truncate">Apply on Upwork</span><ArrowSquareOut size={15} weight="bold" className="relative z-10 shrink-0" /></a>
         : <span className="flex h-11 flex-1 items-center justify-center rounded-2xl bg-[var(--frame)] text-xs font-semibold text-[var(--muted)]">No Upwork link</span>}
-      {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="View job on Upwork" title="View job on Upwork" className={squareButton(false)}><Eye size={17} weight="bold" /></a>}
     </div>}
 
     <div className="flex items-start justify-between gap-3">
@@ -67,8 +68,8 @@ export default function JobApplySection({ job, statusLabel, dismissed, onApplied
       </div>}
     {statusError && <p role="alert" className="mt-2 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{statusError}</p>}
 
-    <div className="mt-2 grid grid-cols-5 gap-2">
-      <button
+    <div className={`mt-2 grid gap-2 ${GRID_COLS[[onLike, onSave || onFavorite, job.url].filter(Boolean).length + 3]}`}>
+      {onLike && <button
         type="button"
         onClick={onLike}
         aria-pressed={liked}
@@ -80,7 +81,7 @@ export default function JobApplySection({ job, statusLabel, dismissed, onApplied
           <Heart size={18} weight={liked ? 'fill' : 'regular'} className={liked ? 'text-[#fb7185] dark:text-[#fda4af]' : ''} />
           <Count value={likeCount} />
         </span>
-      </button>
+      </button>}
       {onSave ? <button
         type="button"
         onClick={onSave}
@@ -89,12 +90,9 @@ export default function JobApplySection({ job, statusLabel, dismissed, onApplied
         title={saved ? 'Unsave' : 'Save'}
         className={squareButton(saved, 'bg-[#e0f2fe] text-[#0369a1] ring-1 ring-[#bae6fd] dark:bg-[#7dd3fc]/20 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30')}
       >
-        <span className="flex items-center gap-1">
-          <BookmarkSimple size={18} weight={saved ? 'fill' : 'regular'} className={saved ? 'text-[#0284c7] dark:text-[#7dd3fc]' : ''} />
-          <Count value={saveCount} />
-        </span>
+        <BookmarkSimple size={18} weight={saved ? 'fill' : 'regular'} className={saved ? 'text-[#0284c7] dark:text-[#7dd3fc]' : ''} />
       </button>
-      : <button
+      : onFavorite && <button
         type="button"
         onClick={onFavorite}
         aria-pressed={favorite}
@@ -107,6 +105,7 @@ export default function JobApplySection({ job, statusLabel, dismissed, onApplied
       <button type="button" onClick={() => copy('link', jobShareLink(job))} aria-label="Copy job link" title={copied === 'link' ? 'Copied' : 'Copy link'} className={squareButton(false)}>{copied === 'link' ? <Check size={16} weight="bold" className="text-[var(--accent-strong)]" /> : <LinkSimple size={16} />}</button>
       <button type="button" onClick={() => onShare('teams')} aria-label="Share in Teams" title="Share in Teams" className={squareButton(false)}><MicrosoftTeamsLogo size={17} weight="fill" className="text-[#4b53bc]" /></button>
       <button type="button" onClick={() => onShare('notify')} aria-label="Notify team" title="Notify team" className={squareButton(false)}><UsersThree size={16} weight="bold" /></button>
+      {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="View job on Upwork" title="View job on Upwork" className={squareButton(false)}><Eye size={17} weight="bold" /></a>}
     </div>
   </div>
 }
