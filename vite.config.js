@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const crmTarget = (env.VITE_CRM_BASE_URL || 'https://upwork.outrightcrm.in').replace(/\/$/, '')
+  const mcpTarget = (env.VITE_MCP_CRM_BASE_URL || 'https://crm.outrightsystems.org').replace(/\/$/, '')
 
   return {
     plugins: [react(), tailwindcss()],
@@ -15,6 +16,12 @@ export default defineConfig(({ mode }) => {
           target: crmTarget,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/crm-entrypoint/, ''),
+        },
+        '/mcp-proxy': {
+          target: mcpTarget,
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/mcp-proxy/, ''),
         },
       },
     },

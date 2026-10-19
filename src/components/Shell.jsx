@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { CaretDown, ChartLineUp, Clock, List, SignOut, SlidersHorizontal, User, UserCircle, X } from '@phosphor-icons/react'
+import { CaretDown, ChartLineUp, Clock, List, ShieldCheck, SignOut, SlidersHorizontal, User, UserCircle, WarningCircle, X } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import gsap from 'gsap'
 import { Mark, iconButton } from './ui'
@@ -9,7 +9,7 @@ import DocNotificationBell from './DocNotificationBell'
 import GridPattern from './GridPattern'
 import { userInitials } from '../lib/auth'
 import { useAuth } from '../contexts/AuthContext'
-import { canAccess, homePath, isAdminUser, rolesOf } from '../lib/roles'
+import { accessNotice, canAccess, homePath, isAdminUser, roleLabel as labelForRole } from '../lib/permissions'
 
 const navigationItems = [
   ['/jobs', 'Jobs'],
@@ -101,9 +101,10 @@ export default function Shell({ children }) {
     }
   }
   const active = (path) => location.pathname.startsWith(path)
-  // Only the sections the user's roles allow (handled here for now; an endpoint will decide this later).
+  // Only the pages the user's permissions allow, with the same rule as the routes (lib/permissions).
   const navItems = navigationItems.filter(([path]) => canAccess(user, path))
-  const roleLabel = isAdminUser(user) ? 'Admin' : rolesOf(user).join(', ') || 'All sections'
+  const roleLabel = labelForRole(user)
+  const notice = accessNotice(user)
   return <div className="relative isolate min-h-[100dvh] overflow-x-clip bg-[var(--paper)]">
     <GridPattern
       width={72}
@@ -136,6 +137,7 @@ export default function Shell({ children }) {
               <button onClick={() => { navigate('/profile'); setProfileOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold transition-colors duration-300 hover:bg-black/[.04]"><UserCircle size={18} weight="light" />View profile<CaretDown size={12} className="ml-auto -rotate-90" /></button>
               <button onClick={() => { navigate('/activity'); setProfileOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold transition-colors duration-300 hover:bg-black/[.04]"><Clock size={18} weight="light" />Activity<CaretDown size={12} className="ml-auto -rotate-90" /></button>
               <button onClick={() => { navigate('/preferences'); setProfileOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold transition-colors duration-300 hover:bg-black/[.04]"><SlidersHorizontal size={18} weight="light" />Work preferences<CaretDown size={12} className="ml-auto -rotate-90" /></button>
+              {isAdminUser(user) && <button onClick={() => { navigate('/admin/permissions'); setProfileOpen(false) }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold transition-colors duration-300 hover:bg-black/[.04]"><ShieldCheck size={18} weight="light" />Admin panel<CaretDown size={12} className="ml-auto -rotate-90" /></button>}
               <button onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-[var(--danger)] transition-colors duration-300 hover:bg-[#f5d6cf]/50"><SignOut size={18} weight="light" />Log out</button>
             </div></div>}
           </div>
@@ -162,10 +164,17 @@ export default function Shell({ children }) {
           <Link data-mobile-nav to="/profile" onClick={(event) => navigateFromMobile(event, '/profile')} className="flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-semibold hover:bg-[var(--paper)]"><UserCircle size={18} />View profile</Link>
           <Link data-mobile-nav to="/activity" onClick={(event) => navigateFromMobile(event, '/activity')} className="flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-semibold hover:bg-[var(--paper)]"><Clock size={18} />Activity</Link>
           <Link data-mobile-nav to="/preferences" onClick={(event) => navigateFromMobile(event, '/preferences')} className="flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-semibold hover:bg-[var(--paper)]"><SlidersHorizontal size={18} />Work preferences</Link>
+          {isAdminUser(user) && <Link data-mobile-nav to="/admin/permissions" onClick={(event) => navigateFromMobile(event, '/admin/permissions')} className="flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-semibold hover:bg-[var(--paper)]"><ShieldCheck size={18} />Admin panel</Link>}
           <button data-mobile-nav type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-semibold text-[var(--danger)] hover:bg-[#f5d6cf]/50"><SignOut size={18} />Log out</button>
         </div>
       </aside>
     </div>
+    {notice && <div className="relative z-10 mx-auto mt-3 max-w-[1500px] px-3 md:px-6">
+      <p role="status" className="flex items-start gap-2 rounded-2xl bg-[var(--warn-bg)] px-4 py-3 text-xs font-semibold text-[var(--warn)] ring-1 ring-[var(--warn)]/20">
+        <WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" />
+        {notice === 'unavailable' ? 'Some modules are unavailable right now. Try again shortly.' : 'You don’t have access to any modules yet. Ask an admin for access.'}
+      </p>
+    </div>}
     <div className="relative z-10">{children}</div>
   </div>
 }

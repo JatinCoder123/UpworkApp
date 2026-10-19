@@ -8,7 +8,25 @@ export const SMART_GATEWAY_URL = import.meta.env?.VITE_SMART_GATEWAY_URL || `${C
 export const TECH_CONTENT_DOCX_URL = import.meta.env?.VITE_TECH_CONTENT_DOCX_URL || `${CRM_BASE_URL}/index.php?entryPoint=TechContentDocx`;
 export const DOWNLOAD_URL = import.meta.env?.VITE_DOWNLOAD_URL || `${CRM_BASE_URL}/index.php?entryPoint=download`;
 export const VIEW_DOC_URL = import.meta.env?.VITE_VIEW_DOC_URL || `${CRM_BASE_URL}/index.php?entryPoint=viewdoc`;
+export const MCP_CRM_BASE_URL = (import.meta.env?.VITE_MCP_CRM_BASE_URL || "https://crm.outrightsystems.org").replace(/\/$/, "");
+export const MCP_SMART_GATEWAY_URL = import.meta.env?.VITE_MCP_SMART_GATEWAY_URL || `${MCP_CRM_BASE_URL}/index.php?entryPoint=smart_gateway`;
+export const MCP_AGENT_URL = import.meta.env?.VITE_MCP_AGENT_URL || `${MCP_CRM_BASE_URL}/index.php?entryPoint=mcp`;
 
+export const getMcpAgentUrl = () => {
+  if (import.meta.env.DEV && typeof window !== "undefined" && window.location.origin.includes("localhost")) {
+    return "/mcp-proxy/index.php?entryPoint=mcp";
+  }
+  return MCP_AGENT_URL;
+};
+
+export const getMcpSmartGatewayUrl = () => {
+  if (import.meta.env.DEV && typeof window !== "undefined" && window.location.origin.includes("localhost")) {
+    return "/mcp-proxy/index.php?entryPoint=smart_gateway";
+  }
+  return MCP_SMART_GATEWAY_URL;
+};
+
+export const CREDENTIALS_MODULE = import.meta.env?.VITE_CREDENTIALS_MODULE || "outr_credentials";
 export const JOBS_MODULE = import.meta.env?.VITE_JOBS_MODULE || "outr_upwork_jobs";
 export const USERS_MODULE = import.meta.env?.VITE_USERS_MODULE || "Users";
 export const SKILLS_MODULE = import.meta.env?.VITE_SKILLS_MODULE || "outr_skills";
@@ -640,18 +658,6 @@ export async function fetchRoles() {
   return asArray(data.records)
     .filter((record) => record?.id && record.deleted !== "1" && asText(record.name).trim())
     .map((record) => ({ id: record.id, name: decodeHtml(asText(record.name).trim()), description: decodeHtml(asText(record.description).trim()) }));
-}
-
-// The user's role from their Users record (the "Role" field, stored as the role id in aclrole_id_c)
-// and their admin flag. A role id that no longer exists counts as no role, so the user can pick again.
-export async function fetchUserRole(crmUserId) {
-  if (!crmUserId) throw createAppError("CRM_USER_MISSING", "Your CRM user could not be found.");
-  const data = await smartGateway({ action: "fetch", module: USERS_MODULE, filters: { id: crmUserId }, page: 1, per_page: 1 });
-  const record = asArray(data.records).find((item) => item?.id === crmUserId);
-  if (!record) throw createAppError("CRM_USER_NOT_FOUND", "Your CRM user could not be found.");
-  const roleId = asText(record.aclrole_id_c).trim();
-  const role = roleId ? (await fetchRoles()).find((item) => item.id === roleId) || null : null;
-  return { role, isAdmin: flag(record.is_admin) };
 }
 
 // Saves the chosen role in the user's "Role" field, once. The record is read first: a role that is already
@@ -1467,7 +1473,142 @@ export async function fetchSiteContent() {
   return (await fetchAllRecords(SITE_CONTENT_MODULE)).map(mapSiteContent);
 }
 
+export async function mcpSmartGateway(payload, { timeout = 60_000, signal } = {}) {
+  const token = generateToken();
+  const targetUrl = getMcpSmartGatewayUrl();
+  try {
+    const response = await axios.post(targetUrl, payload, {
+      headers: {
+        "Content-Type": "application/json",
+        "X-Api-Token": token,
+      },
+      timeout,
+      signal,
+    });
+    if (!response.data?.success) {
+      throw createAppError("SERVER_ERROR", response.data?.message || response.data?.error || "The request could not be completed");
+    }
+    return response.data;
+  } catch (err) {
+    if (axios.isCancel(err)) throw createAppError("ABORTED", "Request cancelled");
+    const status = err?.response?.status;
+    const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || "The request could not be completed";
+    throw createAppError(status === 401 || status === 403 ? "UNAUTHORIZED" : "SERVER_ERROR", msg, { status });
+  }
+}
+
+export async function fetchCredentials({ page = 1, perPage = 100, filters = {} } = {}) {
+  const data = await mcpSmartGateway({
+    action: "fetch",
+    module: CREDENTIALS_MODULE,
+    page,
+    per_page: perPage,
+    filters,
+    order_by: "date_entered",
+    order_dir: "DESC",
+  });
+  const records = asArray(data?.records).filter((r) => r && r.deleted !== "1").map((r) => ({
+    id: r.id,
+    name: decodeHtml(r.name || ""),
+    status: asText(r.status || "Active"),
+    apiType: asText(r.api_type || "custom"),
+    description: decodeHtml(r.description || ""),
+    productionFirstToken: r.production_first_token || "",
+    productionSecondToken: r.production_second_token || "",
+    productionEndpoint: r.production_endpoint || "",
+    devFirstToken: r.dev_first_token || "",
+    devSecondToken: r.dev_second_token || "",
+    devEndpoint: r.dev_endpoint || "",
+    dateEntered: r.date_entered_time_ago || r.date_entered_uni_format || r.date_entered || "",
+    dateModified: r.date_modified_time_ago || r.date_modified_uni_format || r.date_modified || "",
+    raw: r,
+  }));
+  return {
+    records,
+    total: Number(data?.total) || records.length,
+    page: Number(data?.page) || page,
+    totalPages: Number(data?.total_pages) || 1,
+  };
+}
+
+export async function createCredential(data) {
+  const name = String(data?.name || "").trim();
+  if (!name) throw createAppError("NAME_REQUIRED", "Credential name is required");
+  const payload = {
+    name,
+    api_type: data.apiType || data.api_type || "custom",
+    status: data.status || "Active",
+    description: data.description || "",
+    production_first_token: data.productionFirstToken || data.production_first_token || data.token || "",
+    production_second_token: data.productionSecondToken || data.production_second_token || "",
+    production_endpoint: data.productionEndpoint || data.production_endpoint || data.endpoint || "",
+    dev_first_token: data.devFirstToken || data.dev_first_token || "",
+    dev_second_token: data.devSecondToken || data.dev_second_token || "",
+    dev_endpoint: data.devEndpoint || data.dev_endpoint || "",
+  };
+  return mcpSmartGateway({
+    action: "create",
+    module: CREDENTIALS_MODULE,
+    data: payload,
+  });
+}
+
+export async function deleteCredential(id) {
+  if (!id) throw createAppError("ID_REQUIRED", "Credential ID is required");
+  return mcpSmartGateway({
+    action: "delete",
+    module: CREDENTIALS_MODULE,
+    id,
+  });
+}
+
+/*
+ * One step of the CRM MCP agent (the same endpoint the CRM's own mcp_ui page uses).
+ * Body: { message, user } to start, then { job_id, user } while the reply has `has_more`.
+ * Reply: { success, message, job_id, status, has_more, tool_count, actions: [{ step, action, module, id, status, detail }] }.
+ * The agent does not need a key. `agentKey` is only sent when a real agent key is given; never pass an API
+ * credential's token here (the agent ignores it, and it would only expose the secret).
+ * CORS: the endpoint allows only the Content-Type and X-Agent-Key headers.
+ */
+export async function runMcpAgentStep(body, { agentKey, signal } = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (agentKey) headers["X-Agent-Key"] = agentKey;
+
+  const send = (url) => fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
+  const primaryUrl = getMcpAgentUrl();
+  let response;
+  try {
+    response = await send(primaryUrl);
+  } catch (err) {
+    if (err.name === "AbortError") throw err;
+    // Local dev proxy unavailable: try the CRM directly.
+    if (primaryUrl === MCP_AGENT_URL) throw createAppError("NETWORK_ERROR", "Unable to reach the agent server. Please check your connection.");
+    try {
+      response = await send(MCP_AGENT_URL);
+    } catch (directErr) {
+      if (directErr.name === "AbortError") throw directErr;
+      throw createAppError("NETWORK_ERROR", "Unable to reach the agent server. Please check your connection.");
+    }
+  }
+
+  const raw = await response.text();
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw createAppError("PARSE_ERROR", `The agent server did not answer with JSON (HTTP ${response.status}): ${raw.trim().slice(0, 150) || "empty response"}`, { status: response.status });
+  }
+  if (!response.ok || data?.success === false) {
+    throw createAppError("AGENT_ERROR", data?.message || data?.error || `The agent server answered HTTP ${response.status}.`, { status: response.status, data, jobId: data?.job_id });
+  }
+  return data;
+}
+
 export const api = {
+  getCredentials: fetchCredentials,
+  createCredential,
+  deleteCredential,
+  runMcpAgentStep,
   getJobs: (params) => fetchJobs(params),
   getJobsPage: (params) => fetchJobsPage(params),
   getJobStats: (params) => fetchJobStats(params),

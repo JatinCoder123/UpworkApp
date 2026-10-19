@@ -4,6 +4,7 @@ import Shell from '../components/Shell'
 import ThemeToggle from '../components/ThemeToggle'
 import { Mark, primaryButton } from '../components/ui'
 import { useAuth } from '../contexts/AuthContext'
+import { canAccess, homePath, roleLabel as labelForRole } from '../lib/permissions'
 
 function RobotIllustration({ className = 'size-72' }) {
   return (
@@ -112,7 +113,11 @@ function normalizeErrorType({ type, stateType, error }) {
   if (['server-error', '500', 'gateway-error'].includes(raw)) {
     return 'server-error'
   }
-  if (['unauthorized', '401', '403', 'session-expired', 'forbidden'].includes(raw)) {
+  // 403: signed in, but this section is not part of the user's role. Not a session problem.
+  if (['forbidden', '403', 'no-access'].includes(raw)) {
+    return 'forbidden'
+  }
+  if (['unauthorized', '401', 'session-expired'].includes(raw)) {
     return 'unauthorized'
   }
 
@@ -123,7 +128,7 @@ function normalizeErrorType({ type, stateType, error }) {
   return '404'
 }
 
-function getErrorPreset(errorType, currentPath) {
+function getErrorPreset(errorType, currentPath, roleLabel) {
   const urlCode = (
     <code className="break-all rounded-md bg-black/[.06] dark:bg-white/10 px-2 py-0.5 font-mono text-xs font-bold text-[var(--ink)]">
       {currentPath}
@@ -201,6 +206,20 @@ function getErrorPreset(errorType, currentPath) {
         backLabel: 'Back to AI News',
         canRetry: true,
       }
+    case 'forbidden':
+      return {
+        code: '403.',
+        heading: 'No access to this section.',
+        description: (
+          <>
+            You don’t have access to {urlCode}{roleLabel ? <> as <span className="font-semibold text-[var(--ink)]">{roleLabel}</span></> : null}.{' '}
+            <span className="font-semibold text-[var(--ink)]">Ask an admin to give you access.</span>
+          </>
+        ),
+        backTo: '',
+        backLabel: 'Back to your workspace',
+        canRetry: false,
+      }
     case 'unauthorized':
       return {
         code: '401.',
@@ -241,10 +260,14 @@ export default function NotFound({
   backTo,
   backLabel,
 }) {
-  const { status } = useAuth()
+  const { status, user } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const isAuthenticated = status === 'authenticated'
+  // Links only ever point at sections the user's role can open; otherwise to their own workspace.
+  const home = isAuthenticated ? homePath(user) : '/login'
+  const allowed = (path) => isAuthenticated && canAccess(user, path)
+  const roleLabel = isAuthenticated ? labelForRole(user) : ''
 
   const currentPath = location.state?.fromPath || (location.pathname + (location.search || ''))
   const resolvedType = normalizeErrorType({
@@ -252,10 +275,12 @@ export default function NotFound({
     stateType: location.state?.type,
     error: error || location.state?.error,
   })
-  const preset = getErrorPreset(resolvedType, currentPath)
+  const preset = getErrorPreset(resolvedType, currentPath, roleLabel)
 
-  const resolvedBackTo = backTo || preset.backTo
-  const resolvedBackLabel = backLabel || preset.backLabel
+  const wantedBackTo = backTo || preset.backTo
+  const backAllowed = Boolean(wantedBackTo) && allowed(wantedBackTo)
+  const resolvedBackTo = backAllowed ? wantedBackTo : home
+  const resolvedBackLabel = backAllowed ? backLabel || preset.backLabel : 'Back to your workspace'
   const targetBackTo = isAuthenticated && resolvedType !== 'unauthorized' ? resolvedBackTo : '/login'
   const targetBackLabel = isAuthenticated && resolvedType !== 'unauthorized' ? resolvedBackLabel : 'Return to sign in'
 
@@ -265,7 +290,7 @@ export default function NotFound({
         {/* Left: Branding, Heading, URL details & Actions */}
         <div className="max-w-xl space-y-6">
           <Link
-            to={isAuthenticated ? "/tech-news" : "/login"}
+            to={home}
             className="inline-flex items-center gap-2.5 text-base font-bold tracking-tight text-[var(--ink)]"
           >
             <Mark />
@@ -316,7 +341,7 @@ export default function NotFound({
               <span>Go back</span>
             </button>
 
-            {isAuthenticated && targetBackTo !== '/jobs' && (
+            {allowed('/jobs') && targetBackTo !== '/jobs' && (
               <Link
                 to="/jobs"
                 className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink)] ring-1 ring-black/10 dark:ring-white/10 transition-all hover:bg-black/5 dark:hover:bg-white/5 shadow-2xs"
@@ -326,7 +351,7 @@ export default function NotFound({
               </Link>
             )}
 
-            {isAuthenticated && targetBackTo !== '/tech-news' && (
+            {allowed('/tech-news') && targetBackTo !== '/tech-news' && (
               <Link
                 to="/tech-news"
                 className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink)] ring-1 ring-black/10 dark:ring-white/10 transition-all hover:bg-black/5 dark:hover:bg-white/5 shadow-2xs"

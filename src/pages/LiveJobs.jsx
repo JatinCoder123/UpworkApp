@@ -91,7 +91,7 @@ function Stat({ icon: Icon, title, value, note }) {
 }
 
 export default function LiveJobs() {
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const now = useNow(30_000)
@@ -190,7 +190,7 @@ export default function LiveJobs() {
   }, [result])
 
   return <Shell><main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">
-    <Link to="/jobs" className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--muted)] transition-colors hover:text-[var(--ink)]"><span className="grid size-8 place-items-center rounded-full bg-[var(--surface)] ring-1 ring-[var(--line)]"><ArrowLeft size={14} /></span>Jobs feed</Link>
+    {can('Jobs') && <Link to="/jobs" className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--muted)] transition-colors hover:text-[var(--ink)]"><span className="grid size-8 place-items-center rounded-full bg-[var(--surface)] ring-1 ring-[var(--line)]"><ArrowLeft size={14} /></span>Jobs feed</Link>}
 
     <section className="mt-5 rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
       <div className="live-hero rounded-[calc(2rem-.375rem)] p-5 sm:p-8">

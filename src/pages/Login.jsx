@@ -6,7 +6,7 @@ import { Mark, primaryButton } from "../components/ui";
 import ThemeToggle from "../components/ThemeToggle";
 import GridPattern from "../components/GridPattern";
 import { useAuth } from "../contexts/AuthContext";
-import { homePath } from "../lib/roles";
+import { homePath } from "../lib/permissions";
 
 function MicrosoftMark() {
   return (

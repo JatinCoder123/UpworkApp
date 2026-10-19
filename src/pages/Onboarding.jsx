@@ -2,13 +2,12 @@ import { createElement, useEffect, useId, useMemo, useRef, useState } from 'reac
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import gsap from 'gsap'
-import { ArrowRight, Brain, Briefcase, Bug, CaretDown, Check, Code, MagnifyingGlass, PaintBrush, PenNib, SignOut, UserCircle, WarningCircle } from '@phosphor-icons/react'
+import { ArrowRight, Brain, Briefcase, Broadcast, Bug, CaretDown, Check, Code, MagnifyingGlass, MicrosoftTeamsLogo, PaintBrush, PenNib, SignOut, Sparkle, Target, UserCircle, UsersThree, WarningCircle } from '@phosphor-icons/react'
 import { Mark, primaryButton } from '../components/ui'
 import ThemeToggle from '../components/ThemeToggle'
 import GridPattern from '../components/GridPattern'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../services/api'
-import { HIDDEN_ROLES, homePath } from '../lib/roles'
 import { asArray, asText } from '../lib/safe'
 
 const ROLE_ICONS = {
@@ -129,6 +128,54 @@ function RolePicker({ roles, value, onChange, loading, disabled }) {
   </div>
 }
 
+// The brand panel is dark in both themes, so its colours are fixed.
+const glassCard = 'rounded-2xl bg-white/[.05] ring-1 ring-inset ring-white/[.09] backdrop-blur-sm'
+
+// How the portal works, in three steps a non-technical reader can follow; each has a small real-looking example.
+const HOW_IT_WORKS = [
+  {
+    icon: Broadcast,
+    title: 'Collects',
+    text: 'New Upwork jobs and tech news, around the clock.',
+    example: <><span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#c8e875] opacity-70" /><span className="relative size-1.5 rounded-full bg-[#c8e875]" /></span>12 new jobs this hour</>,
+  },
+  {
+    icon: Sparkle,
+    title: 'AI does the groundwork',
+    text: 'Scores every job, writes cover letters and drafts site content.',
+    example: <><Target size={11} weight="bold" />72% match · cover letter ready</>,
+  },
+  {
+    icon: UsersThree,
+    title: 'Your team acts',
+    text: 'Apply, publish and share in Microsoft Teams, from one place.',
+    example: <><MicrosoftTeamsLogo size={11} weight="fill" />Shared with Jatin</>,
+  },
+]
+
+const WORKSPACES = ['Jobs', 'Live Jobs', 'AI News', 'Site Content', 'SEO', 'Domain', 'Video', 'Social', 'Email to Blog', 'WordPress', 'AppScript', 'LLM', 'Cloud', 'API Playground']
+
+// Three connected steps; a lime dot travels down the line like data moving through the portal.
+function HowItWorks() {
+  return <div className="relative">
+    <span aria-hidden="true" className="absolute bottom-7 left-[1.375rem] top-7 w-px bg-gradient-to-b from-[#c8e875]/50 via-white/15 to-[#c8e875]/50" />
+    <span aria-hidden="true" data-flow className="absolute left-[1.1rem] top-7 size-[.55rem] rounded-full bg-[#c8e875] shadow-[0_0_14px_rgba(200,232,117,.8)]" />
+    <ol className="relative space-y-2.5">
+      {HOW_IT_WORKS.map(({ icon: Icon, title, text, example }, index) => <li key={title} className="flex items-start gap-4">
+        <span className="relative z-10 grid size-11 shrink-0 place-items-center rounded-xl bg-[#1d281f] text-[#c8e875] ring-1 ring-inset ring-[#c8e875]/30 shadow-[0_0_18px_rgba(200,232,117,.12)]">
+          <Icon size={19} weight="duotone" />
+        </span>
+        <div className={`${glassCard} min-w-0 flex-1 px-4 py-3`}>
+          <p className="flex items-center gap-2 text-sm font-semibold text-white"><span className="font-mono text-[10px] font-bold text-[#c8e875]">0{index + 1}</span>{title}</p>
+          <p className="mt-0.5 text-[12.5px] leading-5 text-white/60">{text}</p>
+          {/* Example badge; dropped on short screens so the whole overview fits without scrolling. */}
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/[.06] px-2.5 py-1 text-[10.5px] font-semibold text-white/80 [@media(max-height:860px)]:hidden">{example}</p>
+        </div>
+      </li>)}
+    </ol>
+  </div>
+}
+
 /** First login with no role: the user picks one, it is saved in their CRM user's Role field, and the app opens their workspace. */
 export default function Onboarding() {
   const { user, chooseRole, logout } = useAuth()
@@ -138,13 +185,17 @@ export default function Onboarding() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const { data, isLoading, isError, error: loadError, refetch } = useQuery({ queryKey: ['crm-roles'], queryFn: api.getRoles, staleTime: 5 * 60_000 })
-  const roles = useMemo(() => asArray(data).filter((role) => !HIDDEN_ROLES.includes(role.name.toLowerCase())), [data])
+  const roles = useMemo(() => asArray(data), [data])
   const selected = roles.find((role) => role.id === roleId)
   const firstName = asText(user?.name).trim().split(/\s+/)[0] || 'there'
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
-    const ctx = gsap.context(() => gsap.fromTo('[data-enter]', { y: 28, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .9, stagger: .09, ease: 'power4.out' }), root)
+    const ctx = gsap.context(() => {
+      gsap.fromTo('[data-enter]', { y: 28, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .9, stagger: .09, ease: 'power4.out' })
+      // A dot travels down the "How it works" line, like data moving through the portal.
+      gsap.fromTo('[data-flow]', { y: 0, autoAlpha: 0 }, { keyframes: [{ autoAlpha: 1, duration: .2 }, { y: () => (root.current?.querySelector('[data-flow]')?.parentElement?.offsetHeight || 260) - 70, duration: 2.6, ease: 'power1.inOut' }, { autoAlpha: 0, duration: .3 }], repeat: -1, repeatDelay: .6, delay: 1 })
+    }, root)
     return () => ctx.revert()
   }, [])
 
@@ -154,8 +205,8 @@ export default function Onboarding() {
     setSaving(true)
     setError('')
     try {
+      // Once the role is saved, the onboarding route sends the user on to the first page their role can open.
       await chooseRole(selected)
-      navigate(homePath({ ...user, roles: [selected.name], rolesChecked: true }), { replace: true })
     } catch (saveError) {
       setError(saveError?.message || 'Your role could not be saved. Please try again.')
       setSaving(false)
@@ -176,12 +227,19 @@ export default function Onboarding() {
         <span className="text-sm font-bold tracking-[-.02em]">Outright Feed Portal</span>
         <span className="text-[10px] font-semibold uppercase tracking-[.18em] text-white/65">Get Your Live Feeds</span>
       </div>
-      <div className="relative my-auto max-w-xl py-16">
-        <h1 data-enter className="text-[clamp(3rem,6vw,5.6rem)] font-medium leading-[.9] tracking-[-.075em]">
-          Welcome,
-          <br />
-          <span className="font-serif italic text-[var(--lime)]">{firstName}</span>
+      <div className="relative my-auto max-w-[34rem] py-6 xl:py-10">
+        <h1 data-enter className="text-[clamp(2.6rem,4.2vw,4.2rem)] font-medium leading-[.9] tracking-[-.075em]">
+          Welcome, <span className="font-serif italic text-[var(--lime)]">{firstName}</span>
         </h1>
+        <p data-enter className="mt-4 text-[15px] leading-7 text-white/60">One portal that finds the work, does the groundwork with AI and keeps your team in sync.</p>
+        <p data-enter className="mt-6 text-[10px] font-bold uppercase tracking-[.2em] text-white/45 xl:mt-8">How it works</p>
+        <div data-enter className="mt-3"><HowItWorks /></div>
+        <div data-enter className="mt-5">
+          <p className="text-[10px] font-bold uppercase tracking-[.2em] text-white/45">{WORKSPACES.length} workspaces, one login</p>
+          <ul className="mt-2.5 flex flex-wrap gap-1.5">
+            {WORKSPACES.map((name) => <li key={name} className="rounded-full bg-white/[.05] px-2.5 py-1 text-[11px] font-medium text-white/70 ring-1 ring-inset ring-white/[.08]">{name}</li>)}
+          </ul>
+        </div>
       </div>
       <div data-enter className="relative flex items-end justify-between border-t border-white/10 pt-5 text-[10px] uppercase tracking-[.16em] text-white/50">
         <span>Built for focused teams</span>

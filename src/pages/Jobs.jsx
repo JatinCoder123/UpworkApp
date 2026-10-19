@@ -62,7 +62,7 @@ function FilterChip({ children, onClear }) {
 }
 
 export default function Jobs() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const now = useNow();
   const reactions = useCrmReactions(user);
   const jobStatus = useJobStatus();
@@ -297,10 +297,11 @@ export default function Jobs() {
                 </div>}
               </form>
               <div className="ml-auto flex shrink-0 items-center gap-2">
-                <button type="button" onClick={() => setLiveSearching(true)} className="inline-flex items-center gap-2 rounded-full bg-[var(--lime)] px-4 py-2.5 text-xs font-bold !text-[#26320b] ring-1 ring-[var(--lime-dark)]/35 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(105,130,32,.22)]">
+                {/* Opens Live Jobs, so only for users with that permission. */}
+                {can("Live Jobs") && <button type="button" onClick={() => setLiveSearching(true)} className="inline-flex items-center gap-2 rounded-full bg-[var(--lime)] px-4 py-2.5 text-xs font-bold !text-[#26320b] ring-1 ring-[var(--lime-dark)]/35 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(105,130,32,.22)]">
                   <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#3f5a12] opacity-60" /><span className="relative inline-flex size-2 rounded-full bg-[#3f5a12]" /></span>
                   <Broadcast size={14} weight="bold" />Live search
-                </button>
+                </button>}
                 <button type="button" onClick={() => setAdding(true)} className={`${primaryButton} !py-2.5 !pl-4 !pr-5`}><Plus size={14} weight="bold" /><span>Add job</span></button>
               </div>
             </div>

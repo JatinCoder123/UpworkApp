@@ -1,22 +1,37 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { consumeLoginIntro, endSession, fetchSessionUser, startMicrosoftLogin } from "../lib/auth";
-import { fetchUserRole, findGatewayUserIdByEmail, saveUserRole } from "../services/api";
-import { isAdminUser, needsRole } from "../lib/roles";
+import { findGatewayUserIdByEmail, saveUserRole } from "../services/api";
+import { fetchUserAccess } from "../services/accessApi";
+import { can as canUser, needsRole, roleOf } from "../lib/permissions";
 
 const AuthContext = createContext(null);
 
-// Adds the user's role (the "Role" field on their CRM Users record) and admin flag.
-// If the CRM cannot be reached, `rolesChecked` stays false and the user sees every section instead of
-// being locked out or sent to onboarding by mistake (see lib/roles).
-async function withRoles(sessionUser) {
-  const sessionAdmin = isAdminUser(sessionUser);
+// How often access is re-read while the app is open (on window focus), so admin changes arrive without a reload.
+const ACCESS_SYNC_MS = 60_000;
+
+/*
+ * The signed-in user with their access: `role`, `isAdmin` and `permissions` (see lib/permissions).
+ * /api/auth/me sends role and isAdmin today; once it also sends `permissions`, that list is used as is.
+ * Until then the CRM is read through the smart gateway (role defaults + extra permissions, or everything for an admin).
+ * If the CRM cannot be reached, `accessChecked` is false: only the pages open to everyone work and a notice is shown,
+ * the user stays signed in and is never sent to onboarding by mistake.
+ */
+async function withAccess(sessionUser) {
+  const sessionPermissions = Array.isArray(sessionUser.permissions) ? sessionUser.permissions : null;
   try {
     const crmUserId = sessionUser.crmUserId || await findGatewayUserIdByEmail(sessionUser.email);
-    const { role, isAdmin } = await fetchUserRole(crmUserId);
-    return { ...sessionUser, crmUserId, roles: role ? [role.name] : [], isAdmin: sessionAdmin || isAdmin, rolesChecked: true };
-  } catch (roleError) {
-    console.warn("Could not load the user's role; showing every section.", roleError);
-    return { ...sessionUser, isAdmin: sessionAdmin, rolesChecked: false };
+    const access = await fetchUserAccess(crmUserId);
+    return {
+      ...sessionUser,
+      crmUserId,
+      role: access.role?.name || null,
+      isAdmin: sessionUser.isAdmin === true || access.isAdmin,
+      permissions: sessionPermissions ?? access.permissions,
+      accessChecked: true,
+    };
+  } catch (accessError) {
+    console.warn("Could not load the user's access from the CRM.", accessError);
+    return { ...sessionUser, role: roleOf(sessionUser), isAdmin: sessionUser.isAdmin === true, permissions: sessionPermissions ?? [], accessChecked: false };
   }
 }
 
@@ -25,14 +40,16 @@ export function AuthProvider({ children }) {
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
   const [showLoginIntro, setShowLoginIntro] = useState(false);
+  const lastSync = useRef(0);
 
   const refresh = useCallback(async (signal) => {
     setStatus("loading");
     setError("");
     try {
       const sessionUser = await fetchSessionUser({ signal });
-      const fullUser = sessionUser ? await withRoles(sessionUser) : null;
+      const fullUser = sessionUser ? await withAccess(sessionUser) : null;
       if (signal?.aborted) return;
+      lastSync.current = Date.now();
       setUser(fullUser);
       setStatus(fullUser ? "authenticated" : "anonymous");
       if (fullUser && consumeLoginIntro()) setShowLoginIntro(true);
@@ -50,6 +67,30 @@ export function AuthProvider({ children }) {
     return () => controller.abort();
   }, [refresh]);
 
+  // Re-reads access in the background (no loading screen). A 401 signs the user out; other errors keep the current access.
+  const syncAccess = useCallback(async ({ force = false } = {}) => {
+    if (!force && Date.now() - lastSync.current < ACCESS_SYNC_MS) return;
+    lastSync.current = Date.now();
+    try {
+      const sessionUser = await fetchSessionUser();
+      if (!sessionUser) {
+        setUser(null);
+        setStatus("anonymous");
+        return;
+      }
+      setUser(await withAccess(sessionUser));
+    } catch {
+      /* keep the current access; the next focus tries again */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (status !== "authenticated") return undefined;
+    const onFocus = () => syncAccess();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [status, syncAccess]);
+
   const logout = useCallback(async () => {
     await endSession();
     setShowLoginIntro(false);
@@ -57,17 +98,30 @@ export function AuthProvider({ children }) {
     setStatus("anonymous");
   }, []);
 
-  // First-login onboarding: saves the chosen role in the user's CRM "Role" field, then applies it straight away.
+  // First-login onboarding: saves the chosen role in the user's CRM "Role" field, then loads the role's permissions.
   // Only for a user who still needs a role; admins and users who already have one cannot set it from the app.
   const chooseRole = useCallback(async (role) => {
     if (!needsRole(user)) throw new Error("Your role is already set. Only an admin can change it.");
     const crmUserId = user?.crmUserId || await findGatewayUserIdByEmail(user?.email);
     const saved = await saveUserRole(crmUserId, role);
-    setUser((current) => (current ? { ...current, crmUserId, roles: [saved.name], rolesChecked: true } : current));
+    const access = await fetchUserAccess(crmUserId).catch(() => null);
+    setUser((current) => (current ? {
+      ...current,
+      crmUserId,
+      role: saved.name,
+      permissions: Array.isArray(current.permissions) && !access ? current.permissions : access?.permissions || [],
+      accessChecked: true,
+    } : current));
   }, [user]);
 
+  // can("Jobs"): whether the signed-in user holds that permission (admins hold every permission).
+  const can = useCallback((permission) => canUser(user, permission), [user]);
+
   const completeLoginIntro = useCallback(() => setShowLoginIntro(false), []);
-  const value = useMemo(() => ({ user, status, error, login: startMicrosoftLogin, logout, refresh, chooseRole, showLoginIntro, completeLoginIntro }), [user, status, error, logout, refresh, chooseRole, showLoginIntro, completeLoginIntro]);
+  const value = useMemo(
+    () => ({ user, status, error, can, login: startMicrosoftLogin, logout, refresh, syncAccess, chooseRole, showLoginIntro, completeLoginIntro }),
+    [user, status, error, can, logout, refresh, syncAccess, chooseRole, showLoginIntro, completeLoginIntro],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

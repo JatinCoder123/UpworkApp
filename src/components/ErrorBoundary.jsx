@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { ArrowClockwise, ArrowUpRight, Bug, CaretDown, WarningCircle } from '@phosphor-icons/react'
 import Shell from './Shell'
 import { Mark, primaryButton } from './ui'
+import { useAuth } from '../contexts/AuthContext'
+import { homePath } from '../lib/permissions'
 
 /**
  * Catches render errors below it and shows `fallback` instead of a blank screen.
@@ -82,7 +84,8 @@ export function AppError({ error, componentStack }) {
         componentStack={componentStack}
         actions={<>
           <button type="button" onClick={() => window.location.reload()} className={primaryButton}><span>Reload page</span><span className="grid size-7 place-items-center rounded-full bg-white/15"><ArrowClockwise size={13} /></span></button>
-          <button type="button" onClick={() => window.location.assign('/jobs')} className={secondaryButton}>Go to Jobs</button>
+          {/* Outside the router and auth: "/" sends a signed-in user on to their own workspace. */}
+          <button type="button" onClick={() => window.location.assign('/')} className={secondaryButton}>Go to my workspace</button>
         </>}
       />
     </div>
@@ -91,17 +94,18 @@ export function AppError({ error, componentStack }) {
 
 /** One page failed; the header and navigation stay usable. */
 export function PageError({ error, componentStack, onReset }) {
+  const { user } = useAuth()
   return <Shell>
     <main className="mx-auto grid w-full max-w-[1200px] place-items-center px-4 pb-24 pt-14 sm:px-6 md:pt-20">
       <ErrorCard
         eyebrow="This page could not load"
         title="Something went wrong here."
-        description="An error stopped this page from rendering. Try again, or head back to the jobs feed while we sort it out."
+        description="An error stopped this page from rendering. Try again, or head back to your workspace while we sort it out."
         error={error}
         componentStack={componentStack}
         actions={<>
           <button type="button" onClick={onReset} className={primaryButton}><span>Try again</span><span className="grid size-7 place-items-center rounded-full bg-white/15"><ArrowClockwise size={13} /></span></button>
-          <Link to="/jobs" onClick={onReset} className={secondaryButton}>Back to Jobs<ArrowUpRight size={13} /></Link>
+          <Link to={homePath(user)} onClick={onReset} className={secondaryButton}>Back to your workspace<ArrowUpRight size={13} /></Link>
         </>}
       />
     </main>

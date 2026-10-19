@@ -14,6 +14,8 @@ import Video from './pages/Video'
 import SiteContent from './pages/SiteContent'
 import Seo from './pages/Seo'
 import Domain from './pages/Domain'
+import ApiPlayground from './pages/ApiPlayground'
+import AdminPanel from './pages/admin/AdminPanel'
 import ComingSoon from './pages/ComingSoon'
 import NotFound from './pages/NotFound'
 import Onboarding from './pages/Onboarding'
@@ -24,18 +26,20 @@ import DocNotificationToast from './components/DocNotificationToast'
 import GlobalErrorToast from './components/GlobalErrorToast'
 import ErrorBoundary, { PageError } from './components/ErrorBoundary'
 import { useAuth } from './contexts/AuthContext'
-import { canAccess, homePath, needsRole } from './lib/roles'
+import { canAccess, homePath, needsRole } from './lib/permissions'
 
 const NoFallback = () => null
 
-// Signed-in users only. A user without a role picks one on the onboarding page first;
-// a page outside the user's roles sends them to their home page.
+// Signed-in users only. A user without a role picks one on the onboarding page first.
+// A page the user has no permission for (or an admin page, for a non-admin) shows a 403 page at the same URL,
+// never a redirect; URLs that do not exist at all fall through to the 404 route. Rules: lib/permissions.
 function ProtectedRoute({ children }) {
   const { status, user } = useAuth()
   const location = useLocation()
   if (status === 'loading') return <SessionLoader />
   if (status !== 'authenticated') return <Navigate to="/login" replace />
-  if (!canAccess(user, location.pathname)) return <Navigate to={homePath(user)} replace />
+  if (needsRole(user)) return <Navigate to="/onboarding" replace />
+  if (!canAccess(user, location.pathname)) return <NotFound type="forbidden" />
   return children
 }
 
@@ -89,9 +93,11 @@ export default function App() {
       <Route path="/cloud" element={<ProtectedRoute><ComingSoon title="Cloud" subtitle="infrastructure incoming." description="The Cloud workspace is being prepared for cloud infrastructure, deployments, and server management." type="cloud" /></ProtectedRoute>} />
       <Route path="/social" element={<ProtectedRoute><ComingSoon title="Social" subtitle="connections incoming." description="The Social workspace is being prepared for social media integrations, channels, and community feeds." type="social" /></ProtectedRoute>} />
       <Route path="/email-to-blog" element={<ProtectedRoute><ComingSoon title="Email to Blog" subtitle="publishing incoming." description="The Email to Blog workspace is being prepared to turn emails into ready-to-publish blog posts." type="email-to-blog" /></ProtectedRoute>} />
-      <Route path="/api-playground" element={<ProtectedRoute><ComingSoon title="API Playground" subtitle="requests incoming." description="The API Playground workspace is being prepared to try out, test and debug API requests." type="api-playground" /></ProtectedRoute>} />
+      <Route path="/api-playground" element={<ProtectedRoute><ApiPlayground /></ProtectedRoute>} />
       <Route path="/technews" element={<Navigate to="/tech-news" replace />} />
       <Route path="/news" element={<Navigate to="/tech-news" replace />} />
+      <Route path="/admin" element={<Navigate to="/admin/permissions" replace />} />
+      <Route path="/admin/permissions" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/preferences" element={<ProtectedRoute><Preferences /></ProtectedRoute>} />
       <Route path="/404" element={<NotFound />} />

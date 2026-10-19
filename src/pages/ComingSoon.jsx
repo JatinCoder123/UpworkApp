@@ -2,12 +2,15 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, BracketsCurly, Brain, Cloud, Code, EnvelopeSimple, Globe, MagnifyingGlass, Newspaper, ShareNetwork, Sparkle, VideoCamera } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import { primaryButton } from '../components/ui'
+import { useAuth } from '../contexts/AuthContext'
+import { canAccess, homePath } from '../lib/permissions'
 
 export default function ComingSoon({
   title = 'Daily News',
   description = 'This module is currently being prepared and will be available in an upcoming release.',
   type = 'daily-news',
 }) {
+  const { user } = useAuth()
   const icons = {
     domain: Globe,
     video: VideoCamera,
@@ -45,19 +48,20 @@ export default function ComingSoon({
             </p>
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link to="/jobs" className={primaryButton}>
-                <span>Explore Jobs</span>
+              {/* Only sections the user's role can open; otherwise their own workspace. */}
+              <Link to={canAccess(user, '/jobs') ? '/jobs' : homePath(user)} className={primaryButton}>
+                <span>{canAccess(user, '/jobs') ? 'Explore Jobs' : 'Back to your workspace'}</span>
                 <span className="grid size-7 place-items-center rounded-full bg-white/15">
                   <ArrowRight size={13} />
                 </span>
               </Link>
 
-              <Link
+              {canAccess(user, '/tech-news') && <Link
                 to="/tech-news"
                 className="inline-flex items-center gap-2 rounded-full bg-[var(--paper)] px-5 py-2.5 text-xs font-semibold text-[var(--ink)] ring-1 ring-black/10 dark:ring-white/10 transition-all hover:bg-black/5 dark:hover:bg-white/5"
               >
                 <span>Go to AI News</span>
-              </Link>
+              </Link>}
             </div>
           </div>
         </section>
