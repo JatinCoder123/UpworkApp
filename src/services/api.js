@@ -16,6 +16,7 @@ export const TECH_NEWS_MODULE = import.meta.env?.VITE_TECH_NEWS_MODULE || "daily
 export const VIDEO_FEEDS_MODULE = import.meta.env?.VITE_VIDEO_FEEDS_MODULE || "video_feeds";
 export const JOB_ACTIVITY_MODULE = import.meta.env?.VITE_JOB_ACTIVITY_MODULE || "outr_job_activity";
 export const SITE_CONTENT_MODULE = import.meta.env?.VITE_SITE_CONTENT_MODULE || "sites_tech_content";
+export const ROLES_MODULE = import.meta.env?.VITE_ROLES_MODULE || "ACLRoles";
 export const DEFAULT_TECH_NEWS_PER_PAGE = Number(import.meta.env?.VITE_TECH_NEWS_PER_PAGE) || 10;
 
 export function getDocumentDownloadUrl(noteId) {
@@ -83,10 +84,10 @@ export async function smartGateway(payload, { timeout, signal } = {}) {
     if (status >= 500) {
       throw createAppError("SERVER_ERROR", "The server encountered an internal error. Please try again shortly.", { status });
     }
-    throw createAppError("SERVER_ERROR", err?.response?.data?.message || err?.message || "The request could not be completed", { status });
+    throw createAppError("SERVER_ERROR", err?.response?.data?.message || err?.response?.data?.error || err?.message || "The request could not be completed", { status });
   }
   if (!response.data?.success) {
-    const message = response.data?.message || "The request could not be completed";
+    const message = response.data?.message || response.data?.error || "The request could not be completed";
     if (/unauthorized|forbidden|invalid token|expired session/i.test(message)) {
       throw createAppError("UNAUTHORIZED", message);
     }
@@ -627,6 +628,47 @@ export async function resolveCrmUser(user) {
     if (emailKey) crmUserResolutionCache.delete(emailKey);
     return { userName: user?.name || user?.email?.split("@")[0] || "User", userId: "" };
   }
+}
+
+// ----------------------------------------------------
+// User roles (CRM ACL roles; a user's role is saved in the "Role" field of their Users record)
+// ----------------------------------------------------
+
+// Every CRM role, A-Z, as { id, name, description }.
+export async function fetchRoles() {
+  const data = await smartGateway({ action: "fetch", module: ROLES_MODULE, order_by: "name", order_dir: "ASC", page: 1, per_page: 100 });
+  return asArray(data.records)
+    .filter((record) => record?.id && record.deleted !== "1" && asText(record.name).trim())
+    .map((record) => ({ id: record.id, name: decodeHtml(asText(record.name).trim()), description: decodeHtml(asText(record.description).trim()) }));
+}
+
+// The user's role from their Users record (the "Role" field, stored as the role id in aclrole_id_c)
+// and their admin flag. A role id that no longer exists counts as no role, so the user can pick again.
+export async function fetchUserRole(crmUserId) {
+  if (!crmUserId) throw createAppError("CRM_USER_MISSING", "Your CRM user could not be found.");
+  const data = await smartGateway({ action: "fetch", module: USERS_MODULE, filters: { id: crmUserId }, page: 1, per_page: 1 });
+  const record = asArray(data.records).find((item) => item?.id === crmUserId);
+  if (!record) throw createAppError("CRM_USER_NOT_FOUND", "Your CRM user could not be found.");
+  const roleId = asText(record.aclrole_id_c).trim();
+  const role = roleId ? (await fetchRoles()).find((item) => item.id === roleId) || null : null;
+  return { role, isAdmin: flag(record.is_admin) };
+}
+
+// Saves the chosen role in the user's "Role" field, once. The record is read first: a role that is already
+// saved is never overwritten from the app (only an admin can change it in the CRM). Then it is read back to confirm.
+export async function saveUserRole(crmUserId, role) {
+  if (!crmUserId || !role?.id) throw createAppError("ROLE_INVALID", "Choose a role to continue.");
+  const before = await smartGateway({ action: "fetch", module: USERS_MODULE, filters: { id: crmUserId }, page: 1, per_page: 1 });
+  const record = asArray(before.records).find((item) => item?.id === crmUserId);
+  if (!record) throw createAppError("CRM_USER_NOT_FOUND", "Your CRM user could not be found.");
+  const existing = asText(record.aclrole_id_c).trim();
+  if (existing === role.id) return role;
+  if (existing) throw createAppError("ROLE_ALREADY_SET", "A role is already saved for your account. Only an admin can change it.");
+  await smartGateway({ action: "update", module: USERS_MODULE, id: crmUserId, data: { aclrole_id_c: role.id } });
+  const check = await smartGateway({ action: "fetch", module: USERS_MODULE, filters: { id: crmUserId }, page: 1, per_page: 1 });
+  const saved = asText(asArray(check.records).find((item) => item?.id === crmUserId)?.aclrole_id_c).trim();
+  if (saved !== role.id) throw createAppError("ROLE_NOT_SAVED", "Your role could not be saved. Please try again or ask an admin.");
+  return role;
 }
 
 // Activity on a CRM job, newest first, each with the name of the user who did it.
@@ -1445,6 +1487,7 @@ export const api = {
   getNote: (id) => fetchNote(id),
   generateTechContentDoc: (contentId, options) => generateTechContentDoc(contentId, options),
   resolveCrmUser: (user) => resolveCrmUser(user),
+  getRoles: () => fetchRoles(),
   getSkills: (params) => fetchSkills(params),
   createSkill,
   updateSkill,

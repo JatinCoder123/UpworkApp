@@ -9,6 +9,7 @@ import DocNotificationBell from './DocNotificationBell'
 import GridPattern from './GridPattern'
 import { userInitials } from '../lib/auth'
 import { useAuth } from '../contexts/AuthContext'
+import { canAccess, homePath, isAdminUser, rolesOf } from '../lib/roles'
 
 const navigationItems = [
   ['/jobs', 'Jobs'],
@@ -23,7 +24,7 @@ const navigationItems = [
   ['/cloud', 'Cloud'],
   ['/social', 'Social'],
   ['/email-to-blog', 'Email to Blog'],
-  ['/guest-post', 'Guest Post'],
+  ['/api-playground', 'API Playground'],
 ]
 
 export default function Shell({ children }) {
@@ -100,6 +101,9 @@ export default function Shell({ children }) {
     }
   }
   const active = (path) => location.pathname.startsWith(path)
+  // Only the sections the user's roles allow (handled here for now; an endpoint will decide this later).
+  const navItems = navigationItems.filter(([path]) => canAccess(user, path))
+  const roleLabel = isAdminUser(user) ? 'Admin' : rolesOf(user).join(', ') || 'All sections'
   return <div className="relative isolate min-h-[100dvh] overflow-x-clip bg-[var(--paper)]">
     <GridPattern
       width={72}
@@ -109,17 +113,17 @@ export default function Shell({ children }) {
     />
     <header className="sticky top-0 z-30 h-[var(--shell-h)] bg-[var(--paper)] px-3 pt-3 md:px-6 md:pt-5">
       <div className="mx-auto flex max-w-[1500px] items-center justify-between rounded-full bg-[var(--surface)]/90 px-3 py-2 ring-1 ring-black/5 shadow-[0_18px_60px_rgba(30,32,25,.08)] backdrop-blur-xl">
-        <Link to="/jobs" className="flex items-center gap-2.5 rounded-full pr-3 text-sm font-bold tracking-[-.02em]"><Mark /><span className="hidden sm:inline">Outright Feed Portal</span></Link>
+        <Link to={homePath(user)} className="flex items-center gap-2.5 rounded-full pr-3 text-sm font-bold tracking-[-.02em]"><Mark /><span className="hidden sm:inline">Outright Feed Portal</span></Link>
         <nav className="hidden items-center gap-0.5 rounded-full bg-[var(--ink)]/[.045] p-1 xl:flex">
-          {navigationItems.map(([path, label]) => <Link key={path} to={path} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active(path) ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{label}</Link>)}
+          {navItems.map(([path, label]) => <Link key={path} to={path} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active(path) ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{label}</Link>)}
         </nav>
         <div className="flex items-center gap-2">
-          <div className="group relative" tabIndex={0} aria-label="Current CRM: Sales">
+          <div className="group relative" tabIndex={0} aria-label={`Role: ${roleLabel}`}>
             <span className="grid size-9 place-items-center rounded-full bg-[var(--lime)]/25 text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/30 transition-all duration-300 group-hover:bg-[var(--lime)]/45 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-[var(--accent)]">
               <ChartLineUp size={17} weight="duotone" />
             </span>
             <span role="tooltip" className="pointer-events-none absolute right-1/2 top-12 z-40 translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg bg-[var(--ink)] px-3 py-1.5 text-[10px] font-bold text-white opacity-0 shadow-[0_10px_30px_rgba(30,32,25,.18)] transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus:translate-y-0 group-focus:opacity-100">
-              Sales
+              {roleLabel}
             </span>
           </div>
           <ThemeToggle />
@@ -147,11 +151,11 @@ export default function Shell({ children }) {
           <button type="button" onClick={() => setMobileOpen(false)} aria-label="Close navigation menu" className={`${iconButton} size-10`}><X size={17} weight="bold" /></button>
         </div>
         <div data-mobile-nav className="mt-8 flex items-center justify-between rounded-2xl bg-[var(--paper)] p-3 ring-1 ring-[var(--line)]/60">
-          <div><p className="text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">Current CRM</p><p className="mt-1 text-sm font-semibold">Sales</p></div>
+          <div><p className="text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">Role</p><p className="mt-1 text-sm font-semibold">{roleLabel}</p></div>
           <span className="grid size-10 place-items-center rounded-xl bg-[var(--lime)]/35 text-[var(--accent-strong)]"><ChartLineUp size={18} weight="duotone" /></span>
         </div>
         <nav className="mt-7 grid gap-1" aria-label="Mobile navigation links">
-          {navigationItems.map(([path, label]) => <Link data-mobile-nav key={path} to={path} onClick={(event) => navigateFromMobile(event, path)} className={`group flex items-center justify-between rounded-2xl px-4 py-4 text-base font-semibold transition-colors ${active(path) ? 'bg-[var(--lime)] !text-[#26320b]' : 'hover:bg-[var(--paper)]'}`}><span>{label}</span><ArrowLink /></Link>)}
+          {navItems.map(([path, label]) => <Link data-mobile-nav key={path} to={path} onClick={(event) => navigateFromMobile(event, path)} className={`group flex items-center justify-between rounded-2xl px-4 py-4 text-base font-semibold transition-colors ${active(path) ? 'bg-[var(--lime)] !text-[#26320b]' : 'hover:bg-[var(--paper)]'}`}><span>{label}</span><ArrowLink /></Link>)}
         </nav>
         <div className="mt-auto border-t border-[var(--line)] pt-5">
           <div data-mobile-nav className="mb-3 flex items-center gap-3 px-2"><div className="grid size-10 place-items-center rounded-xl bg-[var(--ink)] text-xs font-bold text-white">{userInitials(user?.name)}</div><div className="min-w-0"><p className="truncate text-sm font-bold">{user?.name}</p><p className="truncate text-[10px] text-[var(--muted)]">{user?.email}</p></div></div>

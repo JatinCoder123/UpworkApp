@@ -142,6 +142,36 @@ export function rememberSearch(email, term, module = 'job') {
   return next
 }
 
+/* People a job was shared with in Teams, newest first, per signed-in user, as { email, name }. */
+
+const recipientKey = (email) => `outright-share-recipients:${String(email || 'guest').toLowerCase()}`
+const MAX_RECENT_RECIPIENTS = 8
+
+export function loadRecentRecipients(email) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(recipientKey(email)) || '[]')
+    return asArray(stored)
+      .filter((person) => /@/.test(asText(person?.email)))
+      .map((person) => ({ email: asText(person.email), name: asText(person.name) || asText(person.email) }))
+      .slice(0, MAX_RECENT_RECIPIENTS)
+  } catch { return [] }
+}
+
+// Puts `people` first, drops older copies of them, and keeps the newest few.
+export function rememberRecipients(email, people) {
+  const added = asArray(people).filter((person) => /@/.test(asText(person?.email)))
+  const keys = new Set(added.map((person) => person.email.toLowerCase()))
+  const next = [...added, ...loadRecentRecipients(email).filter((person) => !keys.has(person.email.toLowerCase()))].slice(0, MAX_RECENT_RECIPIENTS)
+  try { localStorage.setItem(recipientKey(email), JSON.stringify(next)) } catch { /* ignore */ }
+  return next
+}
+
+export function forgetRecipient(email, address) {
+  const next = loadRecentRecipients(email).filter((person) => person.email.toLowerCase() !== asText(address).toLowerCase())
+  try { localStorage.setItem(recipientKey(email), JSON.stringify(next)) } catch { /* ignore */ }
+  return next
+}
+
 export function forgetSearch(email, term, module = 'job') {
   const next = loadRecentSearches(email, module).filter((item) => item !== term)
   try { localStorage.setItem(searchKey(email, module), JSON.stringify(next)) } catch { /* ignore */ }

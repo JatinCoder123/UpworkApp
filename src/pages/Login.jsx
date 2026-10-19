@@ -6,6 +6,7 @@ import { Mark, primaryButton } from "../components/ui";
 import ThemeToggle from "../components/ThemeToggle";
 import GridPattern from "../components/GridPattern";
 import { useAuth } from "../contexts/AuthContext";
+import { homePath } from "../lib/roles";
 
 function MicrosoftMark() {
   return (
@@ -30,7 +31,7 @@ const highlights = [
 
 export default function Login() {
   const root = useRef(null);
-  const { status, error, login } = useAuth();
+  const { status, error, login, user } = useAuth();
 
   useEffect(() => {
     const ctx = gsap.context(
@@ -51,7 +52,7 @@ export default function Login() {
     return () => ctx.revert();
   }, []);
 
-  if (status === "authenticated") return <Navigate to="/jobs" replace />;
+  if (status === "authenticated") return <Navigate to={homePath(user)} replace />;
 
   return (
     <main

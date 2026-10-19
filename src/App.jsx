@@ -16,6 +16,7 @@ import Seo from './pages/Seo'
 import Domain from './pages/Domain'
 import ComingSoon from './pages/ComingSoon'
 import NotFound from './pages/NotFound'
+import Onboarding from './pages/Onboarding'
 import SessionLoader from './components/SessionLoader'
 import LoginIntro from './components/LoginIntro'
 import ScrollToTop from './components/ScrollToTop'
@@ -23,13 +24,27 @@ import DocNotificationToast from './components/DocNotificationToast'
 import GlobalErrorToast from './components/GlobalErrorToast'
 import ErrorBoundary, { PageError } from './components/ErrorBoundary'
 import { useAuth } from './contexts/AuthContext'
+import { canAccess, homePath, needsRole } from './lib/roles'
 
 const NoFallback = () => null
 
+// Signed-in users only. A user without a role picks one on the onboarding page first;
+// a page outside the user's roles sends them to their home page.
 function ProtectedRoute({ children }) {
-  const { status } = useAuth()
+  const { status, user } = useAuth()
+  const location = useLocation()
   if (status === 'loading') return <SessionLoader />
-  return status === 'authenticated' ? children : <Navigate to="/login" replace />
+  if (status !== 'authenticated') return <Navigate to="/login" replace />
+  if (!canAccess(user, location.pathname)) return <Navigate to={homePath(user)} replace />
+  return children
+}
+
+// First-login role picker; a user who already has a role is sent on to their home page.
+function OnboardingRoute() {
+  const { status, user } = useAuth()
+  if (status === 'loading') return <SessionLoader />
+  if (status !== 'authenticated') return <Navigate to="/login" replace />
+  return needsRole(user) ? <Onboarding /> : <Navigate to={homePath(user)} replace />
 }
 
 export default function App() {
@@ -55,6 +70,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/onboarding" element={<OnboardingRoute />} />
       <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
       <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
       <Route path="/live-jobs" element={<ProtectedRoute><LiveJobs /></ProtectedRoute>} />
@@ -73,7 +89,7 @@ export default function App() {
       <Route path="/cloud" element={<ProtectedRoute><ComingSoon title="Cloud" subtitle="infrastructure incoming." description="The Cloud workspace is being prepared for cloud infrastructure, deployments, and server management." type="cloud" /></ProtectedRoute>} />
       <Route path="/social" element={<ProtectedRoute><ComingSoon title="Social" subtitle="connections incoming." description="The Social workspace is being prepared for social media integrations, channels, and community feeds." type="social" /></ProtectedRoute>} />
       <Route path="/email-to-blog" element={<ProtectedRoute><ComingSoon title="Email to Blog" subtitle="publishing incoming." description="The Email to Blog workspace is being prepared to turn emails into ready-to-publish blog posts." type="email-to-blog" /></ProtectedRoute>} />
-      <Route path="/guest-post" element={<ProtectedRoute><ComingSoon title="Guest Post" subtitle="outreach incoming." description="The Guest Post workspace is being prepared to find, pitch and track guest post opportunities." type="guest-post" /></ProtectedRoute>} />
+      <Route path="/api-playground" element={<ProtectedRoute><ComingSoon title="API Playground" subtitle="requests incoming." description="The API Playground workspace is being prepared to try out, test and debug API requests." type="api-playground" /></ProtectedRoute>} />
       <Route path="/technews" element={<Navigate to="/tech-news" replace />} />
       <Route path="/news" element={<Navigate to="/tech-news" replace />} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
@@ -19,6 +20,7 @@ import {
   Key,
   LinkSimple,
   MagnifyingGlass,
+  MicrosoftTeamsLogo,
   Newspaper,
   Quotes,
   Sparkle,
@@ -31,6 +33,7 @@ import LogoLoader from '../components/LogoLoader'
 import HScroll from '../components/HScroll'
 import { Modal, primaryButton, stickyBand } from '../components/ui'
 import CategoryFilterDialog from '../components/CategoryFilterDialog'
+import { ShareDialog } from '../components/ShareJobDialog'
 import { api, getDocumentViewUrl, resolveCrmUser } from '../services/api'
 import {
   subscribeDocStatus,
@@ -50,6 +53,20 @@ import { asArray, asText } from '../lib/safe'
 gsap.registerPlugin(ScrollTrigger)
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+// A link that opens this idea in Site Content (read back through ?item=).
+const ideaLink = (item) => `${window.location.origin}/site-content?item=${encodeURIComponent(item.id)}`
+
+// Starting message for sharing an idea in Teams; the document link is added once one exists.
+const ideaShareMessage = (item, noteId) => [
+  `Content idea for ${item.site}: ${item.headline}`,
+  [item.category, item.importance === 'HURRYUP' && 'Urgent', item.done && 'Done'].filter(Boolean).join(' · '),
+  item.keywords?.primary && `Primary keyword: ${item.keywords.primary}`,
+  noteId && `Document: ${getDocumentViewUrl(noteId)}`,
+  item.publishedUrl && `Published: ${item.publishedUrl}`,
+  ideaLink(item),
+].filter(Boolean).join('\n')
+
 // WordPress login of the sites, where a ready document is published. Override with VITE_PUBLISH_SITE_URL.
 const PUBLISH_SITE_URL = import.meta.env?.VITE_PUBLISH_SITE_URL || 'https://sites.outrightcrm.in/wp-login.php?4dx-one'
 
@@ -166,8 +183,10 @@ export default function SiteContent() {
   const debouncedSearch = useDebounced(searchInput.trim(), 400)
   const [recentSearches, setRecentSearches] = useState(() => loadRecentSearches(user?.email, 'sitecontent'))
   const [searchFocused, setSearchFocused] = useState(false)
-  const [selectedId, setSelectedId] = useState(null)
-  const [mobileOpen, setMobileOpen] = useState(false)
+  // A shared link (?item=<id>) opens that idea; filters start at All, so it is in the list.
+  const [searchParams] = useSearchParams()
+  const [selectedId, setSelectedId] = useState(() => searchParams.get('item'))
+  const [mobileOpen, setMobileOpen] = useState(() => Boolean(searchParams.get('item')))
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
   const desktop = useDesktop()
   const root = useRef(null)
@@ -832,6 +851,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const [copied, setCopied] = useState('')
+  const [sharing, setSharing] = useState(false)
   const [activeNoteId, setActiveNoteId] = useState(item.notesId || '')
   const [isTriggering, setIsTriggering] = useState(false)
   const [triggerError, setTriggerError] = useState('')
@@ -1105,6 +1125,26 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
           {copied === 'headline' ? <Check size={12} weight="bold" /> : <Copy size={12} />}
           {copied === 'headline' ? 'Copied' : 'Copy headline'}
         </button>
+
+        <button
+          type="button"
+          onClick={() => setSharing(true)}
+          className="inline-flex items-center gap-1.5 rounded-full bg-[#4b53bc] px-3.5 py-1.5 text-[11px] font-bold text-white shadow-sm hover:brightness-110 active:scale-95 transition-all"
+        >
+          <MicrosoftTeamsLogo size={13} weight="fill" />
+          Share in Teams
+        </button>
+        {sharing && (
+          <ShareDialog
+            noun="content idea"
+            eyebrow={item.site}
+            title={item.headline}
+            link={ideaLink(item)}
+            text={ideaShareMessage(item, activeNoteId)}
+            subject={`Content idea: ${item.headline}`}
+            onClose={() => setSharing(false)}
+          />
+        )}
 
         {item.sourceUrl && (
           <a
