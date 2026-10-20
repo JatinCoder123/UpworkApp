@@ -14,7 +14,7 @@ import {
 import { subscribeDocStatus } from '../services/docSocket'
 // Importing it also subscribes the notification store first, so it has judged each event before the toast sees it.
 import { isOwnDocEvent } from '../services/docNotifications'
-import { getDocumentViewUrl } from '../services/api'
+import { downloadNoteDocument, getDocumentViewUrl } from '../services/api'
 import { asText } from '../lib/safe'
 
 // Plays a gentle subtle audio chime via Web Audio API on completion
@@ -177,31 +177,17 @@ export default function DocNotificationToast() {
     if (!toast.noteId && !toast.viewUrl) return
     const viewUrl = toast.viewUrl || getDocumentViewUrl(toast.noteId)
     const baseName = (asText(toast.title) || 'document').slice(0, 48).toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    const downloadFilename = `${baseName}.doc`
 
     setDownloadingToastId(toast.id)
-    try {
-      const fetchUrl = import.meta.env?.DEV && toast.noteId
-        ? `/crm-entrypoint/index.php?entryPoint=viewdoc&id=${encodeURIComponent(toast.noteId)}`
-        : viewUrl
-
-      const res = await fetch(fetchUrl)
-      if (res.ok) {
-        const html = await res.text()
-        const blob = new Blob([html], { type: 'application/msword;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = downloadFilename
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+    // The Word file itself, from the CRM (works on the live site too); without a note id only the viewer is left.
+    if (toast.noteId) {
+      try {
+        await downloadNoteDocument(toast.noteId, { filename: `${baseName}.docx` })
         setDownloadingToastId(null)
         return
+      } catch (e) {
+        console.warn('Toast download failed, opening view URL:', e)
       }
-    } catch (e) {
-      console.warn('Toast download fallback:', e)
     }
 
     setDownloadingToastId(null)

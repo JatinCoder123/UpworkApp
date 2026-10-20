@@ -34,7 +34,7 @@ import HScroll from '../components/HScroll'
 import { Modal, primaryButton, stickyBand } from '../components/ui'
 import CategoryFilterDialog from '../components/CategoryFilterDialog'
 import { ShareDialog } from '../components/ShareJobDialog'
-import { api, getDocumentViewUrl, resolveCrmUser } from '../services/api'
+import { api, downloadNoteDocument, getDocumentDownloadUrl, getDocumentViewUrl, resolveCrmUser } from '../services/api'
 import {
   subscribeDocStatus,
   getCachedDocStatus,
@@ -1355,47 +1355,19 @@ function DocSection({
     )
   }
 
-  // Direct Word Document Download Handler
+  // Downloads the generated Word file (.docx) from the CRM; see downloadNoteDocument in services/api.
   const handleDownload = async () => {
     const noteId = activeNoteId || note?.id || item.notesId
-    const viewUrl = note?.viewUrl || getDocumentViewUrl(noteId)
-    const rawFilename = asText(note?.filename) || `${asText(item.headline).slice(0, 48)}.doc`
-    const downloadFilename = rawFilename.endsWith('.docx')
-      ? rawFilename.replace(/\.docx$/, '.doc')
-      : rawFilename.endsWith('.doc')
-      ? rawFilename
-      : `${rawFilename}.doc`
-
     setIsDownloading(true)
     try {
-      // 1. Fetch the formatted document through proxy or direct viewdoc endpoint
-      const fetchUrl = import.meta.env?.DEV
-        ? `/crm-entrypoint/index.php?entryPoint=viewdoc&id=${encodeURIComponent(noteId)}`
-        : viewUrl
-
-      const res = await fetch(fetchUrl)
-      if (res.ok) {
-        const html = await res.text()
-        const blob = new Blob([html], { type: 'application/msword;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = downloadFilename
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-        setIsDownloading(false)
-        return
-      }
-    } catch (e) {
-      console.warn('Direct fetch download notice, falling back to viewer:', e)
+      await downloadNoteDocument(noteId, { filename: asText(note?.filename) || `${asText(item.headline).slice(0, 48)}.docx` })
+    } catch (error) {
+      // Last resort: let the browser fetch the same file directly (it is sent as an attachment, so the page stays).
+      console.warn('Document download failed, trying the direct link:', error)
+      if (noteId) window.open(getDocumentDownloadUrl(noteId), '_blank')
+    } finally {
+      setIsDownloading(false)
     }
-
-    // 2. Fallback: Open formatted document view directly in a new tab
-    // (Never open entryPoint=download which requires SuiteCRM session auth and returns "Not a Valid Entry Point")
-    setIsDownloading(false)
-    window.open(viewUrl, '_blank')
   }
 
   // CASE 2: COMPLETED -> 3 requested actions: View Doc, Download Doc, Regenerate Doc

@@ -10,6 +10,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    // The project lives in OneDrive, which turns node_modules files into placeholders (reparse points) that the
+    // build's resolver treats as links and cannot follow ("failed to resolve import 'react'"). Not following links fixes it.
+    resolve: { preserveSymlinks: true },
     server: {
       proxy: {
         '/crm-entrypoint': {

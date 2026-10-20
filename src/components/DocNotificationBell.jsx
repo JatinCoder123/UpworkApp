@@ -13,7 +13,7 @@ import {
   Check,
 } from '@phosphor-icons/react'
 import { useDocNotifications } from '../services/docNotifications'
-import { getDocumentViewUrl } from '../services/api'
+import { downloadNoteDocument, getDocumentViewUrl } from '../services/api'
 import { iconButton } from './ui'
 
 function formatTimeAgo(timestamp) {
@@ -106,32 +106,18 @@ export default function DocNotificationBell() {
     if (!viewUrl) return
 
     const baseName = (notif.title || 'document').slice(0, 48).toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    const downloadFilename = `${baseName}.doc`
 
     setDownloadingId(notif.id)
-    try {
-      const fetchUrl = import.meta.env?.DEV && notif.noteId
-        ? `/crm-entrypoint/index.php?entryPoint=viewdoc&id=${encodeURIComponent(notif.noteId)}`
-        : viewUrl
-
-      const res = await fetch(fetchUrl)
-      if (res.ok) {
-        const html = await res.text()
-        const blob = new Blob([html], { type: 'application/msword;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = downloadFilename
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+    // The Word file itself, from the CRM (works on the live site too); without a note id only the viewer is left.
+    if (notif.noteId) {
+      try {
+        await downloadNoteDocument(notif.noteId, { filename: `${baseName}.docx` })
         setDownloadingId(null)
         markAsRead(notif.id)
         return
+      } catch (err) {
+        console.warn('Doc download failed, opening view URL:', err)
       }
-    } catch (err) {
-      console.warn('Doc download fallback, opening view URL:', err)
     }
 
     setDownloadingId(null)

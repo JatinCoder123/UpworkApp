@@ -42,6 +42,29 @@ export function getDocumentDownloadUrl(noteId) {
   return `${DOWNLOAD_URL}&type=Notes&id=${encodeURIComponent(noteId)}`;
 }
 
+// Saves a generated document (the Word file on a CRM Note) to the user's computer. The CRM "download" entry point
+// sends the real .docx as an attachment and allows cross-site requests, so this works on the live site as well as on
+// localhost (the "viewdoc" page does not allow other sites to read it, which made Download open the viewer instead).
+export async function downloadNoteDocument(noteId, { filename = "" } = {}) {
+  const url = getDocumentDownloadUrl(noteId);
+  if (!url) throw createAppError("DOC_MISSING", "This document has no file yet.");
+  const response = await fetch(url);
+  const type = response.headers.get("content-type") || "";
+  // An HTML reply is a CRM error page, not the document.
+  if (!response.ok || /text\/html/i.test(type)) throw createAppError("DOC_DOWNLOAD_FAILED", `The document could not be downloaded (${response.status}).`);
+  const disposition = response.headers.get("content-disposition") || "";
+  const headerName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1] || /filename="?([^";]+)"?/i.exec(disposition)?.[1] || "";
+  let name = filename || "document.docx";
+  try { name = decodeURIComponent(headerName) || name; } catch { name = headerName || name; }
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(await response.blob());
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
+}
+
 export function getDocumentViewUrl(noteId) {
   if (!noteId) return "";
   return `${VIEW_DOC_URL}&id=${encodeURIComponent(noteId)}`;
@@ -1583,9 +1606,14 @@ export async function generateTechContentDoc(contentId, options = {}) {
   if (userId) {
     url += `&user_id=${encodeURIComponent(userId)}&assigned_user_id=${encodeURIComponent(userId)}`;
   }
+  // The user also goes in the URL above. On the live site the request goes straight to the CRM, and custom
+  // headers would make the browser ask TechContentDocx for CORS permission first; the CRM refuses (400, no CORS
+  // headers), so the request was never sent and nothing was generated. Without them it is a simple request that
+  // reaches the CRM; its reply may still be unreadable there, which handleGenerateDoc treats as "queued" (the live
+  // socket reports the new document). Through the dev proxy (same site) the headers are kept as before.
   const headers = {};
-  if (userName) headers["X-User-Name"] = userName;
-  if (userId) headers["X-User-Id"] = userId;
+  if (import.meta.env?.DEV && userName) headers["X-User-Name"] = userName;
+  if (import.meta.env?.DEV && userId) headers["X-User-Id"] = userId;
   const response = await fetch(url, { headers });
   // HTTP 202 Accepted is the expected standard response for queued async jobs
   if (!response.ok && response.status !== 202) {
