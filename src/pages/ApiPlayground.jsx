@@ -45,18 +45,13 @@ const CREDENTIAL_PROMPTS = [
   { label: 'Explain recent errors', prompt: 'Check recent errors related to this credential and explain the likely cause. Read only.' },
 ]
 
-// The same starting points as the CRM's mcp_ui page, for when no credential is selected.
-const GENERAL_PROMPTS = [
-  { label: 'Investigate a failed webhook', prompt: 'Investigate the latest failed webhook. Check the related configuration, parsed data and execution reports, then explain the root cause.' },
-  { label: 'Check a CRM connection', prompt: 'Check my Zoho connection and tell me which data center it uses and whether the token is valid.' },
-  { label: 'Check the Salesforce webhook', prompt: 'Check the Salesforce webhook configuration, identify the target object from its URL, inspect existing credential references and recent errors before proposing any changes.' },
-  { label: 'Explain the email pipeline', prompt: 'Show the ExtractMails module architecture and explain the path from incoming email to webhook execution.' },
-]
+// "Test <API>" when no credential is selected: names every saved credential of that API (name + record id, never a token).
+const apiTestPrompt = (group) => `Test the ${group.label} API using these saved credentials:\n${group.credentials.map((credential) => `- "${credential.name}" (outr_credentials record ${credential.id})`).join('\n')}\nFor each one, call the API with its token and tell me whether it works. Read only: do not change, create or delete anything.`
 
 // Tells the agent which saved credential the question is about (by name and record id, never by token).
 const withCredential = (question, credential) =>
   credential
-    ? `Saved credential: "${credential.name}" (outr_credentials record ${credential.id}, API type ${credential.apiType || 'unknown'}).\n${question}`
+    ? `Saved credential: "${credential.name}" (outr_credentials record ${credential.id}).\n${question}`
     : question
 
 function loadHistory(storageKey) {
@@ -150,8 +145,9 @@ function Playground({ storageKey, user }) {
 
   // Credentials saved in the CRM (outr_credentials), through the smart gateway.
   const { data: credData, isLoading: credsLoading, isError: credsFailed, error: credsError, refetch: refetchCreds } = useQuery({
-    queryKey: ['suitecrm-credentials'],
-    queryFn: () => api.getCredentials({ perPage: 100 }),
+    // Only credentials ticked "API Playground" in the CRM, picked by the gateway.
+    queryKey: ['suitecrm-credentials', 'playground'],
+    queryFn: () => api.getPlaygroundCredentials(),
     staleTime: 60_000,
   })
   const credentials = credData?.records || []
@@ -321,7 +317,6 @@ function Playground({ storageKey, user }) {
     }
   }
 
-  const prompts = selectedCredential ? CREDENTIAL_PROMPTS : GENERAL_PROMPTS
   const time = (value) => new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
   return (
@@ -372,7 +367,6 @@ function Playground({ storageKey, user }) {
                 <div className="flex min-w-0 items-center gap-2.5">
                   <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-(--lime)/30 text-[var(--accent-strong)]"><Key size={14} weight="bold" /></span>
                   <span className="truncate font-bold text-[var(--ink)]">{selectedCredential.name}</span>
-                  <span className="rounded-md bg-[var(--surface)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] ring-1 ring-[var(--line)]/50">{selectedCredential.apiType}</span>
                   <span className={`size-2 shrink-0 rounded-full ${/^active$/i.test(selectedCredential.status) ? 'bg-[var(--ok)]' : 'bg-gray-400'}`} title={selectedCredential.status} />
                   {selectedCredential.productionEndpoint && <span className="hidden truncate font-mono text-[10px] text-[var(--muted)] md:inline">{selectedCredential.productionEndpoint}</span>}
                 </div>
@@ -392,12 +386,22 @@ function Playground({ storageKey, user }) {
                       : 'Pick a credential above to test it, or start with one of these.'}
                   </p>
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-                    {prompts.map((item) => (
-                      <button key={item.label} type="button" onClick={() => handleAskQuestion(item.prompt)} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3.5 py-2 text-xs font-semibold text-[var(--ink)] shadow-xs ring-1 ring-[var(--line)] transition-all hover:bg-[var(--surface)] hover:ring-[var(--lime-dark)] active:scale-95">
-                        <Play size={11} weight="fill" className="text-[var(--lime-dark)]" />
-                        <span>{item.label}</span>
-                      </button>
-                    ))}
+                    {selectedCredential
+                      ? CREDENTIAL_PROMPTS.map((item) => (
+                        <button key={item.label} type="button" onClick={() => handleAskQuestion(item.prompt)} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3.5 py-2 text-xs font-semibold text-[var(--ink)] shadow-xs ring-1 ring-[var(--line)] transition-all hover:bg-[var(--surface)] hover:ring-[var(--lime-dark)] active:scale-95">
+                          <Play size={11} weight="fill" className="text-[var(--lime-dark)]" />
+                          <span>{item.label}</span>
+                        </button>
+                      ))
+                      // One "Test <API>" per API; disabled until one of its credentials is ticked "API Playground" in the CRM.
+                      : (credData?.groups || []).map((group) => {
+                        const ready = group.credentials.length > 0
+                        return <button key={group.key} type="button" disabled={!ready} onClick={() => handleAskQuestion(apiTestPrompt(group))} title={ready ? `Tests ${group.credentials.length} saved ${group.label} ${group.credentials.length === 1 ? 'credential' : 'credentials'}` : `No ${group.label} credential has "API Playground" ticked in the CRM`} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3.5 py-2 text-xs font-semibold text-[var(--ink)] shadow-xs ring-1 ring-[var(--line)] transition-all hover:bg-[var(--surface)] hover:ring-[var(--lime-dark)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:ring-[var(--line)]">
+                          <Play size={11} weight="fill" className="text-[var(--lime-dark)]" />
+                          <span>Test {group.label} API</span>
+                          {ready ? <span className="rounded-full bg-[var(--surface)] px-1.5 text-[10px] tabular-nums text-[var(--muted)]">{group.credentials.length}</span> : <span className="text-[10px] font-medium text-[var(--muted)]">· not enabled</span>}
+                        </button>
+                      })}
                   </div>
                 </div>
               ) : (
@@ -523,6 +527,7 @@ function Playground({ storageKey, user }) {
         </section>
 
         <CreateCredentialModal
+          options={credData?.options}
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onSuccess={(newCred) => {

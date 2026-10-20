@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUUpLeft, BookmarkSimple, Briefcase, Clock, Eye, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Star, Target } from '@phosphor-icons/react'
+import { ArrowUUpLeft, BookmarkSimple, Briefcase, CheckCircle, Clock, Eye, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Star, Target } from '@phosphor-icons/react'
 import { StatusPill } from './ui'
 import { Chips, Price } from './JobApplySection'
 import ShareJobDialog from './ShareJobDialog'
@@ -99,7 +99,9 @@ export default function JobCard({ job, index, now, liked, saved, onLike, onSave,
             </span>
           )}
           {isNew && <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--accent)] opacity-60" /><span className="relative size-2 rounded-full bg-[var(--accent)]" /></span>}
-          <time dateTime={job.postedAt} title={job.posted} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-strong)]"><Clock size={12} weight="bold" />{timeAgo(job.postedAt, now) || job.posted}</time>        </div>
+          <time dateTime={job.postedAt} title={job.posted} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-strong)]"><Clock size={12} weight="bold" />{timeAgo(job.postedAt, now) || job.posted}</time>
+          {job.appliedAt && <span title={`You applied on ${job.appliedAt}`} className="inline-flex items-center gap-1 rounded-full bg-[var(--ok-bg)] px-2.5 py-0.5 text-[10px] font-bold text-[var(--ok)]"><CheckCircle size={11} weight="fill" />You applied {job.appliedAgo || ''}{job.appliedAgo ? ' · ' : ''}{job.appliedAt}</span>}
+        </div>
         <h3 className="mt-3 text-lg font-semibold leading-snug tracking-[-.025em] transition-colors duration-300 group-hover:text-[var(--accent-strong)] sm:text-[1.2rem]">{job.title}</h3>
         {summary && <p className="mt-2 line-clamp-2 max-w-3xl text-[13px] leading-6 text-[var(--muted)]">{summary}</p>}
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">

@@ -16,6 +16,8 @@ export function useJobStatus() {
     mutationFn: ({ id, status }) => api.updateStatus({ id, status, userEmail: user?.email }),
     onSuccess: (updatedJob, { id }) => {
       queryClient.setQueryData(['job', id], (current) => (current ? { ...current, ...updatedJob, coverLetter: current.coverLetter || updatedJob.coverLetter } : updatedJob))
+      // Before ['jobs']: the Applied tab's list reads this cache entry.
+      queryClient.invalidateQueries({ queryKey: ['my-applied'] })
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
       queryClient.invalidateQueries({ queryKey: ['job-stats'] })
       queryClient.invalidateQueries({ queryKey: ['job-activity', id] })

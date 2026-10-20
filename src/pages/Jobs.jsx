@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import gsap from "gsap";
 import { BookmarkSimple, Briefcase, Broadcast, CaretDown, CaretRight, Check, ClockCounterClockwise, Funnel, Heart, MagnifyingGlass, Plus, SlidersHorizontal, X } from "@phosphor-icons/react";
 import Shell from "../components/Shell";
@@ -120,9 +120,16 @@ export default function Jobs() {
   const status = serverStatus(tab);
   const order = JOB_SORTS.find((item) => item.id === sort) || JOB_SORTS[0];
 
+  const queryClient = useQueryClient();
+  // The Applied tab lists only the jobs this user applied to (with when), whatever the My / All Jobs scope.
+  // Shared with the tab count below through the ["my-applied", ...] cache entry.
+  const myAppliedQuery = (withSearch) => {
+    const params = { userEmail: user?.email, dateFilter: gatewayDateFilter, search: withSearch ? search : "", category: jobCategory, subcategory: jobSubcategory, skill: serverSkill };
+    return { queryKey: ["my-applied", params], queryFn: () => api.getMyAppliedJobs(params) };
+  };
   const { data: jobPages, isLoading, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, isError, error, refetch } = useInfiniteQuery({
-    queryKey: ["jobs", showAllJobs ? "all" : user?.email, gatewayDateFilter, search, status, order.orderBy, order.orderDir, jobCategory, jobSubcategory, serverSkill],
-    queryFn: ({ pageParam }) => api.getJobsPage({ page: pageParam, perPage: 20, dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs, search, status, orderBy: order.orderBy, orderDir: order.orderDir, category: jobCategory, subcategory: jobSubcategory, skill: serverSkill }),
+    queryKey: ["jobs", status === "Applied" ? "mine" : showAllJobs ? "all" : user?.email, gatewayDateFilter, search, status, order.orderBy, order.orderDir, jobCategory, jobSubcategory, serverSkill],
+    queryFn: ({ pageParam }) => status === "Applied" ? queryClient.fetchQuery(myAppliedQuery(true)) : api.getJobsPage({ page: pageParam, perPage: 20, dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs, search, status, orderBy: order.orderBy, orderDir: order.orderDir, category: jobCategory, subcategory: jobSubcategory, skill: serverSkill }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => (lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined),
     enabled: Boolean(user?.email),
@@ -135,11 +142,13 @@ export default function Jobs() {
     enabled: Boolean(user?.email),
   });
   const jobStats = asObject(jobStatsData);
+  // Applied count: the jobs this user applied to, with the same filters as the other tab counts (not the search).
+  const { data: myAppliedData } = useQuery({ ...myAppliedQuery(false), enabled: Boolean(user?.email), placeholderData: (previous) => previous });
   const scopePrefix = showAllJobs ? "all" : "my";
   const scopeCounts = { "My Jobs": jobStats.my_total, "All Jobs": jobStats.all_total };
   const pipelineCounts = {
     New: (jobStats[`${scopePrefix}_new`] || 0) + (jobStats[`${scopePrefix}_seen`] || 0),
-    Applied: jobStats[`${scopePrefix}_applied`],
+    Applied: myAppliedData?.total,
     Rejected: jobStats[`${scopePrefix}_rejected`],
   };
   const { data: skillPages, isLoading: skillsLoading, isError: skillsError, error: skillsQueryError, hasNextPage: hasMoreSkills, isFetchingNextPage: isFetchingMoreSkills, fetchNextPage: fetchMoreSkills } = useInfiniteQuery({

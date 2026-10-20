@@ -3,22 +3,16 @@ import { Key, Globe, ShieldCheck, FloppyDisk, Sparkle } from '@phosphor-icons/re
 import { Modal, DialogHeader, primaryButton } from './ui'
 import { api } from '../services/api'
 
-const API_TYPES = [
-  { value: 'custom', label: 'Custom / Other' },
-  { value: 'openai', label: 'OpenAI / ChatGPT' },
-  { value: 'claude', label: 'Anthropic Claude' },
-  { value: 'paypal', label: 'PayPal' },
-  { value: 'MOZ', label: 'MOZ SEO' },
-  { value: 'Google', label: 'Google Cloud / API' },
-  { value: 'Microsoft', label: 'Microsoft Azure / Graph' },
-  { value: 'Salesforce', label: 'Salesforce' },
-  { value: 'Zoho', label: 'Zoho CRM' },
-]
-
-export default function CreateCredentialModal({ isOpen, onClose, onSuccess }) {
+// API type and status choices are the CRM's own dropdowns (from the gateway), never a list in this file.
+export default function CreateCredentialModal({ isOpen, onClose, onSuccess, options }) {
+  const apiTypes = options?.apiType || []
+  const statuses = (options?.status || []).filter((option) => option.value)
   const [name, setName] = useState('')
-  const [apiType, setApiType] = useState('custom')
-  const [status, setStatus] = useState('Active')
+  const [apiType, setApiType] = useState('')
+  const [status, setStatus] = useState('')
+  // Made from the API Playground, so it is ticked "API Playground" (is_payload) and shows up there.
+  const [inPlayground, setInPlayground] = useState(true)
+  const chosenStatus = status || statuses[0]?.value || ''
   const [token, setToken] = useState('')
   const [endpoint, setEndpoint] = useState('')
   const [description, setDescription] = useState('')
@@ -41,7 +35,8 @@ export default function CreateCredentialModal({ isOpen, onClose, onSuccess }) {
       const res = await api.createCredential({
         name: trimmedName,
         apiType,
-        status,
+        status: chosenStatus,
+        inPlayground,
         productionFirstToken: token.trim(),
         productionEndpoint: endpoint.trim(),
         description: description.trim(),
@@ -50,7 +45,7 @@ export default function CreateCredentialModal({ isOpen, onClose, onSuccess }) {
         id: res.id,
         name: trimmedName,
         apiType,
-        status,
+        status: chosenStatus,
         productionFirstToken: token.trim(),
         productionEndpoint: endpoint.trim(),
         description: description.trim(),
@@ -105,9 +100,9 @@ export default function CreateCredentialModal({ isOpen, onClose, onSuccess }) {
               onChange={(e) => setApiType(e.target.value)}
               className="w-full rounded-xl bg-[var(--paper)] px-3.5 py-2.5 text-xs font-medium text-[var(--ink)] ring-1 ring-[var(--line)] focus:outline-none focus:ring-2 focus:ring-[var(--lime-dark)]"
             >
-              {API_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+              {apiTypes.map((t) => (
+                <option key={t.value || 'none'} value={t.value}>
+                  {t.label || '--None--'}
                 </option>
               ))}
             </select>
@@ -116,28 +111,13 @@ export default function CreateCredentialModal({ isOpen, onClose, onSuccess }) {
           <div>
             <label className="block text-xs font-bold text-[var(--ink)] mb-1.5">Status</label>
             <div className="flex items-center gap-2 pt-0.5">
-              <button
-                type="button"
-                onClick={() => setStatus('Active')}
-                className={`flex-1 rounded-xl py-2 text-xs font-bold transition-all ${
-                  status === 'Active'
-                    ? 'bg-[var(--ok-bg)] text-[var(--ok)] ring-1 ring-[var(--ok)]/40'
-                    : 'bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)] hover:text-[var(--ink)]'
-                }`}
-              >
-                ● Active
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatus('Inactive')}
-                className={`flex-1 rounded-xl py-2 text-xs font-bold transition-all ${
-                  status === 'Inactive'
-                    ? 'bg-black/5 dark:bg-white/10 text-[var(--ink)] ring-1 ring-[var(--line)]'
-                    : 'bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)] hover:text-[var(--ink)]'
-                }`}
-              >
-                ○ Inactive
-              </button>
+              {statuses.map((option) => {
+                const picked = chosenStatus === option.value
+                const on = /^active$/i.test(option.value)
+                return <button key={option.value} type="button" onClick={() => setStatus(option.value)} className={`flex-1 rounded-xl py-2 text-xs font-bold transition-all ${picked ? (on ? 'bg-[var(--ok-bg)] text-[var(--ok)] ring-1 ring-[var(--ok)]/40' : 'bg-black/5 dark:bg-white/10 text-[var(--ink)] ring-1 ring-[var(--line)]') : 'bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)] hover:text-[var(--ink)]'}`}>
+                  {on ? '●' : '○'} {option.label}
+                </button>
+              })}
             </div>
           </div>
         </div>
@@ -180,6 +160,12 @@ export default function CreateCredentialModal({ isOpen, onClose, onSuccess }) {
             />
           </div>
         </div>
+
+        <label className="flex cursor-pointer items-center gap-2.5 rounded-xl bg-[var(--paper)] px-3.5 py-2.5 text-xs font-semibold text-[var(--ink)] ring-1 ring-[var(--line)]">
+          <input type="checkbox" checked={inPlayground} onChange={(event) => setInPlayground(event.target.checked)} className="size-4 accent-[var(--lime-dark)]" />
+          Show in API Playground
+          <span className="ml-auto text-[10px] font-medium text-[var(--muted)]">the CRM's "API Playground" checkbox</span>
+        </label>
 
         <div>
           <label className="block text-xs font-bold text-[var(--ink)] mb-1.5">Description / Purpose</label>

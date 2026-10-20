@@ -35,7 +35,6 @@ export default function CredentialsDropdown({
     if (!q) return true
     return (
       c.name?.toLowerCase().includes(q) ||
-      c.apiType?.toLowerCase().includes(q) ||
       c.status?.toLowerCase().includes(q)
     )
   })
@@ -58,7 +57,7 @@ export default function CredentialsDropdown({
         {selectedCredential && (
           <span
             className={`size-2 rounded-full ${
-              selectedCredential.status === 'Active' ? 'bg-[var(--ok)] ring-2 ring-[var(--ok)]/25' : 'bg-gray-400'
+              /^active$/i.test(selectedCredential.status || '') ? 'bg-[var(--ok)] ring-2 ring-[var(--ok)]/25' : 'bg-gray-400'
             }`}
             title={selectedCredential.status}
           />
@@ -143,7 +142,7 @@ export default function CredentialsDropdown({
             ) : (
               filtered.map((cred) => {
                 const isSelected = selectedCredential?.id === cred.id
-                const isActive = cred.status === 'Active'
+                const isActive = /^active$/i.test(cred.status || '')
 
                 return (
                   <button
@@ -171,9 +170,6 @@ export default function CredentialsDropdown({
                         </span>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px] text-[var(--muted)]">
-                        <span className="rounded-md bg-black/5 dark:bg-white/10 px-1.5 py-0.5 uppercase tracking-wider font-bold">
-                          {cred.apiType}
-                        </span>
                         {cred.productionFirstToken && (
                           <span className="font-mono text-[9px] opacity-75">
                             {cred.productionFirstToken.slice(0, 4)}•••{cred.productionFirstToken.slice(-4)}

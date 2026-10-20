@@ -531,6 +531,39 @@ export async function fetchSkillCounts({ skills = [], dateFilter, userEmail, all
   return Object.fromEntries(names.map((name, index) => [name, Number(data.stats?.[`skill_${index}`]?.count) || 0]));
 }
 
+// Every page of a gateway fetch (50 per page, the gateway maximum).
+async function fetchEveryPage(query) {
+  const first = await smartGateway({ ...query, page: 1, per_page: 50 });
+  const totalPages = Math.max(Number(first.total_pages) || 1, Math.ceil((Number(first.total) || 0) / 50));
+  const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => smartGateway({ ...query, page: index + 2, per_page: 50 })));
+  return [first, ...rest].flatMap((page) => asArray(page?.records)).filter((record) => record && record.deleted !== "1");
+}
+
+// The jobs the signed-in user applied to (Apply on Upwork), newest application first, each with when they applied.
+// Who applied comes from the job activity log: this user's latest "Applied" / "Undo Applied" entry on each job
+// (written by updateStatus). The jobs are then fetched by the gateway, must still be Applied, and follow the page's
+// filters (date, search, department / role, one skill). Returns one page, in the shape of fetchJobsPage.
+export async function fetchMyAppliedJobs({ userEmail, dateFilter, search = "", category = "", subcategory = "", skill = "" } = {}) {
+  const userId = await findGatewayUserIdByEmail(userEmail);
+  const activity = await fetchEveryPage({ action: "fetch", module: JOB_ACTIVITY_MODULE, filters: { user_id: userId, description: { in: ["Applied", "Undo Applied"] } }, order_by: "date_entered", order_dir: "DESC" });
+  // Newest first, so the first entry seen for a job is the user's latest action on it.
+  const latest = new Map();
+  for (const record of activity) if (record.job_id && !latest.has(record.job_id)) latest.set(record.job_id, record);
+  const applied = [...latest.values()].filter((record) => record.description === "Applied");
+  if (!applied.length) return { records: [], page: 1, perPage: 0, total: 0, totalPages: 1 };
+
+  const query = { action: "fetch", module: JOBS_MODULE, filters: { id: { in: applied.map((record) => record.job_id) }, status: "Applied", ...(await engagementFilters(userEmail)), ...skillGroupFilters({ category, subcategory, skill }) } };
+  const searchText = asText(search).trim();
+  if (searchText) Object.assign(query, { search: searchText, search_fields: JOB_SEARCH_FIELDS });
+  const jobs = new Map((await fetchEveryPage(addGatewayDateFilter(query, dateFilter))).map((record) => [record.id, record]));
+  const records = applied.filter((record) => jobs.has(record.job_id)).map((record) => ({
+    ...mapGatewayJob(jobs.get(record.job_id)),
+    appliedAt: asText(record.date_entered_uni_format || record.date_entered),
+    appliedAgo: asText(record.date_entered_time_ago),
+  }));
+  return { records, page: 1, perPage: records.length, total: records.length, totalPages: 1 };
+}
+
 export async function fetchJobs(options = {}) {
   const page = await fetchJobsPage(options);
   return page.records;
@@ -1594,6 +1627,30 @@ export async function mcpSmartGateway(payload, { timeout = 60_000, signal } = {}
   }
 }
 
+// The API Playground only offers credentials ticked "API Playground" in the CRM (outr_credentials.is_payload = 1).
+const PLAYGROUND_FILTER = { is_payload: 1 };
+
+// The APIs with a "Test <API>" button. Each one's ticked credentials are picked by the gateway, by name,
+// so a credential added or ticked in the CRM later (e.g. one named "Claude ...") shows up on its own.
+export const PLAYGROUND_APIS = [
+  { key: "claude", label: "Claude", match: "claude" },
+  { key: "chatgpt", label: "ChatGPT", match: "chatgpt" },
+  { key: "upwork", label: "Upwork", match: "upwork" },
+];
+
+// { records: every ticked credential (the dropdown), groups: [{ key, label, credentials }] (the Test buttons),
+//   options: the CRM's own API type and status choices (the create form) }.
+export async function fetchPlaygroundCredentials() {
+  const [all, ...groups] = await Promise.all([
+    fetchCredentials({ perPage: 100, filters: PLAYGROUND_FILTER }),
+    ...PLAYGROUND_APIS.map(async (target) => ({
+      ...target,
+      credentials: (await fetchCredentials({ perPage: 100, filters: { ...PLAYGROUND_FILTER, name: { like: `%${target.match}%` } } })).records,
+    })),
+  ]);
+  return { ...all, groups };
+}
+
 export async function fetchCredentials({ page = 1, perPage = 100, filters = {} } = {}) {
   const data = await mcpSmartGateway({
     action: "fetch",
@@ -1607,8 +1664,9 @@ export async function fetchCredentials({ page = 1, perPage = 100, filters = {} }
   const records = asArray(data?.records).filter((r) => r && r.deleted !== "1").map((r) => ({
     id: r.id,
     name: decodeHtml(r.name || ""),
-    status: asText(r.status || "Active"),
-    apiType: asText(r.api_type || "custom"),
+    // As saved in the CRM; nothing is invented when a field is empty.
+    status: asText(r.status),
+    apiType: asText(r.api_type),
     description: decodeHtml(r.description || ""),
     productionFirstToken: r.production_first_token || "",
     productionSecondToken: r.production_second_token || "",
@@ -1620,11 +1678,15 @@ export async function fetchCredentials({ page = 1, perPage = 100, filters = {} }
     dateModified: r.date_modified_time_ago || r.date_modified_uni_format || r.date_modified || "",
     raw: r,
   }));
+  // The CRM dropdowns for these fields, as [{ value, label }] (the empty "none" choice kept, labelled by the CRM).
+  const lists = asObject(data?.dropdown_lists);
+  const choices = (list) => Object.entries(asObject(list)).map(([value, label]) => ({ value: asText(value), label: decodeHtml(asText(label)) || asText(value) }));
   return {
     records,
     total: Number(data?.total) || records.length,
     page: Number(data?.page) || page,
     totalPages: Number(data?.total_pages) || 1,
+    options: { apiType: choices(lists.api_type), status: choices(lists.status) },
   };
 }
 
@@ -1633,8 +1695,8 @@ export async function createCredential(data) {
   if (!name) throw createAppError("NAME_REQUIRED", "Credential name is required");
   const payload = {
     name,
-    api_type: data.apiType || data.api_type || "custom",
-    status: data.status || "Active",
+    api_type: data.apiType ?? data.api_type ?? "",
+    status: data.status || "active",
     description: data.description || "",
     production_first_token: data.productionFirstToken || data.production_first_token || data.token || "",
     production_second_token: data.productionSecondToken || data.production_second_token || "",
@@ -1643,6 +1705,8 @@ export async function createCredential(data) {
     dev_second_token: data.devSecondToken || data.dev_second_token || "",
     dev_endpoint: data.devEndpoint || data.dev_endpoint || "",
   };
+  // Ticks "API Playground" (is_payload) when asked, so a credential made in the playground shows up there.
+  if (data.inPlayground) payload.is_payload = 1;
   return mcpSmartGateway({
     action: "create",
     module: CREDENTIALS_MODULE,
@@ -1703,12 +1767,14 @@ export async function runMcpAgentStep(body, { agentKey, signal } = {}) {
 
 export const api = {
   getCredentials: fetchCredentials,
+  getPlaygroundCredentials: fetchPlaygroundCredentials,
   createCredential,
   deleteCredential,
   runMcpAgentStep,
   getJobs: (params) => fetchJobs(params),
   getJobsPage: (params) => fetchJobsPage(params),
   getJobStats: (params) => fetchJobStats(params),
+  getMyAppliedJobs: (params) => fetchMyAppliedJobs(params),
   getSkillCounts: (params) => fetchSkillCounts(params),
   getGroupOptions: (module) => fetchGroupOptions(module),
   getJobGroupCounts: (params) => fetchJobGroupCounts(params),
