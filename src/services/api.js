@@ -312,6 +312,11 @@ export async function findGatewayUserIdByEmail(email) {
   if (gatewayUserIdCache.has(normalizedEmail)) return gatewayUserIdCache.get(normalizedEmail);
 
   const request = (async () => {
+    // The gateway filters Users by email1 itself: one small request instead of downloading every user.
+    const direct = await smartGateway({ action: "fetch", module: USERS_MODULE, filters: { email1: normalizedEmail }, page: 1, per_page: 5 }).catch(() => null);
+    const directMatch = asArray(direct?.records).find((record) => asText(record?.email1).trim().toLowerCase() === normalizedEmail);
+    if (directMatch?.id) return directMatch.id;
+
     const perPage = 100;
     const firstPage = await smartGateway({ action: "fetch", module: USERS_MODULE, page: 1, per_page: perPage });
     let users = [...asArray(firstPage.records)];
@@ -341,7 +346,92 @@ const JOB_SEARCH_FIELDS = ["name", "job_title", "description", "skills", "matche
 
 const JOB_ORDER_FIELDS = ["date_entered", "match_score"];
 
-export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEmail, allJobs = false, search = "", status = "", orderBy = "date_entered", orderDir = "DESC" } = {}) {
+// Filters from the skills section, all applied by the gateway: category and sub category (CRM dropdown keys,
+// e.g. "development", "crm_development"; jobs and skills both store the keys) and, for jobs, one skill (LIKE on the job's skills).
+// The gateway cannot OR several skills in one request, so a pick of two or more skills is matched on the loaded pages.
+function skillGroupFilters({ category = "", subcategory = "", skill = "" } = {}) {
+  const filters = {};
+  if (asText(category).trim()) filters.category = asText(category).trim();
+  if (asText(subcategory).trim()) filters.sub_category = asText(subcategory).trim();
+  if (asText(skill).trim()) filters.skills = { like: `%${asText(skill).trim()}%` };
+  return filters;
+}
+
+// The category and sub category choices, exactly as a CRM module defines them (fetch -> dropdown_lists):
+// { category: [{ value, label }], subcategory: [{ value, label }] }. The empty "" (none) option is left out.
+// outr_skills and outr_upwork_jobs share the same lists, and both store the keys ("development", "crm_development").
+export async function fetchGroupOptions(module = SKILLS_MODULE) {
+  const data = await smartGateway({ action: "fetch", module, page: 1, per_page: 1 });
+  const lists = asObject(data.dropdown_lists);
+  const toOptions = (list) => Object.entries(asObject(list))
+    .map(([value, label]) => ({ value: asText(value).trim(), label: asText(label).trim() || asText(value).trim() }))
+    .filter((option) => option.value);
+  return { category: toOptions(lists.category), subcategory: toOptions(lists.sub_category ?? lists.subcategory) };
+}
+
+// Jobs per category, and per sub category inside the chosen category, for the current scope and date window.
+// One get_stats call: { category: { [key]: count }, subcategory: { [key]: count } }.
+export async function fetchJobGroupCounts({ options, dateFilter, userEmail, allJobs = false, category = "" } = {}) {
+  const categories = asArray(options?.category).map((option) => option.value).filter(Boolean);
+  const subcategories = asArray(options?.subcategory).map((option) => option.value).filter(Boolean);
+  if (!categories.length && !subcategories.length) return { category: {}, subcategory: {} };
+  const base = { ai_processed: 1 };
+  if (!allJobs) base.assigned_user_id = await findGatewayUserIdByEmail(userEmail);
+  const data = await smartGateway({
+    action: "get_stats",
+    date_range: "",
+    date_field: dateFilter?.date_field || "",
+    date_from: dateFilter?.date_from || "",
+    date_to: dateFilter?.date_to || "",
+    queries: [
+      ...categories.map((value, index) => ({ key: `category_${index}`, module: JOBS_MODULE, filters: { ...base, ...skillGroupFilters({ category: value }) } })),
+      ...subcategories.map((value, index) => ({ key: `subcategory_${index}`, module: JOBS_MODULE, filters: { ...base, ...skillGroupFilters({ category, subcategory: value }) } })),
+    ],
+  });
+  const countOf = (key) => Number(data.stats?.[key]?.count) || 0;
+  return {
+    category: Object.fromEntries(categories.map((value, index) => [value, countOf(`category_${index}`)])),
+    subcategory: Object.fromEntries(subcategories.map((value, index) => [value, countOf(`subcategory_${index}`)])),
+  };
+}
+
+// Every skill in a category / sub category (dropdown keys), filtered by the gateway; all pages.
+export async function fetchSkillsInGroup({ category = "", subcategory = "" } = {}) {
+  const filters = skillGroupFilters({ category, subcategory });
+  const perPage = 50;
+  const query = (page) => smartGateway({ action: "fetch", module: SKILLS_MODULE, filters, order_by: "name", order_dir: "ASC", page, per_page: perPage });
+  const first = await query(1);
+  const total = Number(first.total) || asArray(first.records).length;
+  const totalPages = Math.max(Number(first.total_pages) || 1, Math.ceil(total / perPage));
+  const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => query(index + 2)));
+  return [first, ...rest]
+    .flatMap((page) => asArray(page?.records))
+    .filter((record) => record && record.deleted !== "1")
+    .map((record) => ({ ...record, name: asText(record.name).trim() }))
+    .filter((record) => record.name);
+}
+
+// Skills per category, and per sub category inside the chosen category (dropdown keys), counted by the gateway.
+// A sub category with no skills in the chosen category is not part of it, so the UI leaves it out.
+export async function fetchSkillGroupCounts({ options, category = "" } = {}) {
+  const categories = asArray(options?.category).map((option) => option.value).filter(Boolean);
+  const subcategories = asArray(options?.subcategory).map((option) => option.value).filter(Boolean);
+  if (!categories.length && !subcategories.length) return { category: {}, subcategory: {} };
+  const data = await smartGateway({
+    action: "get_stats",
+    queries: [
+      ...categories.map((value, index) => ({ key: `category_${index}`, module: SKILLS_MODULE, filters: skillGroupFilters({ category: value }) })),
+      ...subcategories.map((value, index) => ({ key: `subcategory_${index}`, module: SKILLS_MODULE, filters: skillGroupFilters({ category, subcategory: value }) })),
+    ],
+  });
+  const countOf = (key) => Number(data.stats?.[key]?.count) || 0;
+  return {
+    category: Object.fromEntries(categories.map((value, index) => [value, countOf(`category_${index}`)])),
+    subcategory: Object.fromEntries(subcategories.map((value, index) => [value, countOf(`subcategory_${index}`)])),
+  };
+}
+
+export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEmail, allJobs = false, search = "", status = "", orderBy = "date_entered", orderDir = "DESC", category = "", subcategory = "", skill = "" } = {}) {
   const assignedUserId = allJobs ? null : await findGatewayUserIdByEmail(userEmail);
   const query = {
     action: "fetch",
@@ -354,6 +444,7 @@ export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEm
   const filters = { ai_processed: 1, ...(await engagementFilters(userEmail)) };
   if (assignedUserId) filters.assigned_user_id = assignedUserId;
   if (status) filters.status = status;
+  Object.assign(filters, skillGroupFilters({ category, subcategory, skill }));
   if (Object.keys(filters).length) query.filters = filters;
   const searchText = asText(search).trim();
   if (searchText) {
@@ -390,8 +481,12 @@ function mapEngagement(value) {
   };
 }
 
-export async function fetchJobStats({ dateFilter, userEmail } = {}) {
+export async function fetchJobStats({ dateFilter, userEmail, category = "", subcategory = "", skill = "" } = {}) {
   const assignedUserId = await findGatewayUserIdByEmail(userEmail);
+  // The tab counts follow the skills section (category, sub category, single skill), like the list. get_stats ignores
+  // the LIKE filter the list uses, so the skill is matched with its search on the skills field instead (same result).
+  const group = skillGroupFilters({ category, subcategory });
+  const skillSearch = asText(skill).trim() ? { search: asText(skill).trim(), search_fields: ["skills"] } : {};
   const statuses = ["New", "Seen", "Applied", "Rejected"];
   const queries = [
     { key: "my_total", module: JOBS_MODULE, filters: { ai_processed: 1, assigned_user_id: assignedUserId } },
@@ -403,7 +498,7 @@ export async function fetchJobStats({ dateFilter, userEmail } = {}) {
         { key: `all_${statusKey}`, module: JOBS_MODULE, filters: { ai_processed: 1, status } },
       ];
     }),
-  ];
+  ].map((query) => ({ ...query, ...skillSearch, filters: { ...query.filters, ...group } }));
   const data = await smartGateway({
     action: "get_stats",
     date_range: "",
@@ -419,10 +514,10 @@ export async function fetchJobStats({ dateFilter, userEmail } = {}) {
 
 // Jobs per skill for the current scope and date window, as { [skillName]: count }.
 // Each get_stats query searches the jobs' skills field, the same search the jobs list uses.
-export async function fetchSkillCounts({ skills = [], dateFilter, userEmail, allJobs = false } = {}) {
+export async function fetchSkillCounts({ skills = [], dateFilter, userEmail, allJobs = false, category = "", subcategory = "" } = {}) {
   const names = [...new Set(asArray(skills).map((skill) => asText(skill).trim()).filter(Boolean))];
   if (!names.length) return {};
-  const filters = { ai_processed: 1 };
+  const filters = { ai_processed: 1, ...skillGroupFilters({ category, subcategory }) };
   if (!allJobs) filters.assigned_user_id = await findGatewayUserIdByEmail(userEmail);
   // Index-based keys keep skill names with spaces or symbols out of the stats keys.
   const data = await smartGateway({
@@ -963,7 +1058,8 @@ export async function saveLiveJobToCrm(job) {
 }
 
 export async function fetchSkills({ page = 1, perPage = 20 } = {}) {
-  const data = await smartGateway({ action: "fetch", module: SKILLS_MODULE, page, per_page: perPage });
+  // Sorted by name so pages never overlap: without an order the gateway repeated some skills and left others out.
+  const data = await smartGateway({ action: "fetch", module: SKILLS_MODULE, order_by: "name", order_dir: "ASC", page, per_page: perPage });
   return {
     // Skill names are sorted and compared as text in the UI, so every record gets a string name.
     records: asArray(data.records).filter((record) => record && record.deleted !== "1").map((record) => ({ ...record, name: asText(record.name).trim(), category: skillCategory(record) })).filter((record) => record.name),
@@ -974,10 +1070,11 @@ export async function fetchSkills({ page = 1, perPage = 20 } = {}) {
   };
 }
 
-export async function createSkill(name) {
+// `group` ({ category, subcategory } dropdown keys) files the new skill under that category / sub category.
+export async function createSkill(name, group = {}) {
   const trimmedName = String(name || "").trim();
   if (!trimmedName) throw createAppError("SKILL_NAME_REQUIRED", "Enter a skill name.");
-  return smartGateway({ action: "create", module: SKILLS_MODULE, data: { name: trimmedName } });
+  return smartGateway({ action: "create", module: SKILLS_MODULE, data: { name: trimmedName, ...skillGroupFilters({ category: group?.category, subcategory: group?.subcategory }) } });
 }
 
 export async function updateSkill(id, name) {
@@ -1613,6 +1710,10 @@ export const api = {
   getJobsPage: (params) => fetchJobsPage(params),
   getJobStats: (params) => fetchJobStats(params),
   getSkillCounts: (params) => fetchSkillCounts(params),
+  getGroupOptions: (module) => fetchGroupOptions(module),
+  getJobGroupCounts: (params) => fetchJobGroupCounts(params),
+  getSkillsInGroup: (params) => fetchSkillsInGroup(params),
+  getSkillGroupCounts: (params) => fetchSkillGroupCounts(params),
   getJob: (id, userEmail) => fetchJobById(id, userEmail),
   getCoverLetter: (job) => fetchCoverLetter(job),
   saveCoverLetter,

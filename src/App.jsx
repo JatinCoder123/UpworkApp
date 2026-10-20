@@ -1,24 +1,7 @@
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Login from './pages/Login'
-import Jobs from './pages/Jobs'
-import JobDetail from './pages/JobDetail'
-import LiveJobs from './pages/LiveJobs'
-import LiveJobDetail from './pages/LiveJobDetail'
-import Activity from './pages/Activity'
-import TechNews from './pages/TechNews'
-import TechNewsDetail from './pages/TechNewsDetail'
-import Profile from './pages/Profile'
-import Preferences from './pages/Preferences'
-import Video from './pages/Video'
-import SiteContent from './pages/SiteContent'
-import Seo from './pages/Seo'
-import Domain from './pages/Domain'
-import ApiPlayground from './pages/ApiPlayground'
-import AdminPanel from './pages/admin/AdminPanel'
-import ComingSoon from './pages/ComingSoon'
 import NotFound from './pages/NotFound'
-import Onboarding from './pages/Onboarding'
 import SessionLoader from './components/SessionLoader'
 import LoginIntro from './components/LoginIntro'
 import ScrollToTop from './components/ScrollToTop'
@@ -27,6 +10,25 @@ import GlobalErrorToast from './components/GlobalErrorToast'
 import ErrorBoundary, { PageError } from './components/ErrorBoundary'
 import { useAuth } from './contexts/AuthContext'
 import { canAccess, homePath, needsRole } from './lib/permissions'
+
+// Each page downloads only when it is first opened, so the app starts with a small bundle.
+const Jobs = lazy(() => import('./pages/Jobs'))
+const JobDetail = lazy(() => import('./pages/JobDetail'))
+const LiveJobs = lazy(() => import('./pages/LiveJobs'))
+const LiveJobDetail = lazy(() => import('./pages/LiveJobDetail'))
+const Activity = lazy(() => import('./pages/Activity'))
+const TechNews = lazy(() => import('./pages/TechNews'))
+const TechNewsDetail = lazy(() => import('./pages/TechNewsDetail'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Preferences = lazy(() => import('./pages/Preferences'))
+const Video = lazy(() => import('./pages/Video'))
+const SiteContent = lazy(() => import('./pages/SiteContent'))
+const Seo = lazy(() => import('./pages/Seo'))
+const Domain = lazy(() => import('./pages/Domain'))
+const ApiPlayground = lazy(() => import('./pages/ApiPlayground'))
+const ComingSoon = lazy(() => import('./pages/ComingSoon'))
+const Onboarding = lazy(() => import('./pages/Onboarding'))
+const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'))
 
 const NoFallback = () => null
 
@@ -71,6 +73,7 @@ export default function App() {
     <ErrorBoundary name="error-toast" fallback={NoFallback}><GlobalErrorToast /></ErrorBoundary>
     {/* A page that fails to render shows an error inside the normal header; changing route clears it. */}
     <ErrorBoundary name="page" fallback={PageError} resetKey={location.pathname}>
+    <Suspense fallback={<SessionLoader />}>
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
@@ -103,6 +106,7 @@ export default function App() {
       <Route path="/404" element={<NotFound />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </Suspense>
     </ErrorBoundary>
   </>
 }

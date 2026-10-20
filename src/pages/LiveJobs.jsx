@@ -113,7 +113,7 @@ export default function LiveJobs() {
 
   const { data: skillPages, isLoading: skillsLoading, hasNextPage, isFetchingNextPage, fetchNextPage } = useInfiniteQuery({
     queryKey: ['skills'],
-    queryFn: ({ pageParam }) => api.getSkills({ page: pageParam, perPage: 20 }),
+    queryFn: ({ pageParam }) => api.getSkills({ page: pageParam, perPage: 50 }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => (lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined),
   })

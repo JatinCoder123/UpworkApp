@@ -8,8 +8,9 @@ import { asArray, asObject } from "../lib/safe";
  */
 
 export const DEFAULT_TLDS = ["com", "io", "ai", "co"];
-export const BATCH_SIZE = 5;
-export const MAX_SUGGESTIONS = 50;
+// Names are found 50 at a time (the next 50 load as the user scrolls), up to 200 per search.
+export const BATCH_SIZE = 50;
+export const MAX_SUGGESTIONS = 200;
 
 export function isAbortError(error) {
   return error?.name === "AbortError";

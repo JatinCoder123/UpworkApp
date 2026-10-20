@@ -14,7 +14,8 @@ const initialTheme = storedTheme || (window.matchMedia('(prefers-color-scheme: d
 document.documentElement.dataset.theme = initialTheme
 document.documentElement.style.colorScheme = initialTheme
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } } })
+// Cached data is kept 10 minutes (default 5), so going back to a page shows it at once while it refreshes in the background.
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, gcTime: 10 * 60_000, refetchOnWindowFocus: false } } })
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

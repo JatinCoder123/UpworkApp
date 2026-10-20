@@ -57,8 +57,9 @@ function readSessionKey() {
 export default function Domain() {
   const { data: domainConfig, isError: configFailed, error: configError, refetch: retryConfig } = useQuery({ queryKey: ['domain-config'], queryFn: getDomainConfig, staleTime: Infinity, retry: 1 })
   const integrations = useMemo(() => domainConfig?.integrations || {}, [domainConfig])
-  const batchSize = domainConfig?.batchSize || BATCH_SIZE
-  const maxSuggestions = domainConfig?.maxSuggestions || MAX_SUGGESTIONS
+  // 50 names per batch, up to 200 per search (services/domainApi.js).
+  const batchSize = BATCH_SIZE
+  const maxSuggestions = MAX_SUGGESTIONS
   const [sessionKey] = useState(readSessionKey)
   const [input, setInput] = useState('')
   const [mode, setMode] = useState('auto')
@@ -79,6 +80,9 @@ export default function Domain() {
   const [sort, setSort] = useState('rank')
   const [tldFilter, setTldFilter] = useState('all')
   const [playOpen, setPlayOpen] = useState(false)
+  // True once a batch finds no new names, so scrolling stops asking for more.
+  const [exhausted, setExhausted] = useState(false)
+  const loadMoreRef = useRef(null)
   const inputRef = useRef(null)
   const controllerRef = useRef(null)
   const flowRef = useRef(0)
@@ -127,18 +131,53 @@ export default function Domain() {
     setNotice('')
     setLab(EMPTY_LAB)
     setBatch(0)
+    setExhausted(false)
     setSort('rank')
     setTldFilter('all')
     setPhase('idle')
   }
 
+  // Detailed screening of one set of names. Runs in the background while more names are being found.
+  const screenNames = async ({ ctx, items, offset, batchNumber, resultType, signal, stale }) => {
+    const crm = crmRef.current
+    const domains = new Set(items.map((item) => item.domain))
+    try {
+      const { suggestions: analyzed } = await analyzeDomains({ sourceDomain: ctx.sourceDomain, brief: ctx.brief, candidates: items, signal })
+      if (stale()) return
+      const byDomain = new Map(analyzed.map((item) => [item.domain, item]))
+      setResults((current) => current.map((item) => {
+        if (!domains.has(item.domain)) return item
+        const analysis = byDomain.get(item.domain)
+        if (!analysis) return item.stage === 'screening' ? { ...item, stage: 'unscreened' } : item
+        return { ...item, ...analysis, moz: item.moz || null, checks: applyMozToChecks(analysis.checks, item.moz), stage: 'complete' }
+      }))
+      enqueueCrm(async () => {
+        const searchId = await ensureSearch(crm, ctx)
+        for (const analysis of analyzed) {
+          const rank = offset + items.findIndex((item) => item.domain === analysis.domain) + 1
+          const id = await crmSaveDomainResult(searchId, { ...analysis, source_domain: ctx.sourceDomain || '' }, { resultType, state: 'complete', batch: batchNumber, rank })
+          if (!stale()) updateResult(analysis.domain, { crm_result_id: id })
+        }
+        await crmUpdateSearch(searchId, { status: 'completed', resultCount: resultsRef.current.length, batchCount: batchNumber })
+      })
+    } catch (screenError) {
+      if (isAbortError(screenError) || stale()) return
+      setResults((current) => current.map((item) => (domains.has(item.domain) && item.stage === 'screening' ? { ...item, stage: 'unscreened' } : item)))
+      setNotice(`Detailed screening could not finish for some names. ${screenError.message}`)
+    }
+  }
+
+  // One batch = 50 names (fewer when close to the 200 limit). The domain service sends only a few names per
+  // request, so requests repeat until the batch is full; each set shows, and starts screening, as soon as it arrives.
   const runBatch = async (ctx, batchNumber) => {
     const flowId = flowRef.current
     const signal = controllerRef.current.signal
     const crm = crmRef.current
     const stale = () => flowId !== flowRef.current
-    const offset = resultsRef.current.length
     const resultType = ctx.sourceDomain ? 'related_suggestion' : 'prompt_suggestion'
+    const target = Math.min(batchSize, maxSuggestions - resultsRef.current.length)
+    let found = 0
+    let screening = Promise.resolve()
     setError('')
     setNotice('')
     setLab({ ...EMPTY_LAB, round: 1 })
@@ -147,57 +186,45 @@ export default function Domain() {
     setPhaseStartedAt(Date.now())
 
     try {
-      const { suggestions } = await collectAvailableSuggestions({
-        sourceDomain: ctx.sourceDomain,
-        brief: ctx.brief,
-        tlds: ctx.tlds,
-        targetCount: batchSize,
-        excludedDomains: resultsRef.current.map((item) => item.domain),
-        signal,
-        onEvent: (event) => { if (!stale()) setLab((current) => labReducer(current, event)) },
-      })
-      if (stale()) return
-      const items = suggestions.map((suggestion) => ({ ...suggestion, source_domain: ctx.sourceDomain || '', stage: 'screening', batch: batchNumber, is_favorite: false }))
-      resultsRef.current = [...resultsRef.current, ...items]
-      setResults(resultsRef.current)
-      setPhase('screening')
-      setPhaseStartedAt(Date.now())
-      enqueueCrm(async () => {
-        const searchId = await ensureSearch(crm, ctx)
-        for (const [index, item] of items.entries()) {
-          const id = await crmSaveDomainResult(searchId, item, { resultType, state: 'quick', batch: batchNumber, rank: offset + index + 1 })
-          if (!stale()) updateResult(item.domain, { crm_result_id: id })
-        }
-        await crmUpdateSearch(searchId, { status: 'processing', resultCount: offset + items.length, batchCount: batchNumber })
-      })
-
-      try {
-        const { suggestions: analyzed } = await analyzeDomains({ sourceDomain: ctx.sourceDomain, brief: ctx.brief, candidates: suggestions, signal })
+      while (found < target) {
+        const { suggestions } = await collectAvailableSuggestions({
+          sourceDomain: ctx.sourceDomain,
+          brief: ctx.brief,
+          tlds: ctx.tlds,
+          targetCount: target - found,
+          excludedDomains: resultsRef.current.map((item) => item.domain),
+          signal,
+          onEvent: (event) => { if (!stale()) setLab((current) => labReducer(current, event)) },
+        })
         if (stale()) return
-        const byDomain = new Map(analyzed.map((item) => [item.domain, item]))
-        setResults((current) => current.map((item) => {
-          if (item.batch !== batchNumber) return item
-          const analysis = byDomain.get(item.domain)
-          if (!analysis) return item.stage === 'screening' ? { ...item, stage: 'unscreened' } : item
-          return { ...item, ...analysis, moz: item.moz || null, checks: applyMozToChecks(analysis.checks, item.moz), stage: 'complete' }
-        }))
+        const known = new Set(resultsRef.current.map((item) => item.domain))
+        const fresh = suggestions.filter((suggestion) => suggestion?.domain && !known.has(suggestion.domain)).slice(0, target - found)
+        if (!fresh.length) {
+          setExhausted(true)
+          setNotice(found ? `Found ${found} more names; no further available names came up for this search.` : 'No more available names were found for this search.')
+          break
+        }
+        const offset = resultsRef.current.length
+        const foundAt = Date.now()
+        const items = fresh.map((suggestion) => ({ ...suggestion, source_domain: ctx.sourceDomain || '', stage: 'screening', batch: batchNumber, is_favorite: false, foundAt }))
+        found += items.length
+        resultsRef.current = [...resultsRef.current, ...items]
+        setResults(resultsRef.current)
         enqueueCrm(async () => {
           const searchId = await ensureSearch(crm, ctx)
-          for (const analysis of analyzed) {
-            const rank = offset + items.findIndex((item) => item.domain === analysis.domain) + 1
-            const id = await crmSaveDomainResult(searchId, { ...analysis, source_domain: ctx.sourceDomain || '' }, { resultType, state: 'complete', batch: batchNumber, rank })
-            if (!stale()) updateResult(analysis.domain, { crm_result_id: id })
+          for (const [index, item] of items.entries()) {
+            const id = await crmSaveDomainResult(searchId, item, { resultType, state: 'quick', batch: batchNumber, rank: offset + index + 1 })
+            if (!stale()) updateResult(item.domain, { crm_result_id: id })
           }
-          await crmUpdateSearch(searchId, { status: 'completed', resultCount: offset + items.length, batchCount: batchNumber })
+          await crmUpdateSearch(searchId, { status: 'processing', resultCount: offset + items.length, batchCount: batchNumber })
         })
-      } catch (screenError) {
-        if (isAbortError(screenError) || stale()) return
-        setResults((current) => current.map((item) => (item.batch === batchNumber && item.stage === 'screening' ? { ...item, stage: 'unscreened' } : item)))
-        setNotice(`Detailed screening could not finish for this batch. ${screenError.message}`)
+        // Screening runs one set at a time, so the screening service is not flooded.
+        screening = screening.then(() => screenNames({ ctx, items: fresh, offset, batchNumber, resultType, signal, stale }))
+        if (found < target) setLab({ ...EMPTY_LAB, round: 1 })
       }
     } catch (flowError) {
       if (isAbortError(flowError) || stale()) return
-      setError(flowError.message)
+      setError(found ? `Found ${found} names, then the domain service stopped: ${flowError.message}` : flowError.message)
     } finally {
       if (!stale()) {
         setPhase('idle')
@@ -281,7 +308,8 @@ export default function Domain() {
   }
 
   const findMore = () => {
-    if (!context || phase !== 'idle') return
+    if (!context || phase !== 'idle' || resultsRef.current.length >= maxSuggestions) return
+    setExhausted(false)
     if (!controllerRef.current || controllerRef.current.signal.aborted) beginFlow()
     runBatch(context, batch + 1)
   }
@@ -385,8 +413,24 @@ export default function Domain() {
     return ranked
   }, [results, sort, tldFilter])
 
+  // Scrolling to the end of the list finds the next 50 names, until 200. Paused after an error, when a batch
+  // found nothing new, or while an extension filter is on (the button below still works then).
+  const findMoreRef = useRef(findMore)
+  useEffect(() => { findMoreRef.current = findMore })
+  const autoLoad = phase === 'idle' && Boolean(context) && results.length > 0 && results.length < maxSuggestions && !error && !exhausted && tldFilter === 'all'
+  useEffect(() => {
+    const target = loadMoreRef.current
+    if (!autoLoad || !target) return undefined
+    const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) findMoreRef.current() }, { rootMargin: '400px 0px' })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [autoLoad])
+
   const busy = phase !== 'idle'
   const screeningCount = results.filter((item) => item.stage === 'screening').length
+  // When the oldest name still being screened was found, for the banner's timer.
+  const screeningStartedAt = screeningCount ? Math.min(...results.filter((item) => item.stage === 'screening').map((item) => item.foundAt || Infinity)) : null
+  const screeningSince = Number.isFinite(screeningStartedAt) ? screeningStartedAt : null
   const subject = context?.sourceDomain || context?.brief || ''
   const showLanding = !direct && !results.length && phase === 'idle' && !error && !notice
   const labBlock = phase === 'naming' && <>
@@ -447,10 +491,10 @@ export default function Domain() {
             </div>
           </div>
 
-          {phase === 'screening' && <>
-            <ScreeningBanner startedAt={phaseStartedAt} count={screeningCount} />
-            <button type="button" onClick={() => setPlayOpen((open) => !open)} aria-expanded={playOpen} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-[var(--accent-strong)]"><GameController size={14} weight="duotone" />{playOpen ? 'Hide the mini games' : 'Play a quick game while this finishes'}</button>
-            {playOpen && <WhileYouWait onCheckName={(label) => { setInput(label); setMode('auto'); inputRef.current?.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />}
+          {screeningCount > 0 && <>
+            <ScreeningBanner startedAt={screeningSince} count={screeningCount} />
+            {phase !== 'naming' && <button type="button" onClick={() => setPlayOpen((open) => !open)} aria-expanded={playOpen} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-[var(--accent-strong)]"><GameController size={14} weight="duotone" />{playOpen ? 'Hide the mini games' : 'Play a quick game while this finishes'}</button>}
+            {playOpen && phase !== 'naming' && <WhileYouWait onCheckName={(label) => { setInput(label); setMode('auto'); inputRef.current?.focus(); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />}
           </>}
 
           <div className="mt-6 space-y-4">
@@ -460,9 +504,10 @@ export default function Domain() {
 
           {labBlock}
 
+          <div ref={loadMoreRef} aria-hidden="true" />
           {phase === 'idle' && context && results.length < maxSuggestions && <div className="mt-8 flex justify-center">
             <button type="button" onClick={findMore} className="group inline-flex items-center justify-center gap-3 rounded-full bg-[var(--ink)] py-2 pl-5 pr-2 text-sm font-semibold text-white transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-0.5 active:scale-[.98]">
-              Find {batchSize} more names<span className="grid size-8 place-items-center rounded-full bg-white/15 transition-transform group-hover:rotate-90"><Plus size={14} weight="bold" /></span>
+              Find {Math.min(batchSize, maxSuggestions - results.length)} more names<span className="grid size-8 place-items-center rounded-full bg-white/15 transition-transform group-hover:rotate-90"><Plus size={14} weight="bold" /></span>
             </button>
           </div>}
         </section>}
