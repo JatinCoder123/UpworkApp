@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowClockwise, ShieldCheck, WarningCircle, X } from '@phosphor-icons/react'
 import { adminApi } from '../../services/adminApi'
-import { PAGE_PERMISSIONS } from '../../lib/permissions'
+import { PAGE_PERMISSIONS, permissionKey } from '../../lib/permissions'
 import { asArray, asText } from '../../lib/safe'
 
 // React Query keys for the admin panel, so every tab shares one copy of the data.
@@ -21,14 +21,14 @@ export function useAdminCatalog() {
   return { permissions, roles, users }
 }
 
-const SECTION_NAMES = new Set(Object.values(PAGE_PERMISSIONS))
+const SECTION_NAMES = new Set(Object.values(PAGE_PERMISSIONS).map(permissionKey))
 
 /** Section permissions open a page in the portal; the rest (Reports, User Management, ...) have no page yet. */
 export function groupPermissions(permissions) {
   const list = asArray(permissions)
   return [
-    { title: 'Sections', note: 'Each opens a page in the portal.', items: list.filter((permission) => SECTION_NAMES.has(permission.name)) },
-    { title: 'Other access', note: 'No page in the portal uses these yet.', items: list.filter((permission) => !SECTION_NAMES.has(permission.name)) },
+    { title: 'Sections', note: 'Each opens a page in the portal.', items: list.filter((permission) => SECTION_NAMES.has(permissionKey(permission.name))) },
+    { title: 'Other access', note: 'No page in the portal uses these yet.', items: list.filter((permission) => !SECTION_NAMES.has(permissionKey(permission.name))) },
   ].filter((group) => group.items.length)
 }
 

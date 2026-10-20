@@ -66,7 +66,7 @@ export function ExtraFilterFields({ value, onChange, onPaper = false }) {
   return <>
     <p className={fieldLabel}>Job type</p>
     <div className={`mt-2 grid grid-cols-3 gap-1 rounded-xl ${tone.field} p-1 ring-1 ring-black/5 dark:ring-white/10`} role="radiogroup" aria-label="Job type">
-      {JOB_TYPES.map(([id, label]) => <button key={id} type="button" role="radio" aria-checked={value.jobType === id} onClick={() => onChange({ ...value, jobType: value.jobType === id ? 'any' : id })} className={`whitespace-nowrap rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${value.jobType === id ? 'bg-[var(--ink)] text-white shadow-sm' : `text-[var(--muted)] ${tone.hover} hover:text-[var(--ink)]`}`}>{label}</button>)}
+      {JOB_TYPES.map(([id, label]) => <button key={id} type="button" role="radio" aria-checked={value.jobType === id} onClick={() => onChange({ ...value, jobType: value.jobType === id ? 'any' : id })} className={`whitespace-nowrap rounded-lg px-2 py-2 text-xs font-semibold transition-colors ${value.jobType === id ? 'bg-[var(--ink)] text-white shadow-sm dark:bg-[var(--text)] dark:text-[var(--paper)]' : `text-[var(--muted)] ${tone.hover} hover:text-[var(--ink)]`}`}>{label}</button>)}
     </div>
 
     <p className={`${fieldLabel} mt-4`}>Client location</p>

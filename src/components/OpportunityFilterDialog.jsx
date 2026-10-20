@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, CircleNotch, PencilSimple, Plus, Trash, X } from '@phosphor-icons/react'
-import { DialogHeader, Modal } from './ui'
+import { Check, CircleNotch, Info, MagnifyingGlass, PencilSimple, Plus, Trash, X } from '@phosphor-icons/react'
+import { Modal } from './ui'
 import { ExtraFilterFields } from './JobListControls'
 import { api } from '../services/api'
 import { EMPTY_EXTRA_FILTERS } from '../lib/preferences'
@@ -23,6 +23,8 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
   // CRM dropdown keys ('' = all), starting from the category picked in the skills section.
   const [category, setCategory] = useState(group.category || '')
   const [subcategory, setSubcategory] = useState(group.category ? group.subcategory || '' : '')
+  // Search box over the skills in the open tab (by name).
+  const [query, setQuery] = useState('')
 
   const updateSkillCache = (updater) => queryClient.setQueryData(['skills'], (current) => {
     if (!asArray(current?.pages).length) return current
@@ -97,7 +99,9 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
     placeholderData: (previous) => previous,
   })
   const inGroup = new Set(asArray(groupSkills).map((record) => record.id))
-  const visibleSkills = category ? skillRecords.filter((record) => inGroup.has(record.id) || editing?.id === record.id) : skillRecords
+  const searchText = query.trim().toLowerCase()
+  const visibleSkills = (category ? skillRecords.filter((record) => inGroup.has(record.id) || editing?.id === record.id) : skillRecords)
+    .filter((record) => !searchText || editing?.id === record.id || asText(record.name).toLowerCase().includes(searchText))
   const tabCount = (field, value) => groupCounts?.[field]?.[value]
   // Every sub category in the CRM dropdown is a tab, each with its skill count.
   const subcategoryTabs = asArray(groupOptions.subcategory)
@@ -148,39 +152,54 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
 
   return (
     <Modal onClose={applyAndClose} wide>
-      <DialogHeader eyebrow={skillsOnly ? 'Skills' : 'Refine jobs'} title={skillsOnly ? 'Filter by skill' : 'Filter your job list'} onClose={applyAndClose} />
-      {!skillsOnly && <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-        Narrow jobs by type and client location, and choose from the shared CRM skills. Skill changes here update the outr_skills module for everyone. Your picks apply when you close this panel.
-      </p>}
-      {!skillsOnly && <div className="mt-7 rounded-2xl bg-[var(--paper)] p-4">
-        <p className="text-[10px] font-bold uppercase tracking-[.17em] text-[var(--muted)]">More filters</p>
-        <p className="mt-1 text-[9px] text-[var(--muted)]">Job type and client location</p>
-        <div className="mt-4"><ExtraFilterFields value={filters} onChange={changeFilters} onPaper /></div>
-      </div>}
-      <div className={`${skillsOnly ? 'mt-6' : 'mt-4'} rounded-2xl bg-[var(--paper)] p-4`}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {skillsOnly ? <p className="text-xs font-semibold text-[var(--muted)]">{selectedSkills.length ? `${selectedSkills.length} ${selectedSkills.length === 1 ? 'skill' : 'skills'} selected` : 'Pick one or more skills'}</p> : <div>
-            <p className="text-[10px] font-bold uppercase tracking-[.17em] text-[var(--muted)]">All skills</p>
-            <p className="mt-1 text-[9px] text-[var(--muted)]">{skillRecords.length} loaded from CRM</p>
-          </div>}
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={() => setIsAdding(true)} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--raised)] px-3 py-1.5 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-all duration-300 hover:ring-[var(--lime-dark)]">
-              <Plus size={11} weight="bold" /> Add skill
+      {/* Dark header with the lime circles, as in the design. */}
+      <div className="relative -mx-5 -mt-5 mb-6 overflow-hidden rounded-t-[calc(2rem-.375rem)] bg-[#1f2a21] px-6 pb-7 pt-12 sm:-mx-8 sm:-mt-8 sm:px-8">
+        <span aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-44 rounded-full bg-[#c8df7a]" />
+        <span aria-hidden="true" className="pointer-events-none absolute right-12 top-20 size-12 rounded-full border-2 border-[#c8df7a]/80" />
+        {/* Solid dark circle, so the x shows clearly on top of the lime circle. */}
+        <button type="button" onClick={applyAndClose} aria-label="Close dialog" className="absolute right-6 top-6 z-10 grid size-9 place-items-center rounded-full bg-[#1f2a21] text-white shadow-[0_4px_14px_rgba(0,0,0,.25)] ring-1 ring-white/25 transition-transform hover:scale-105"><X size={15} weight="bold" /></button>
+        <h2 className="relative max-w-[17rem] text-[1.75rem] font-semibold leading-[1.05] tracking-[-.045em] text-white">Find the skills that <span className="block font-serif italic text-[#c8df7a]">fit you.</span></h2>
+      </div>
+
+      {!skillsOnly && <div className="space-y-1"><ExtraFilterFields value={filters} onChange={changeFilters} /></div>}
+
+      <div className={skillsOnly ? '' : 'mt-6'}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Skills</p>
+            <p className="mt-1 text-[11px] text-[var(--muted)]">{selectedSkills.length} selected · {skillRecords.length} from CRM</p>
+          </div>
+          {/* Clear and Apply filter, next to Add skill. */}
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            {skillsOnly
+              // Clear: no skills, back to All / All. The removed skills apply straight away, like other removals.
+              ? <button type="button" disabled={!selectedSkills.length && !skills.length && !category} onClick={() => { setSelectedSkills([]); pickCategory(''); if (skills.length) removeNow({ skills: [] }) }} className="rounded-full px-3.5 py-2 text-xs font-bold text-[var(--muted)] transition-colors hover:text-[var(--ink)] disabled:pointer-events-none disabled:opacity-40">Clear</button>
+              : <button type="button" disabled={!hasFilters} onClick={clearFilters} className="rounded-full px-3.5 py-2 text-xs font-bold text-[var(--muted)] transition-colors hover:text-[var(--ink)] disabled:pointer-events-none disabled:opacity-40">Clear filters</button>}
+            <button type="button" onClick={applyAndClose} className="rounded-full bg-[var(--text)] px-4 py-2 text-xs font-bold text-[var(--paper)] transition-transform duration-300 hover:-translate-y-0.5">Apply filter</button>
+            <button type="button" onClick={() => setIsAdding(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--raised)] px-3.5 py-2 text-xs font-bold text-[var(--ink)] ring-1 ring-[var(--ink)]/70 transition-colors hover:bg-[var(--paper)]">
+              <Plus size={12} weight="bold" /> Add skill
             </button>
           </div>
         </div>
 
-        {/* Department = CRM category, Role = CRM sub category. */}
-        {skillsOnly && asArray(groupOptions.category).length > 0 && <p className="mt-4 text-[10px] font-bold uppercase tracking-[.17em] text-[var(--muted)]">Department</p>}
-        {asArray(groupOptions.category).length > 0 && <div role="tablist" aria-label="Departments" className={`${skillsOnly ? 'mt-2' : 'mt-4'} flex gap-1.5 pb-1 ${skillsOnly ? 'flex-wrap' : 'overflow-x-auto [scrollbar-width:thin]'}`}>
-          <button type="button" role="tab" aria-selected={!category} onClick={() => pickCategory('')} className={tabClass(!category)}>All{countBadge(!category, skillRecords.length)}</button>
-          {groupOptions.category.map((option) => {
+        <label className="mt-3 flex items-center gap-2 rounded-xl bg-[var(--raised)] px-3.5 py-2.5 ring-1 ring-[var(--line)] focus-within:ring-2 focus-within:ring-[var(--lime-dark)]">
+          <MagnifyingGlass size={14} className="shrink-0 text-[var(--muted)]" />
+          <span className="sr-only">Search skills</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape' && query) { event.stopPropagation(); setQuery('') } }} placeholder={`Search ${skillRecords.length} skills`} className="min-w-0 flex-1 bg-transparent text-xs font-medium text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" />
+          {query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search" className="grid size-5 place-items-center rounded-full text-[var(--muted)] hover:text-[var(--ink)]"><X size={10} weight="bold" /></button>}
+        </label>
+
+        {asArray(groupOptions.category).length > 0 && <div role="tablist" aria-label="Departments" className="mt-4 flex gap-5 overflow-x-auto border-b border-[var(--line)] [scrollbar-width:none]">
+          {[{ value: '', label: 'All', total: skillRecords.length }, ...groupOptions.category.map((option) => ({ ...option, total: tabCount('category', option.value) }))].map((option) => {
             const active = category === option.value
-            return <button key={option.value} type="button" role="tab" aria-selected={active} onClick={() => pickCategory(active ? '' : option.value)} title={active ? 'Click to remove' : undefined} className={tabClass(active)}>{option.label}{countBadge(active, tabCount('category', option.value))}</button>
+            return <button key={option.value || 'all'} type="button" role="tab" aria-selected={active} onClick={() => pickCategory(active ? '' : option.value)} title={active && option.value ? 'Click to remove' : undefined} className={`-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 pb-2.5 text-xs font-semibold transition-colors ${active ? 'border-[var(--ink)] text-[var(--ink)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--ink)]'}`}>
+              {option.label}
+              {option.total != null && <span className={`rounded-full px-1.5 py-px text-[10px] font-bold tabular-nums ${active ? 'bg-[var(--ink)] text-white dark:bg-[var(--text)] dark:text-[var(--paper)]' : 'bg-[var(--paper)] text-[var(--muted)] ring-1 ring-[var(--line)]'}`}>{option.total}</span>}
+            </button>
           })}
         </div>}
-        {skillsOnly && category && subcategoryTabs.length > 0 && <p className="mt-4 text-[10px] font-bold uppercase tracking-[.17em] text-[var(--muted)]">Role</p>}
-        {category && subcategoryTabs.length > 0 && <div role="tablist" aria-label={`${categoryLabel} roles`} className={`mt-2 flex gap-1.5 border-l-2 border-[var(--line)] pb-1 pl-2.5 ${skillsOnly ? 'flex-wrap' : 'overflow-x-auto [scrollbar-width:thin]'}`}>
+        {/* Roles of the chosen department, under its tab. */}
+        {category && subcategoryTabs.length > 0 && <div role="tablist" aria-label={`${categoryLabel} roles`} className="mt-3 flex flex-wrap gap-1.5">
           <button type="button" role="tab" aria-selected={!subcategory} onClick={() => setSubcategory('')} className={tabClass(!subcategory, true)}>All {categoryLabel}{countBadge(!subcategory, tabCount('category', category))}</button>
           {subcategoryTabs.map((option) => {
             const active = subcategory === option.value
@@ -198,8 +217,7 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
           </div>
         )}
 
-        {skillsOnly && <p className="mt-4 text-[10px] font-bold uppercase tracking-[.17em] text-[var(--muted)]">Skills</p>}
-        <div className={`${skillsOnly ? 'mt-2' : 'mt-4'} flex max-h-[42dvh] flex-wrap content-start gap-2 overflow-y-auto pr-1`}>
+        <div className="mt-3 flex max-h-[38dvh] min-h-24 flex-wrap content-start gap-2 overflow-y-auto rounded-2xl p-1 pr-2 [scrollbar-width:thin]">
           {visibleSkills.map((record) => editing?.id === record.id ? (
             <div key={record.id} className="flex items-center gap-1 rounded-full bg-[var(--raised)] p-1 ring-1 ring-[var(--lime-dark)]">
               <input autoFocus value={editing.name} onChange={(event) => setEditing((current) => ({ ...current, name: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') handleUpdateSkill(); if (event.key === 'Escape') { event.stopPropagation(); setEditing(null) } }} className="w-32 bg-transparent px-2 text-[10px] font-semibold outline-none" />
@@ -207,8 +225,8 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
               <button type="button" onClick={() => setEditing(null)} className="grid size-6 place-items-center rounded-full text-[var(--muted)]" aria-label="Cancel editing"><X size={10} weight="bold" /></button>
             </div>
           ) : (
-            <div key={record.id} className={`group flex items-center rounded-full ring-1 transition-all duration-300 ${record._deleting ? 'opacity-55' : ''} ${selectedSkills.includes(record.name) ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/30' : 'bg-[var(--surface)] text-[var(--muted)] ring-black/5'}`}>
-              <button type="button" disabled={record._creating || record._deleting} onClick={() => toggleSkill(record.name)} className="py-2 pl-3 pr-2 text-[10px] font-semibold disabled:cursor-wait">{record.name}</button>
+            <div key={record.id} className={`group flex items-center rounded-full ring-1 transition-all duration-300 ${record._deleting ? 'opacity-55' : ''} ${selectedSkills.includes(record.name) ? 'bg-[#d6e9a0] text-[#26320b] ring-[#9fbf4c]' : 'bg-[var(--raised)] text-[var(--ink)] ring-[var(--line)]'}`}>
+              <button type="button" disabled={record._creating || record._deleting} onClick={() => toggleSkill(record.name)} className="inline-flex items-center gap-1 py-2 pl-3 pr-2 text-[11px] font-semibold disabled:cursor-wait">{selectedSkills.includes(record.name) && <Check size={11} weight="bold" />}{record.name}</button>
               {record._creating ? <span className="mr-2 grid size-5 place-items-center" aria-label="Creating skill"><CircleNotch size={11} className="animate-spin" /></span> : <button type="button" disabled={record._deleting} onClick={() => { setEditing({ id: record.id, name: asText(record.name), previousName: record.name }); setDeleteCandidate(null) }} className="grid size-6 place-items-center rounded-full opacity-45 transition-opacity hover:bg-black/5 hover:opacity-100 disabled:pointer-events-none" aria-label={`Rename ${record.name}`}><PencilSimple size={10} /></button>}
               {!record._creating && (record._deleting ? <span className="mr-2 grid size-6 place-items-center" aria-label="Deleting skill"><CircleNotch size={11} className="animate-spin" /></span> :
               deleteCandidate === record.id ? <>
@@ -219,16 +237,11 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
           ))}
           {(isLoading || (category && groupLoading)) && <span className="rounded-full bg-[var(--surface)] px-3 py-2 text-[10px] font-semibold text-[var(--muted)]">Loading skills…</span>}
           {!isLoading && skillRecords.length === 0 && !mutationError && <p className="py-6 text-xs text-[var(--muted)]">No CRM skills have been created yet.</p>}
-          {!isLoading && !groupLoading && skillRecords.length > 0 && visibleSkills.length === 0 && <p className="py-6 text-xs text-[var(--muted)]">No skills in {[categoryLabel, subcategoryLabel].filter(Boolean).join(' · ')} yet.</p>}
+          {!isLoading && !groupLoading && skillRecords.length > 0 && visibleSkills.length === 0 && <p className="px-2 py-6 text-xs text-[var(--muted)]">{searchText ? `No skills match "${query.trim()}".` : `No skills in ${[categoryLabel, subcategoryLabel].filter(Boolean).join(' · ')} yet.`}</p>}
         </div>
+        <p className="mt-3 flex items-center gap-2 rounded-xl bg-[var(--paper)] px-3 py-2 text-[11px] text-[var(--muted)] ring-1 ring-[var(--line)]/70"><Info size={13} className="shrink-0" />Edits to skills are shared with your whole team.</p>
       </div>
-      {skillsOnly ? <div className="mt-5 flex items-center justify-end gap-2">
-        {/* Clear: no skills, back to All / All. The removed skills apply straight away, like other removals. */}
-        <button type="button" disabled={!selectedSkills.length && !skills.length && !category} onClick={() => { setSelectedSkills([]); pickCategory(''); if (skills.length) removeNow({ skills: [] }) }} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)] transition-colors hover:text-[var(--ink)] disabled:pointer-events-none disabled:opacity-40">Clear</button>
-        <button type="button" onClick={applyAndClose} className="rounded-full bg-[var(--text)] px-6 py-3 text-xs font-bold text-[var(--paper)] transition-transform duration-300 hover:-translate-y-0.5">Apply filter</button>
-      </div> : hasFilters && <div className="mt-5 flex justify-end">
-        <button type="button" onClick={clearFilters} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)] transition-colors hover:text-[var(--ink)]">Clear filters</button>
-      </div>}
+
     </Modal>
   )
 }

@@ -18,6 +18,7 @@ export function useJobStatus() {
       queryClient.setQueryData(['job', id], (current) => (current ? { ...current, ...updatedJob, coverLetter: current.coverLetter || updatedJob.coverLetter } : updatedJob))
       // Before ['jobs']: the Applied tab's list reads this cache entry.
       queryClient.invalidateQueries({ queryKey: ['my-applied'] })
+      queryClient.invalidateQueries({ queryKey: ['preferred-jobs'] })
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
       queryClient.invalidateQueries({ queryKey: ['job-stats'] })
       queryClient.invalidateQueries({ queryKey: ['job-activity', id] })

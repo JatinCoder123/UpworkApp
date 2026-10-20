@@ -37,6 +37,7 @@ export function useCrmReactions(user) {
     const apply = (job) => (job?.id === id ? change(job) : job)
     queryClient.setQueriesData({ queryKey: ['jobs'] }, (pages) => (asArray(pages?.pages).length ? { ...pages, pages: pages.pages.map((page) => ({ ...page, records: asArray(page?.records).map(apply) })) } : pages))
     queryClient.setQueryData(['job', id], (job) => (job ? apply(job) : job))
+    queryClient.setQueriesData({ queryKey: ['preferred-jobs'] }, (list) => (Array.isArray(list) ? list.map(apply) : list))
   }
   // Shows `on` for this reaction straight away, in the user's id list and the job's own engagement.
   const show = (kind, id, on) => {

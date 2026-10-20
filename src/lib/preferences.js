@@ -144,13 +144,24 @@ const DATE_FILTER_KEYS = {
 
 const DATE_PRESETS = new Set(['all', 'today', 'yesterday', '24hours', '7days', '30days', 'lastMonth', 'custom'])
 
+// The date window a page starts with when the user has not picked one.
+const DEFAULT_DATE_FILTERS = {
+  jobs: { preset: '7days', from: '', to: '' },
+}
+
+export function defaultDateFilter(moduleName) {
+  return { ...(DEFAULT_DATE_FILTERS[moduleName] || { preset: 'all', from: '', to: '' }) }
+}
+
 export function loadDateFilter(moduleName) {
-  const fallback = { preset: 'all', from: '', to: '' }
+  const fallback = defaultDateFilter(moduleName)
   const key = DATE_FILTER_KEYS[moduleName]
   if (!key) return fallback
   try {
     const saved = JSON.parse(localStorage.getItem(key) || 'null')
     if (!saved || !DATE_PRESETS.has(saved.preset)) return fallback
+    // A page with its own default (Jobs: Last 7 days) always opens on it instead of a saved "Any time".
+    if (saved.preset === 'all' && DEFAULT_DATE_FILTERS[moduleName]) return fallback
     if (saved.preset === 'custom' && (!saved.from || !saved.to)) return fallback
     return { preset: saved.preset, from: saved.from || '', to: saved.to || '' }
   } catch {

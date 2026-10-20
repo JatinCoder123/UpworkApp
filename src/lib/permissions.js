@@ -8,10 +8,10 @@ import { asArray, asText } from './safe'
 
 /*
  * Page -> CRM permission name (one record per module in the Permissions module).
- * Names must match the CRM exactly; when a permission is renamed in the CRM, rename it here in the same release.
+ * Names are matched ignoring upper / lower case and extra spaces ("API Playground" = the CRM's "Api Playground");
+ * when a permission is renamed in the CRM beyond that, rename it here in the same release.
  * Detail pages share their list page's permission (/jobs/:id needs "Jobs").
  * Pages not listed here are open to every signed-in user (Profile, Preferences, Activity, Onboarding).
- * "API Playground" has no CRM permission yet: until an admin creates one, only admins see that page.
  */
 export const PAGE_PERMISSIONS = {
   '/jobs': 'Jobs',
@@ -53,10 +53,14 @@ export function roleOf(user) {
 /** What to show where the user's name appears. */
 export const roleLabel = (user) => (isAdminUser(user) ? 'Admin' : roleOf(user) ?? 'No role')
 
+/** A permission name for comparing: case and extra spaces do not matter ("Api Playground" = "API Playground"). */
+export const permissionKey = (name) => asText(name).trim().replace(/\s+/g, ' ').toLowerCase()
+
 /** True when the user holds this permission name. No permission needed, or an admin: always true. */
 export function can(user, permission) {
   if (!permission || isAdminUser(user)) return true
-  return asArray(user?.permissions).includes(permission)
+  const wanted = permissionKey(permission)
+  return asArray(user?.permissions).some((held) => permissionKey(held) === wanted)
 }
 
 /** The permission a page needs, or null when every signed-in user may open it. */

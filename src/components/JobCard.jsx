@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUUpLeft, BookmarkSimple, Briefcase, CheckCircle, Clock, Eye, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Star, Target } from '@phosphor-icons/react'
+import { ArrowUUpLeft, BookmarkSimple, Briefcase, CheckCircle, Clock, Eye, Fire, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Star, Target } from '@phosphor-icons/react'
 import { StatusPill } from './ui'
 import { Chips, Price } from './JobApplySection'
 import ShareJobDialog from './ShareJobDialog'
@@ -100,6 +100,8 @@ export default function JobCard({ job, index, now, liked, saved, onLike, onSave,
           )}
           {isNew && <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--accent)] opacity-60" /><span className="relative size-2 rounded-full bg-[var(--accent)]" /></span>}
           <time dateTime={job.postedAt} title={job.posted} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-strong)]"><Clock size={12} weight="bold" />{timeAgo(job.postedAt, now) || job.posted}</time>
+          {/* Solid colours only (no see-through tints), so it looks the same in every browser and theme. */}
+          {job.preference && <span title="Matches your preferences" className="inline-flex items-center gap-1 rounded-full bg-[#fff1e6] px-2 py-0.5 text-[10px] font-semibold text-[#c2410c] ring-1 ring-[#fed7aa] dark:bg-[#3b1d0e] dark:text-[#fdba74] dark:ring-[#7c2d12]"><Fire size={10} weight="fill" className="text-[#f97316]" />Hot</span>}
           {job.appliedAt && <span title={`You applied on ${job.appliedAt}`} className="inline-flex items-center gap-1 rounded-full bg-[var(--ok-bg)] px-2.5 py-0.5 text-[10px] font-bold text-[var(--ok)]"><CheckCircle size={11} weight="fill" />You applied {job.appliedAgo || ''}{job.appliedAgo ? ' · ' : ''}{job.appliedAt}</span>}
         </div>
         <h3 className="mt-3 text-lg font-semibold leading-snug tracking-[-.025em] transition-colors duration-300 group-hover:text-[var(--accent-strong)] sm:text-[1.2rem]">{job.title}</h3>

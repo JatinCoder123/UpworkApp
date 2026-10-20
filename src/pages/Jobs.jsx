@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import gsap from "gsap";
-import { BookmarkSimple, Briefcase, Broadcast, CaretDown, CaretRight, Check, ClockCounterClockwise, Funnel, Heart, MagnifyingGlass, Plus, SlidersHorizontal, X } from "@phosphor-icons/react";
+import { BookmarkSimple, Briefcase, Broadcast, CaretDown, CaretRight, Check, ClockCounterClockwise, Funnel, GearSix, Heart, MagnifyingGlass, Plus, SlidersHorizontal, X } from "@phosphor-icons/react";
 import Shell from "../components/Shell";
 import JobCard from "../components/JobCard";
 import JobDrawer from "../components/JobDrawer";
@@ -11,6 +11,7 @@ import HScroll from "../components/HScroll";
 import { AddJobDialog } from "../components/dialogs";
 import DateTimeRangeFilter from "../components/DateTimeRangeFilter";
 import OpportunityFilterDialog from "../components/OpportunityFilterDialog";
+import JobPreferencesDialog from "../components/JobPreferencesDialog";
 import LiveSearchDialog from "../components/LiveSearchDialog";
 import { ActiveDateFilterChip, RefreshFilterButton } from "../components/FilterToolbarControls";
 import { iconButton, primaryButton } from "../components/ui";
@@ -108,6 +109,9 @@ export default function Jobs() {
   const [adding, setAdding] = useState(false);
   const [liveSearching, setLiveSearching] = useState(false);
   const [skillDialog, setSkillDialog] = useState(false);
+  // "My preferences": on every time the page opens; unticked, the feed is the plain newest-first list.
+  const [usePreferences, setUsePreferences] = useState(true);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [activeId, setActiveId] = useState(null);
   const [sort, setSort] = useState(loadJobSort);
   const [extraFilters, setExtraFilters] = useState(() => loadExtraFilters("jobs"));
@@ -239,12 +243,38 @@ export default function Jobs() {
   });
   const reactionJobs = reactionJobQueries.map((query) => query.data).filter((job) => job?.id);
   const reactionJobsKey = reactionJobs.map((job) => `${job.id}:${job.status}`).join("|");
+  // The user's feed preferences (CRM, outr_user_preferences) and the jobs that match them (any age, New / Seen),
+  // both through the gateway. Used on the New and All tabs of the plain list (not Saved / Liked).
+  const { data: preferenceData } = useQuery({ queryKey: ["my-preferences", user?.email], queryFn: () => api.getMyPreferences(user.email), enabled: Boolean(user?.email), staleTime: 5 * 60_000 });
+  const preferences = useMemo(() => asArray(preferenceData?.records), [preferenceData]);
+  const activePreferences = useMemo(() => preferences.filter((preference) => preference.active), [preferences]);
+  const preferenceOptions = preferenceData?.options || EMPTY_GROUP_OPTIONS;
+  const preferencesApply = usePreferences && activePreferences.length > 0 && (tab === "New" || tab === "All") && !reactionView;
+  const { data: preferredJobsData } = useQuery({
+    queryKey: ["preferred-jobs", showAllJobs ? "all" : user?.email, search, jobCategory, jobSubcategory, serverSkill, activePreferences],
+    queryFn: () => api.getPreferredJobs({ userEmail: user.email, preferences: activePreferences, allJobs: showAllJobs, search, category: jobCategory, subcategory: jobSubcategory, skill: serverSkill }),
+    enabled: Boolean(user?.email) && preferencesApply,
+    placeholderData: (previous) => previous,
+  });
   const allDisplayJobs = useMemo(() => {
     const loadedIds = new Set(loadedJobs.map((job) => job.id));
-    return [...loadedJobs, ...reactionJobs.filter((job) => !loadedIds.has(job.id))];
+    const plain = [...loadedJobs, ...reactionJobs.filter((job) => !loadedIds.has(job.id))];
+    if (!preferencesApply) return plain;
+    // Preference jobs come first, highest priority first (newest first within the same priority); every other job
+    // follows below in the list's own order (newest first, or the chosen sort). A job already loaded keeps its own copy.
+    const labelOf = (list, value) => asArray(list).find((option) => option.value === value)?.label || "";
+    const preferred = new Map(asArray(preferredJobsData).map((job) => [job.id, job.preference]));
+    const plainIds = new Set(plain.map((job) => job.id));
+    const merged = [...plain, ...asArray(preferredJobsData).filter((job) => !plainIds.has(job.id))].map((job) => {
+      const preference = preferred.get(job.id);
+      return preference ? { ...job, preference: { ...preference, label: labelOf(preferenceOptions.subcategory, preference.subcategory) || labelOf(preferenceOptions.category, preference.category) || "Any role" } } : job;
+    });
+    const postedTime = (job) => { const time = new Date(job.postedAt).getTime(); return Number.isFinite(time) ? time : 0; };
+    const mine = merged.filter((job) => job.preference).sort((a, b) => b.preference.priority - a.preference.priority || postedTime(b) - postedTime(a));
+    return [...mine, ...merged.filter((job) => !job.preference)];
     // reactionJobs is a new array each render; its key says when its contents change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedJobs, reactionJobsKey]);
+  }, [loadedJobs, reactionJobsKey, preferencesApply, preferredJobsData, preferenceOptions]);
 
   // A refreshed or shared ?job= link can point at a job outside the loaded pages; fetch that one on its own.
   const listedPreview = previewId ? allDisplayJobs.find((job) => job.id === previewId) : null;
@@ -407,6 +437,15 @@ export default function Jobs() {
                   <BookmarkSimple size={14} weight={savedOnly || reactions.saved.length > 0 ? "fill" : "regular"} className={savedOnly || reactions.saved.length > 0 ? "text-[#0284c7] dark:text-[#7dd3fc]" : "text-[#0369a1]"} />Saved
                   {reactions.saved.length > 0 && <span className={`font-mono text-[10px] tabular-nums ${savedOnly ? "opacity-75" : "text-[var(--muted)]"}`}>{reactions.saved.length}</span>}
                 </button>
+                {/* My preferences: ticked, matching jobs are placed by their priority; the gear edits them (saved in the CRM). */}
+                <span className={`inline-flex shrink-0 items-center rounded-full ring-1 transition-colors ${usePreferences && activePreferences.length ? "bg-(--lime)/35 ring-[var(--lime-dark)]/40" : "bg-[var(--surface)] ring-[var(--line)]"}`}>
+                  <label className="inline-flex cursor-pointer items-center gap-2 py-2 pl-3.5 pr-2 text-xs font-semibold text-[var(--ink)]" title={activePreferences.length ? "Place jobs that match my preferences by their priority" : "No active preferences yet: use the gear to add one"}>
+                    <input type="checkbox" checked={usePreferences} onChange={(event) => setUsePreferences(event.target.checked)} className="size-3.5 accent-[var(--lime-dark)]" />
+                    My preferences
+                    {activePreferences.length > 0 && <span className="font-mono text-[10px] tabular-nums text-[var(--muted)]">{activePreferences.length}</span>}
+                  </label>
+                  <button type="button" onClick={() => setPreferencesOpen(true)} aria-label="Edit my preferences" title="Edit my preferences" className="mr-1 grid size-7 place-items-center rounded-full text-[var(--muted)] transition-colors hover:bg-black/5 hover:text-[var(--ink)] dark:hover:bg-white/10"><GearSix size={14} weight="bold" /></button>
+                </span>
               </div>
               <span aria-hidden="true" className="hidden h-6 w-px shrink-0 bg-[var(--line)] sm:block" />
               {/* Skills: Department (CRM category) -> Role (CRM sub category) -> that role's skills. The gateway filters each step. */}
@@ -556,6 +595,7 @@ export default function Jobs() {
         {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={jobStatus.markApplied} applyError={jobStatus.errorId === preview.id ? `Could not mark this job as applied: ${jobStatus.error?.message || "please try again."}` : ""} />}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}
+        {preferencesOpen && <JobPreferencesDialog user={user} preferences={preferences} options={preferenceOptions} onClose={() => setPreferencesOpen(false)} />}
         {skillDialog && <OpportunityFilterDialog key={skillDialog} skillsOnly={skillDialog === "skills"} skills={skills} extraFilters={extraFilters} skillRecords={skillRecords} groupOptions={groupOptions} group={skillGroup} isLoading={skillsLoading || isFetchingMoreSkills} error={skillsError ? skillsQueryError : null} onClose={() => setSkillDialog(false)} onApply={({ skills: nextSkills, extraFilters: nextFilters, group }) => { setSkills(nextSkills); setExtraFilters(nextFilters); if (group) setSkillGroup(group); setSkillDialog(false); }} onRemove={({ skills: nextSkills, extraFilters: nextFilters }) => { setSkills(nextSkills); setExtraFilters(nextFilters); }} />}
       </main>
     </Shell>
