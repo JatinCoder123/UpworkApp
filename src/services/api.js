@@ -692,6 +692,70 @@ export async function fetchPreferredJobs({ userEmail, preferences, allJobs = fal
   return [...best.values()].map(({ record, preference }) => ({ ...mapGatewayJob(record), preference: { id: preference.id, category: preference.category, subcategory: preference.subcategory, priority: preference.priority, minScore: preference.minScore } }));
 }
 
+// ----------------------------------------------------
+// User feedback (outr_feedback): one CRM record per feedback, linked to the user who gave it
+// ----------------------------------------------------
+
+export const FEEDBACK_MODULE = import.meta.env?.VITE_FEEDBACK_MODULE || "outr_feedback";
+
+function mapFeedback(record) {
+  return {
+    id: record.id,
+    userId: asText(record.user_id),
+    userName: decodeHtml(asText(record.user_name || record.assigned_user_name)),
+    section: decodeHtml(asText(record.section)) || "Portal",
+    pageUrl: decodeHtml(asText(record.page_url)),
+    type: asText(record.feedback_type) || "other",
+    rating: Math.min(5, Math.max(0, Math.round(Number(record.rating) || 0))),
+    message: decodeHtml(asText(record.description)),
+    status: asText(record.status) || "new",
+    createdAt: asText(record.date_entered_uni_format || record.date_entered),
+    createdAgo: asText(record.date_entered_time_ago),
+  };
+}
+
+// Feedback newest first: the signed-in user's own (mine) or everyone's (admin), with the CRM's Type / Status choices.
+export async function fetchFeedback({ userEmail = "", mine = false } = {}) {
+  const filters = mine ? { user_id: await findGatewayUserIdByEmail(userEmail) } : {};
+  const query = { action: "fetch", module: FEEDBACK_MODULE, filters, order_by: "date_entered", order_dir: "DESC" };
+  const first = await smartGateway({ ...query, page: 1, per_page: 50 });
+  const totalPages = Math.max(Number(first.total_pages) || 1, 1);
+  const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => smartGateway({ ...query, page: index + 2, per_page: 50 })));
+  const lists = asObject(first.dropdown_lists);
+  const choices = (list) => Object.entries(asObject(list)).map(([value, label]) => [asText(value), decodeHtml(asText(label))]).filter(([value]) => value);
+  return {
+    records: [first, ...rest].flatMap((page) => asArray(page?.records)).filter((record) => record && record.deleted !== "1").map(mapFeedback),
+    options: { type: choices(lists.feedback_type), status: choices(lists.status) },
+  };
+}
+
+// Saves one feedback from the signed-in user (status New).
+export async function createFeedback(userEmail, { section = "", pageUrl = "", type = "other", rating = 0, message = "", typeLabel = "" } = {}) {
+  const text = asText(message).trim();
+  if (!text) throw createAppError("FEEDBACK_EMPTY", "Write your feedback first.");
+  const userId = await findGatewayUserIdByEmail(userEmail);
+  const stars = Math.min(5, Math.max(0, Math.round(Number(rating) || 0)));
+  const data = {
+    name: [asText(section) || "Portal", typeLabel || type, stars ? `★${stars}` : ""].filter(Boolean).join(" · "),
+    description: text,
+    user_id: userId,
+    assigned_user_id: userId,
+    section: asText(section) || "Portal",
+    page_url: asText(pageUrl).slice(0, 255),
+    feedback_type: type,
+    rating: stars,
+    status: "new",
+  };
+  const created = await smartGateway({ action: "create", module: FEEDBACK_MODULE, data });
+  return created.id ?? created.record?.id ?? created.data?.id ?? "";
+}
+
+// Admin: changes a feedback's status.
+export async function setFeedbackStatus(id, status) {
+  if (!id || !status) return;
+  await smartGateway({ action: "update", module: FEEDBACK_MODULE, id, data: { status } });
+}
+
 export async function fetchJobs(options = {}) {
   const page = await fetchJobsPage(options);
   return page.records;
@@ -1913,6 +1977,9 @@ export const api = {
   deleteMyPreference: (id) => deleteMyPreference(id),
   setMyPreferencesEnabled: (preferences, enabled) => setMyPreferencesEnabled(preferences, enabled),
   getPreferredJobs: (params) => fetchPreferredJobs(params),
+  getFeedback: (params) => fetchFeedback(params),
+  createFeedback: (userEmail, entry) => createFeedback(userEmail, entry),
+  setFeedbackStatus: (id, status) => setFeedbackStatus(id, status),
   getSkillCounts: (params) => fetchSkillCounts(params),
   getGroupOptions: (module) => fetchGroupOptions(module),
   getJobGroupCounts: (params) => fetchJobGroupCounts(params),

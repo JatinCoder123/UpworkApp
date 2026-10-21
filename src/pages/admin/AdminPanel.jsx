@@ -1,16 +1,18 @@
 import { useSearchParams } from 'react-router-dom'
-import { ChartPieSlice, IdentificationBadge, ShieldCheck, UsersThree } from '@phosphor-icons/react'
+import { ChartPieSlice, ChatCircleText, IdentificationBadge, ShieldCheck, UsersThree } from '@phosphor-icons/react'
 import Shell from '../../components/Shell'
 import ErrorBoundary, { SectionError } from '../../components/ErrorBoundary'
 import { ErrorNote, useAdminCatalog } from './adminParts'
 import UsersTab from './UsersTab'
 import RolesTab from './RolesTab'
 import OverviewTab from './OverviewTab'
+import FeedbackTab from './FeedbackTab'
 
 const TABS = [
   ['users', 'Users', UsersThree],
   ['roles', 'Roles', IdentificationBadge],
   ['overview', 'Overview', ChartPieSlice],
+  ['feedback', 'Feedback', ChatCircleText],
 ]
 
 /**
@@ -48,6 +50,7 @@ export default function AdminPanel() {
         <ErrorBoundary name={`admin-${tab}`} resetKey={tab} fallback={SectionError} fallbackProps={{ title: 'This part of the admin panel could not load' }}>
           {tab === 'users' && <UsersTab catalog={catalog} filter={filter} onFilterChange={(next) => openTab('users', next === 'all' ? {} : { filter: next })} />}
           {tab === 'roles' && <RolesTab catalog={catalog} />}
+          {tab === 'feedback' && <FeedbackTab />}
           {tab === 'overview' && <OverviewTab catalog={catalog} onOpenUsers={(next) => openTab('users', next === 'all' ? {} : { filter: next })} />}
         </ErrorBoundary>
       </div>

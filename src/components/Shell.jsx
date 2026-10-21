@@ -7,6 +7,7 @@ import { Mark, iconButton } from './ui'
 import ThemeToggle from './ThemeToggle'
 import DocNotificationBell from './DocNotificationBell'
 import GridPattern from './GridPattern'
+import FeedbackWidget from './FeedbackWidget'
 import { userInitials } from '../lib/auth'
 import { useAuth } from '../contexts/AuthContext'
 import { accessNotice, canAccess, homePath, isAdminUser, roleLabel as labelForRole } from '../lib/permissions'
@@ -176,6 +177,8 @@ export default function Shell({ children }) {
       </p>
     </div>}
     <div className="relative z-10">{children}</div>
+    {/* Feedback button on every signed-in page. */}
+    <FeedbackWidget />
   </div>
 }
 
