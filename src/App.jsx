@@ -32,6 +32,9 @@ const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'))
 
 const NoFallback = () => null
 
+// Where the welcome intro may play: the portal's start, not a link to a page inside it.
+const WELCOME_PATHS = ['/', '/login']
+
 // Signed-in users only. A user without a role picks one on the onboarding page first.
 // A page the user has no permission for (or an admin page, for a non-admin) shows a 403 page at the same URL,
 // never a redirect; URLs that do not exist at all fall through to the 404 route. Rules: lib/permissions.
@@ -56,10 +59,16 @@ function OnboardingRoute() {
 export default function App() {
   const { status, showLoginIntro, completeLoginIntro } = useAuth()
   const location = useLocation()
-  const [showWelcomeIntro, setShowWelcomeIntro] = useState(() => sessionStorage.getItem('outrightfeedportal-welcome-intro') !== 'seen')
+  // The welcome intro plays when the portal is opened at its start (/ or /login), once per tab. A copied link to a
+  // page (e.g. /jobs/123) opened in a new tab goes straight to that page: each tab has its own sessionStorage, so the
+  // "seen" flag alone would replay the intro in every new tab.
+  const [showWelcomeIntro, setShowWelcomeIntro] = useState(() => {
+    if (!WELCOME_PATHS.includes(window.location.pathname)) return false
+    try { return sessionStorage.getItem('outrightfeedportal-welcome-intro') !== 'seen' } catch { return false }
+  })
 
   const completeWelcomeIntro = () => {
-    sessionStorage.setItem('outrightfeedportal-welcome-intro', 'seen')
+    try { sessionStorage.setItem('outrightfeedportal-welcome-intro', 'seen') } catch { /* storage blocked: nothing to remember */ }
     setShowWelcomeIntro(false)
   }
 

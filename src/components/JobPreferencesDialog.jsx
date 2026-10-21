@@ -12,7 +12,7 @@ const selectClass = 'h-9 w-full min-w-0 cursor-pointer rounded-xl bg-[var(--pape
  * that counts, and a priority. Matching jobs come first in the feed, highest priority first, whatever their age;
  * all other jobs follow below. Changes are saved to the CRM together with "Save preferences".
  */
-export default function JobPreferencesDialog({ user, preferences = [], options = { category: [], subcategory: [] }, onClose }) {
+export default function JobPreferencesDialog({ user, enabled = true, preferences = [], options = { category: [], subcategory: [] }, onClose }) {
   const queryClient = useQueryClient()
   const [rows, setRows] = useState(() => asArray(preferences).map((preference) => ({ ...preference, key: preference.id })))
   const [removed, setRemoved] = useState([])
@@ -21,7 +21,7 @@ export default function JobPreferencesDialog({ user, preferences = [], options =
   const labelOf = (list, value) => asArray(list).find((option) => option.value === value)?.label || ''
 
   const update = (key, change) => setRows((current) => current.map((row) => (row.key === key ? { ...row, ...change, dirty: true } : row)))
-  const add = () => setRows((current) => [...current, { key: `new-${Date.now()}`, category: asArray(options.category)[0]?.value || '', subcategory: '', minScore: 60, priority: 70, active: true, dirty: true }])
+  const add = () => setRows((current) => [...current, { key: `new-${Date.now()}`, category: asArray(options.category)[0]?.value || '', subcategory: '', minScore: 60, priority: 70, active: true, userCheck: enabled, dirty: true }])
   const remove = (row) => {
     setRows((current) => current.filter((item) => item.key !== row.key))
     if (row.id) setRemoved((current) => [...current, row.id])

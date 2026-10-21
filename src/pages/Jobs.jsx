@@ -109,8 +109,9 @@ export default function Jobs() {
   const [adding, setAdding] = useState(false);
   const [liveSearching, setLiveSearching] = useState(false);
   const [skillDialog, setSkillDialog] = useState(false);
-  // "My preferences": on every time the page opens; unticked, the feed is the plain newest-first list.
-  const [usePreferences, setUsePreferences] = useState(true);
+  // "My preferences" checkbox: saved in the CRM per user (user_check on the user's preference records), so it is the
+  // same in every browser. The click shows at once; the saved value takes over once the CRM confirms it.
+  const [preferenceToggle, setPreferenceToggle] = useState(null);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [activeId, setActiveId] = useState(null);
   const [sort, setSort] = useState(loadJobSort);
@@ -249,6 +250,20 @@ export default function Jobs() {
   const preferences = useMemo(() => asArray(preferenceData?.records), [preferenceData]);
   const activePreferences = useMemo(() => preferences.filter((preference) => preference.active), [preferences]);
   const preferenceOptions = preferenceData?.options || EMPTY_GROUP_OPTIONS;
+  // Ticked when any of the user's preference records has user_check on (ticked by default before any are saved).
+  const savedToggle = preferences.length ? preferences.some((preference) => preference.userCheck) : true;
+  const usePreferences = preferenceToggle ?? savedToggle;
+  const setUsePreferences = async (enabled) => {
+    setPreferenceToggle(enabled);
+    try {
+      await api.setMyPreferencesEnabled(preferences, enabled);
+      await queryClient.invalidateQueries({ queryKey: ["my-preferences"] });
+    } catch (error) {
+      console.warn("Could not save the My preferences checkbox", error);
+    } finally {
+      setPreferenceToggle(null);
+    }
+  };
   const preferencesApply = usePreferences && activePreferences.length > 0 && (tab === "New" || tab === "All") && !reactionView;
   const { data: preferredJobsData } = useQuery({
     queryKey: ["preferred-jobs", showAllJobs ? "all" : user?.email, search, jobCategory, jobSubcategory, serverSkill, activePreferences],
@@ -595,7 +610,7 @@ export default function Jobs() {
         {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={jobStatus.markApplied} applyError={jobStatus.errorId === preview.id ? `Could not mark this job as applied: ${jobStatus.error?.message || "please try again."}` : ""} />}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}
-        {preferencesOpen && <JobPreferencesDialog user={user} preferences={preferences} options={preferenceOptions} onClose={() => setPreferencesOpen(false)} />}
+        {preferencesOpen && <JobPreferencesDialog user={user} enabled={usePreferences} preferences={preferences} options={preferenceOptions} onClose={() => setPreferencesOpen(false)} />}
         {skillDialog && <OpportunityFilterDialog key={skillDialog} skillsOnly={skillDialog === "skills"} skills={skills} extraFilters={extraFilters} skillRecords={skillRecords} groupOptions={groupOptions} group={skillGroup} isLoading={skillsLoading || isFetchingMoreSkills} error={skillsError ? skillsQueryError : null} onClose={() => setSkillDialog(false)} onApply={({ skills: nextSkills, extraFilters: nextFilters, group }) => { setSkills(nextSkills); setExtraFilters(nextFilters); if (group) setSkillGroup(group); setSkillDialog(false); }} onRemove={({ skills: nextSkills, extraFilters: nextFilters }) => { setSkills(nextSkills); setExtraFilters(nextFilters); }} />}
       </main>
     </Shell>

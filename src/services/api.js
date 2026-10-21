@@ -606,6 +606,8 @@ function mapPreference(record) {
     minScore: clampPercent(record.min_ai_score, 0),
     priority: clampPercent(record.priority, 50),
     active: ["1", "true", "on"].includes(asText(record.active).toLowerCase()) || record.active === true || record.active === 1,
+    // The "My preferences" checkbox on the Jobs page (user_check), kept on every one of the user's preference records.
+    userCheck: ["1", "true", "on"].includes(asText(record.user_check).toLowerCase()) || record.user_check === true || record.user_check === 1,
   };
 }
 
@@ -635,6 +637,7 @@ export async function saveMyPreference(userEmail, preference, labels = {}) {
     min_ai_score: minScore,
     priority,
     active: preference.active === false ? 0 : 1,
+    user_check: preference.userCheck === false ? 0 : 1,
   };
   if (preference.id) {
     await smartGateway({ action: "update", module: PREFERENCES_MODULE, id: preference.id, data });
@@ -642,6 +645,11 @@ export async function saveMyPreference(userEmail, preference, labels = {}) {
   }
   const created = await smartGateway({ action: "create", module: PREFERENCES_MODULE, data });
   return { ...preference, id: created.id ?? created.record?.id ?? created.data?.id ?? "", minScore, priority };
+}
+
+// Saves the "My preferences" checkbox (user_check) on all of the user's preference records, so it follows them.
+export async function setMyPreferencesEnabled(preferences, enabled) {
+  await Promise.all(asArray(preferences).filter((preference) => preference.id).map((preference) => smartGateway({ action: "update", module: PREFERENCES_MODULE, id: preference.id, data: { user_check: enabled ? 1 : 0 } })));
 }
 
 export async function deleteMyPreference(id) {
@@ -1903,6 +1911,7 @@ export const api = {
   getMyPreferences: (userEmail) => fetchMyPreferences(userEmail),
   saveMyPreference: (userEmail, preference, labels) => saveMyPreference(userEmail, preference, labels),
   deleteMyPreference: (id) => deleteMyPreference(id),
+  setMyPreferencesEnabled: (preferences, enabled) => setMyPreferencesEnabled(preferences, enabled),
   getPreferredJobs: (params) => fetchPreferredJobs(params),
   getSkillCounts: (params) => fetchSkillCounts(params),
   getGroupOptions: (module) => fetchGroupOptions(module),
