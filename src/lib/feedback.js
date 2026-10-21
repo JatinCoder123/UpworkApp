@@ -16,7 +16,7 @@ const DEFAULT_STATUSES = [['new', 'New'], ['in_progress', 'In progress'], ['done
 const label = (list, id, fallback) => asArray(list).find(([value]) => value === id)?.[1] || fallback
 
 // Pages that need no permission, named for the feedback list.
-const OPEN_SECTIONS = { '/profile': 'Profile', '/preferences': 'Preferences', '/activity': 'Activity', '/admin': 'Admin panel', '/onboarding': 'Onboarding' }
+const OPEN_SECTIONS = { '/profile': 'Profile', '/preferences': 'Preferences', '/activity': 'Activity', '/admin': 'Admin panel', '/onboarding': 'Onboarding', '/feeds': 'Custom feed' }
 
 /** The section a page belongs to ("Jobs", "Site Content", ...): its menu permission name, or a plain name. */
 export function sectionForPath(pathname) {

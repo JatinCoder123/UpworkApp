@@ -9,6 +9,7 @@ export default function ComingSoon({
   title = 'Daily News',
   description = 'This module is currently being prepared and will be available in an upcoming release.',
   type = 'daily-news',
+  children,
 }) {
   const { user } = useAuth()
   const icons = {
@@ -63,6 +64,7 @@ export default function ComingSoon({
                 <span>Go to AI News</span>
               </Link>}
             </div>
+            {children}
           </div>
         </section>
       </main>

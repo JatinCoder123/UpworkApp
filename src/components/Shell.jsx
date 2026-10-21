@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { CaretDown, ChartLineUp, Clock, List, ShieldCheck, SignOut, SlidersHorizontal, User, UserCircle, WarningCircle, X } from '@phosphor-icons/react'
+import { CaretDown, ChartLineUp, Clock, List, Plus, ShieldCheck, SignOut, SlidersHorizontal, User, UserCircle, WarningCircle, X } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import gsap from 'gsap'
 import { Mark, iconButton } from './ui'
@@ -8,7 +8,9 @@ import ThemeToggle from './ThemeToggle'
 import DocNotificationBell from './DocNotificationBell'
 import GridPattern from './GridPattern'
 import FeedbackWidget from './FeedbackWidget'
+import NewFeedDialog from './NewFeedDialog'
 import { userInitials } from '../lib/auth'
+import { feedPath, useFeeds } from '../lib/feeds'
 import { useAuth } from '../contexts/AuthContext'
 import { accessNotice, canAccess, homePath, isAdminUser, roleLabel as labelForRole } from '../lib/permissions'
 
@@ -34,15 +36,22 @@ export default function Shell({ children }) {
   const queryClient = useQueryClient()
   const [profileOpen, setProfileOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [feedsOpen, setFeedsOpen] = useState(false)
+  const [newFeedOpen, setNewFeedOpen] = useState(false)
   const { user, logout: endAuthSession } = useAuth()
+  const { data: feeds = [] } = useFeeds(user)
   const menuRef = useRef(null)
+  const feedsMenuRef = useRef(null)
   const mobileMenuRef = useRef(null)
   const mobileBackdropRef = useRef(null)
   const mobilePanelRef = useRef(null)
   const mobileTimelineRef = useRef(null)
   const mobileNavigatingRef = useRef(false)
   useEffect(() => {
-    const dismiss = (event) => !menuRef.current?.contains(event.target) && setProfileOpen(false)
+    const dismiss = (event) => {
+      if (!menuRef.current?.contains(event.target)) setProfileOpen(false)
+      if (!feedsMenuRef.current?.contains(event.target)) setFeedsOpen(false)
+    }
     document.addEventListener('pointerdown', dismiss)
     return () => document.removeEventListener('pointerdown', dismiss)
   }, [])
@@ -106,6 +115,8 @@ export default function Shell({ children }) {
   const navItems = navigationItems.filter(([path]) => canAccess(user, path))
   const roleLabel = labelForRole(user)
   const notice = accessNotice(user)
+  const feedsActive = location.pathname.startsWith('/feeds/')
+  const openNewFeed = () => { setFeedsOpen(false); setMobileOpen(false); setNewFeedOpen(true) }
   return <div className="relative isolate min-h-[100dvh] overflow-x-clip bg-[var(--paper)]">
     <GridPattern
       width={72}
@@ -118,6 +129,17 @@ export default function Shell({ children }) {
         <Link to={homePath(user)} className="flex items-center gap-2.5 rounded-full pr-3 text-sm font-bold tracking-[-.02em]"><Mark /><span className="hidden sm:inline">Outright Feed Portal</span></Link>
         <nav className="hidden items-center gap-0.5 rounded-full bg-[var(--ink)]/[.045] p-1 xl:flex">
           {navItems.map(([path, label]) => <Link key={path} to={path} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active(path) ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{label}</Link>)}
+          {/* Custom feeds any user created (CRM), and "+ New feed". */}
+          {/* index.css gives buttons `font: inherit`, so the button's size and weight are set here. */}
+          <div ref={feedsMenuRef} className="relative text-[11px] font-semibold">
+            <button type="button" aria-expanded={feedsOpen} aria-haspopup="menu" onClick={() => setFeedsOpen((open) => !open)} className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${feedsActive ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Feeds<CaretDown size={10} weight="bold" className={`transition-transform ${feedsOpen ? 'rotate-180' : ''}`} /></button>
+            {feedsOpen && <div role="menu" className="absolute right-0 top-11 z-40 w-64 rounded-[1.25rem] bg-black/5 p-1.5 ring-1 ring-black/5 shadow-[0_24px_70px_rgba(30,32,25,.18)]"><div className="max-h-[60vh] overflow-y-auto rounded-[calc(1.25rem-.375rem)] bg-[var(--surface)] p-1.5 text-xs font-bold">
+              {feeds.map((feed) => <Link key={feed.id} role="menuitem" to={feedPath(feed)} onClick={() => setFeedsOpen(false)} className={`block truncate rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${location.pathname === feedPath(feed) ? 'bg-[var(--lime)]/40 text-[var(--ink)]' : 'hover:bg-black/[.04]'}`}>{feed.name}</Link>)}
+              {!feeds.length && <p className="px-3 py-2.5 text-[11px] text-[var(--muted)]">No custom feeds yet.</p>}
+              <div className="my-1 h-px bg-black/[.07]" />
+              <button type="button" role="menuitem" onClick={openNewFeed} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-[var(--ink)] transition-colors hover:bg-black/[.04]"><Plus size={14} weight="bold" />New feed</button>
+            </div></div>}
+          </div>
         </nav>
         <div className="flex items-center gap-2">
           <div className="group relative" tabIndex={0} aria-label={`Role: ${roleLabel}`}>
@@ -160,6 +182,13 @@ export default function Shell({ children }) {
         <nav className="mt-7 grid gap-1" aria-label="Mobile navigation links">
           {navItems.map(([path, label]) => <Link data-mobile-nav key={path} to={path} onClick={(event) => navigateFromMobile(event, path)} className={`group flex items-center justify-between rounded-2xl px-4 py-4 text-base font-semibold transition-colors ${active(path) ? 'bg-[var(--lime)] !text-[#26320b]' : 'hover:bg-[var(--paper)]'}`}><span>{label}</span><ArrowLink /></Link>)}
         </nav>
+        <div className="mt-5">
+          <p className="px-4 text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">Feeds</p>
+          <div className="mt-2 grid gap-1 text-sm font-bold">
+            {feeds.map((feed) => <Link key={feed.id} to={feedPath(feed)} onClick={(event) => navigateFromMobile(event, feedPath(feed))} className={`group flex items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition-colors ${location.pathname === feedPath(feed) ? 'bg-[var(--lime)] !text-[#26320b]' : 'hover:bg-[var(--paper)]'}`}><span className="truncate">{feed.name}</span><ArrowLink /></Link>)}
+            <button type="button" onClick={openNewFeed} className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-sm font-bold text-[var(--ink)] border border-dashed border-[var(--line)] transition-colors hover:bg-[var(--paper)]"><Plus size={16} weight="bold" />New feed</button>
+          </div>
+        </div>
         <div className="mt-auto border-t border-[var(--line)] pt-5">
           <div data-mobile-nav className="mb-3 flex items-center gap-3 px-2"><div className="grid size-10 place-items-center rounded-xl bg-[var(--ink)] text-xs font-bold text-white">{userInitials(user?.name)}</div><div className="min-w-0"><p className="truncate text-sm font-bold">{user?.name}</p><p className="truncate text-[10px] text-[var(--muted)]">{user?.email}</p></div></div>
           <Link data-mobile-nav to="/profile" onClick={(event) => navigateFromMobile(event, '/profile')} className="flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-semibold hover:bg-[var(--paper)]"><UserCircle size={18} />View profile</Link>
@@ -179,6 +208,7 @@ export default function Shell({ children }) {
     <div className="relative z-10">{children}</div>
     {/* Feedback button on every signed-in page. */}
     <FeedbackWidget />
+    {newFeedOpen && <NewFeedDialog user={user} takenNames={[...navigationItems.map(([, label]) => label), ...feeds.map((feed) => feed.name)]} onClose={() => setNewFeedOpen(false)} />}
   </div>
 }
 

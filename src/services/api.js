@@ -603,6 +603,9 @@ function mapPreference(record) {
     id: record.id,
     category: asText(record.category),
     subcategory: asText(record.sub_category),
+    // The preference's skill (relate to outr_skills), used instead of the Role.
+    skillId: asText(record.skill_id),
+    skillName: decodeHtml(asText(record.skill_name)),
     minScore: clampPercent(record.min_ai_score, 0),
     priority: clampPercent(record.priority, 50),
     active: ["1", "true", "on"].includes(asText(record.active).toLowerCase()) || record.active === true || record.active === 1,
@@ -614,11 +617,11 @@ function mapPreference(record) {
 // The signed-in user's preferences, and the CRM's Department / Role choices for them.
 export async function fetchMyPreferences(userEmail) {
   const userId = await findGatewayUserIdByEmail(userEmail);
-  const first = await smartGateway({ action: "fetch", module: PREFERENCES_MODULE, filters: { user_id: userId }, order_by: "priority", order_dir: "DESC", page: 1, per_page: 50 });
+  const first = await smartGateway({ action: "fetch", module: PREFERENCES_MODULE, filters: { user_id: userId }, order_by: "date_entered", order_dir: "ASC", page: 1, per_page: 50 });
   const lists = asObject(first.dropdown_lists);
   const choices = (list) => Object.entries(asObject(list)).map(([value, label]) => ({ value: asText(value), label: decodeHtml(asText(label)) })).filter((option) => option.value);
   const totalPages = Math.max(Number(first.total_pages) || 1, 1);
-  const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => smartGateway({ action: "fetch", module: PREFERENCES_MODULE, filters: { user_id: userId }, order_by: "priority", order_dir: "DESC", page: index + 2, per_page: 50 })));
+  const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => smartGateway({ action: "fetch", module: PREFERENCES_MODULE, filters: { user_id: userId }, order_by: "date_entered", order_dir: "ASC", page: index + 2, per_page: 50 })));
   const records = [first, ...rest].flatMap((page) => asArray(page?.records)).filter((record) => record && record.deleted !== "1").map(mapPreference);
   return { records, options: { category: choices(lists.category), subcategory: choices(lists.sub_category) } };
 }
@@ -629,11 +632,13 @@ export async function saveMyPreference(userEmail, preference, labels = {}) {
   const minScore = clampPercent(preference.minScore, 0);
   const priority = clampPercent(preference.priority, 50);
   const data = {
-    name: `${labels.category || preference.category || "Any department"} / ${labels.subcategory || preference.subcategory || "Any role"} · priority ${priority}%`,
+    name: `${labels.category || preference.category || "Any department"} / ${asText(preference.skillName) || "Any skill"} · AI score ${minScore}%+`,
     user_id: userId,
     assigned_user_id: userId,
     category: asText(preference.category),
-    sub_category: asText(preference.subcategory),
+    // Skill replaces Role: the Role is left empty so it does not narrow the jobs.
+    sub_category: "",
+    skill_id: asText(preference.skillId),
     min_ai_score: minScore,
     priority,
     active: preference.active === false ? 0 : 1,
@@ -663,8 +668,10 @@ export async function deleteMyPreference(id) {
 export async function fetchPreferredJobs({ userEmail, preferences, allJobs = false, search = "", category = "", subcategory = "", skill = "" } = {}) {
   const active = asArray(preferences)
     .filter((preference) => preference.active)
-    // A Department / Role picked in the skills row narrows these too: a preference outside it is skipped.
-    .filter((preference) => (!category || !preference.category || preference.category === category) && (!subcategory || !preference.subcategory || preference.subcategory === subcategory));
+    // A Department picked in the skills row narrows these too, and so does one picked skill: a preference outside
+    // them is skipped (the gateway can match one skill per request).
+    .filter((preference) => (!category || !preference.category || preference.category === category)
+      && (!asText(skill).trim() || !preference.skillName || preference.skillName.toLowerCase() === asText(skill).trim().toLowerCase()));
   if (!active.length) return [];
   const assignedUserId = allJobs ? null : await findGatewayUserIdByEmail(userEmail);
   const engagement = await engagementFilters(userEmail);
@@ -675,7 +682,8 @@ export async function fetchPreferredJobs({ userEmail, preferences, allJobs = fal
       status: { in: ["New", "Seen"] },
       match_score: { gte: preference.minScore },
       ...engagement,
-      ...skillGroupFilters({ category: preference.category || category, subcategory: preference.subcategory || subcategory, skill }),
+      // Department + the preference's skill (the same skill match as the Jobs skill filter).
+      ...skillGroupFilters({ category: preference.category || category, subcategory, skill: preference.skillName || skill }),
     };
     if (assignedUserId) filters.assigned_user_id = assignedUserId;
     const query = { action: "fetch", module: JOBS_MODULE, filters, order_by: "match_score", order_dir: "DESC" };
@@ -687,9 +695,9 @@ export async function fetchPreferredJobs({ userEmail, preferences, allJobs = fal
   const best = new Map();
   for (const { record, preference } of lists.flat()) {
     const current = best.get(record.id);
-    if (!current || preference.priority > current.preference.priority) best.set(record.id, { record, preference });
+    if (!current) best.set(record.id, { record, preference });
   }
-  return [...best.values()].map(({ record, preference }) => ({ ...mapGatewayJob(record), preference: { id: preference.id, category: preference.category, subcategory: preference.subcategory, priority: preference.priority, minScore: preference.minScore } }));
+  return [...best.values()].map(({ record, preference }) => ({ ...mapGatewayJob(record), preference: { id: preference.id, category: preference.category, skillName: preference.skillName, minScore: preference.minScore } }));
 }
 
 // ----------------------------------------------------
@@ -754,6 +762,54 @@ export async function createFeedback(userEmail, { section = "", pageUrl = "", ty
 export async function setFeedbackStatus(id, status) {
   if (!id || !status) return;
   await smartGateway({ action: "update", module: FEEDBACK_MODULE, id, data: { status } });
+}
+
+// ----------------------------------------------------
+// Custom feeds (outr_feeds): sections any user adds to the nav, one CRM record per feed, linked to its creator
+// ----------------------------------------------------
+
+export const FEEDS_MODULE = import.meta.env?.VITE_FEEDS_MODULE || "outr_feeds";
+
+function mapFeed(record) {
+  return {
+    id: record.id,
+    name: decodeHtml(asText(record.name)).trim(),
+    // What the feed should show; later sent as the prompt to the endpoint the feed is connected to.
+    description: decodeHtml(asText(record.description)).trim(),
+    userId: asText(record.user_id || record.assigned_user_id),
+    userName: decodeHtml(asText(record.user_name || record.assigned_user_name || record.created_by_name)),
+    createdAt: asText(record.date_entered_uni_format || record.date_entered),
+    createdAgo: asText(record.date_entered_time_ago),
+  };
+}
+
+// Every user's feeds, oldest first so the menu order stays the same as feeds are added.
+export async function fetchFeeds() {
+  const query = { action: "fetch", module: FEEDS_MODULE, order_by: "date_entered", order_dir: "ASC" };
+  const first = await smartGateway({ ...query, page: 1, per_page: 50 });
+  const totalPages = Math.max(Number(first.total_pages) || 1, 1);
+  const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => smartGateway({ ...query, page: index + 2, per_page: 50 })));
+  return [first, ...rest].flatMap((page) => asArray(page?.records)).filter((record) => record && record.deleted !== "1").map(mapFeed).filter((feed) => feed.name);
+}
+
+// Saves a new feed from the signed-in user and returns its id.
+export async function createFeed(userEmail, { name = "", description = "" } = {}) {
+  const title = asText(name).trim();
+  if (!title) throw createAppError("FEED_NAME_EMPTY", "Give the feed a name first.");
+  const userId = await findGatewayUserIdByEmail(userEmail);
+  const data = {
+    name: title,
+    description: asText(description).trim(),
+    user_id: userId,
+    assigned_user_id: userId,
+  };
+  const created = await smartGateway({ action: "create", module: FEEDS_MODULE, data });
+  return created.id ?? created.record?.id ?? created.data?.id ?? "";
+}
+
+export async function deleteFeed(id) {
+  if (!id) return;
+  await smartGateway({ action: "delete", module: FEEDS_MODULE, id });
 }
 
 // Why each job was rejected: the reason in its latest "Rejected: …" activity entry, as { [jobId]: reason }.
@@ -2001,6 +2057,9 @@ export const api = {
   getFeedback: (params) => fetchFeedback(params),
   createFeedback: (userEmail, entry) => createFeedback(userEmail, entry),
   setFeedbackStatus: (id, status) => setFeedbackStatus(id, status),
+  getFeeds: () => fetchFeeds(),
+  createFeed: (userEmail, feed) => createFeed(userEmail, feed),
+  deleteFeed: (id) => deleteFeed(id),
   getSkillCounts: (params) => fetchSkillCounts(params),
   getGroupOptions: (module) => fetchGroupOptions(module),
   getJobGroupCounts: (params) => fetchJobGroupCounts(params),

@@ -26,6 +26,7 @@ const Seo = lazy(() => import('./pages/Seo'))
 const Domain = lazy(() => import('./pages/Domain'))
 const ApiPlayground = lazy(() => import('./pages/ApiPlayground'))
 const ComingSoon = lazy(() => import('./pages/ComingSoon'))
+const CustomFeed = lazy(() => import('./pages/CustomFeed'))
 const Onboarding = lazy(() => import('./pages/Onboarding'))
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'))
 
@@ -87,6 +88,8 @@ export default function App() {
       <Route path="/social" element={<ProtectedRoute><ComingSoon title="Social" subtitle="connections incoming." description="The Social workspace is being prepared for social media integrations, channels, and community feeds." type="social" /></ProtectedRoute>} />
       <Route path="/email-to-blog" element={<ProtectedRoute><ComingSoon title="Email to Blog" subtitle="publishing incoming." description="The Email to Blog workspace is being prepared to turn emails into ready-to-publish blog posts." type="email-to-blog" /></ProtectedRoute>} />
       <Route path="/api-playground" element={<ProtectedRoute><ApiPlayground /></ProtectedRoute>} />
+      {/* Feeds users created (CRM outr_feeds); open to every signed-in user. */}
+      <Route path="/feeds/:id" element={<ProtectedRoute><CustomFeed /></ProtectedRoute>} />
       <Route path="/technews" element={<Navigate to="/tech-news" replace />} />
       <Route path="/news" element={<Navigate to="/tech-news" replace />} />
       <Route path="/admin" element={<Navigate to="/admin/permissions" replace />} />
