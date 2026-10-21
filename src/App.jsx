@@ -3,7 +3,6 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
 import SessionLoader from './components/SessionLoader'
-import LoginIntro from './components/LoginIntro'
 import ScrollToTop from './components/ScrollToTop'
 import DocNotificationToast from './components/DocNotificationToast'
 import GlobalErrorToast from './components/GlobalErrorToast'
@@ -55,9 +54,7 @@ function OnboardingRoute() {
 }
 
 export default function App() {
-  const { status, showLoginIntro, completeLoginIntro } = useAuth()
   const location = useLocation()
-  if (status === 'authenticated' && showLoginIntro) return <LoginIntro onComplete={completeLoginIntro} />
 
   return <>
     <ScrollToTop />

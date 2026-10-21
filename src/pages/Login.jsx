@@ -7,6 +7,7 @@ import ThemeToggle from "../components/ThemeToggle";
 import GridPattern from "../components/GridPattern";
 import { useAuth } from "../contexts/AuthContext";
 import { homePath } from "../lib/permissions";
+import SessionLoader from "../components/SessionLoader";
 
 function MicrosoftMark() {
   return (
@@ -33,7 +34,10 @@ export default function Login() {
   const root = useRef(null);
   const { status, error, login, user } = useAuth();
 
+  // The entrance animation runs once the login screen is actually shown (not while the session is being checked).
+  const showingLogin = status !== "loading" && status !== "authenticated";
   useEffect(() => {
+    if (!showingLogin) return undefined;
     const ctx = gsap.context(
       () =>
         gsap.fromTo(
@@ -50,8 +54,10 @@ export default function Login() {
       root,
     );
     return () => ctx.revert();
-  }, []);
+  }, [showingLogin]);
 
+  // While the session is being checked, a signed-in user must not see the login screen flash before being sent on.
+  if (status === "loading") return <SessionLoader />;
   if (status === "authenticated") return <Navigate to={homePath(user)} replace />;
 
   return (
