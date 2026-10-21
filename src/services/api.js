@@ -756,6 +756,26 @@ export async function setFeedbackStatus(id, status) {
   await smartGateway({ action: "update", module: FEEDBACK_MODULE, id, data: { status } });
 }
 
+// Why each job was rejected: the reason in its latest "Rejected: …" activity entry, as { [jobId]: reason }.
+// One gateway request for the whole list.
+export async function fetchRejectReasons(jobIds) {
+  const ids = [...new Set(asArray(jobIds).filter(Boolean))];
+  if (!ids.length) return {};
+  const data = await smartGateway({ action: "fetch", module: JOB_ACTIVITY_MODULE, filters: { job_id: { in: ids }, description: { like: "Rejected:" } }, order_by: "date_entered", order_dir: "DESC", page: 1, per_page: 200 });
+  const reasons = {};
+  for (const record of asArray(data.records)) {
+    const reason = rejectReasonOf(record.description);
+    if (record.job_id && reason && !(record.job_id in reasons)) reasons[record.job_id] = reason;
+  }
+  return reasons;
+}
+
+// "Rejected: Budget too low" -> "Budget too low" (anything else -> "").
+export function rejectReasonOf(description) {
+  const match = /^Rejected:\s*(.+)$/s.exec(decodeHtml(asText(description)).trim());
+  return match ? match[1].trim() : "";
+}
+
 export async function fetchJobs(options = {}) {
   const page = await fetchJobsPage(options);
   return page.records;
@@ -1972,6 +1992,7 @@ export const api = {
   getJobsPage: (params) => fetchJobsPage(params),
   getJobStats: (params) => fetchJobStats(params),
   getMyAppliedJobs: (params) => fetchMyAppliedJobs(params),
+  getRejectReasons: (jobIds) => fetchRejectReasons(jobIds),
   getMyPreferences: (userEmail) => fetchMyPreferences(userEmail),
   saveMyPreference: (userEmail, preference, labels) => saveMyPreference(userEmail, preference, labels),
   deleteMyPreference: (id) => deleteMyPreference(id),
@@ -2022,7 +2043,10 @@ export const api = {
       id,
       data: { status },
     });
-    const description = userEmail ? statusActivity(current.status, status) : "";
+    let description = userEmail ? statusActivity(current.status, status) : "";
+    // A rejection keeps its reason in the activity entry ("Rejected: Budget too low"); see fetchRejectReasons.
+    const reasonText = asText(reason).trim().slice(0, 150);
+    if (description === "Rejected" && reasonText) description = `Rejected: ${reasonText}`;
     if (description) await logJobActivity({ jobId: id, userEmail, description }).catch((error) => console.warn("Could not record job activity", error));
     const changes = { status, reason, coverLetter, activity: [`Status changed from ${current.status} to ${status}`, ...current.activity] };
     localChanges.set(id, changes);

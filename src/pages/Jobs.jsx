@@ -325,6 +325,16 @@ export default function Jobs() {
     [allDisplayJobs, tab, savedOnly, likedOnly, skills, extraFilters, reactions.saved, reactions.liked],
   );
 
+  // Why each rejected job on screen was rejected (from the activity log), in one gateway request.
+  const rejectedIds = useMemo(() => filtered.filter((job) => job.status === "Rejected").map((job) => job.id), [filtered]);
+  const { data: rejectReasons } = useQuery({
+    queryKey: ["reject-reasons", rejectedIds],
+    queryFn: () => api.getRejectReasons(rejectedIds),
+    enabled: rejectedIds.length > 0,
+    placeholderData: (previous) => previous,
+    staleTime: 60_000,
+  });
+
   useEffect(() => {
     const target = loadMoreRef.current;
     if (!target || !hasNextPage) return undefined;
@@ -567,7 +577,7 @@ export default function Jobs() {
                   </div>
                 </nav>
                 <div className="min-w-0">
-                  <section className="space-y-4">{filtered.map((job, index) => <ErrorBoundary key={job.id} name="job-card" fallback={CardError} resetKey={job}><JobCard job={job} index={index} now={now} liked={reactions.isLiked(job.id, job)} saved={reactions.isSaved(job.id, job)} onLike={() => reactions.toggleLike(job.id, job)} onSave={() => reactions.toggleSave(job.id, job)} onOpen={() => openPreview(job.id)}
+                  <section className="space-y-4">{filtered.map((job, index) => <ErrorBoundary key={job.id} name="job-card" fallback={CardError} resetKey={job}><JobCard job={job} index={index} now={now} rejectReason={asObject(rejectReasons)[job.id]} liked={reactions.isLiked(job.id, job)} saved={reactions.isSaved(job.id, job)} onLike={() => reactions.toggleLike(job.id, job)} onSave={() => reactions.toggleSave(job.id, job)} onOpen={() => openPreview(job.id)}
                     onUndo={job.status === "Applied" || job.status === "Rejected" ? () => jobStatus.undo(job) : undefined}
                     undoing={jobStatus.pendingId === job.id}
                     undoError={jobStatus.errorId === job.id ? jobStatus.error?.message || "Could not undo. Try again." : ""} /></ErrorBoundary>)}</section>

@@ -13,7 +13,7 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import ShareJobDialog from '../components/ShareJobDialog'
 import JobActivity from '../components/JobActivity'
 import { StatusPill } from '../components/ui'
-import { api } from '../services/api'
+import { api, rejectReasonOf } from '../services/api'
 import JobDetailSkeleton, { DrawerDetailSkeleton } from '../components/JobDetailSkeleton'
 import { timeAgo, useNow } from '../lib/time'
 import { skillStyle } from '../lib/jobSignals'
@@ -54,6 +54,9 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
   const now = useNow()
   const { data: job, isLoading, isError, error, refetch } = useQuery({ queryKey: ['job', id], queryFn: () => api.getJob(id, user?.email), enabled: Boolean(id), retry: false, placeholderData: initialJob })
   const jobId = job?.id
+  // Why a rejected job was rejected: its latest "Rejected: …" activity entry (shared with the Activity panel's query).
+  const { data: activityEntries } = useQuery({ queryKey: ['job-activity', id], queryFn: () => api.getJobActivity(id), enabled: Boolean(id) && job?.status === 'Rejected', staleTime: 30_000 })
+  const rejectReason = job?.status === 'Rejected' ? rejectReasonOf(asArray(activityEntries).find((entry) => /^Rejected/.test(entry.description))?.description) : ''
   const { mutate: markJobSeen } = useMutation({
     mutationFn: () => api.updateStatus({ id, status: 'Seen' }),
     onSuccess: (updatedJob) => {
@@ -97,7 +100,8 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
     statusLabel={job.status}
     dismissed={job.status === 'Rejected'}
     onApplied={() => status.markApplied(job)}
-    onDismiss={() => status.markNotFit(job)}
+    onDismiss={(reason) => status.markNotFit(job, reason)}
+    rejectReason={rejectReason}
     statusError={status.errorId === job.id ? status.error?.message || 'Could not update this job.' : ''}
     resolved={job.status === 'Applied' ? 'applied' : job.status === 'Rejected' ? 'rejected' : null}
     onUndo={() => status.undo(job)}

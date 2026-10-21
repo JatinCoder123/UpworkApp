@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { ClockCounterClockwise, WarningCircle } from '@phosphor-icons/react'
-import { api } from '../services/api'
+import { api, rejectReasonOf } from '../services/api'
 import { timeAgo, useNow } from '../lib/time'
 
 const ACTIONS = {
@@ -15,6 +15,12 @@ const ACTIONS = {
   'Cover letter edited': 'edited the cover letter',
   'Cover letter edited with AI': 'edited the cover letter with AI',
   'Cover letter AI change undone': 'undid an AI change to the cover letter',
+}
+
+// "Rejected: Budget too low" reads as "marked it as not a fit — Budget too low".
+const describe = (description) => {
+  const reason = rejectReasonOf(description)
+  return reason ? `${ACTIONS.Rejected} — ${reason}` : ACTIONS[description] || description
 }
 
 const Dot = ({ active }) => <span className={`absolute -left-[1.3rem] top-1.5 size-2 rounded-full ring-2 ring-[var(--surface)] ${active ? 'bg-[var(--lime-dark)]' : 'bg-[var(--line)]'}`} />
@@ -32,7 +38,7 @@ export default function JobActivity({ job }) {
       {isLoading && <li className="relative text-xs leading-5 text-[var(--muted)]"><Dot />Loading activity…</li>}
       {entries.map((entry, index) => <li key={entry.id} className="relative text-xs leading-5">
         <Dot active={index === 0} />
-        <span className="font-semibold">{entry.userName}</span> {ACTIONS[entry.description] || entry.description}
+        <span className="font-semibold">{entry.userName}</span> {describe(entry.description)}
         {entry.timeAgo && <span className="block text-[11px] text-[var(--muted)]" title={entry.date}>{entry.timeAgo}</span>}
       </li>)}
       <li className="relative text-xs leading-5">

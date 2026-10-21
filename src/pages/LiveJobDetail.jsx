@@ -36,6 +36,7 @@ function ActionPanel({ job, reactions, onShare, showApply }) {
     dismissed={dismissed}
     onApplied={() => { if (!applied) reactions.toggleApplied(job.id) }}
     onDismiss={() => reactions.toggleDismissed(job.id)}
+    askReason={false}
     resolved={applied ? 'applied' : dismissed ? 'rejected' : null}
     onUndo={() => (applied ? reactions.toggleApplied(job.id) : reactions.toggleDismissed(job.id))}    onShare={onShare}
     showApply={showApply}

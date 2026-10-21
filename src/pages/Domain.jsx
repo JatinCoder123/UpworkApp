@@ -8,11 +8,12 @@ import { DirectResult, SuggestionCard } from '../components/domain/DomainCards'
 import { NamingLab, ScreeningBanner, WhileYouWait } from '../components/domain/NamingLab'
 import {
   BATCH_SIZE, DEFAULT_TLDS, MAX_SUGGESTIONS, analyzeDomains, applyMozToChecks, checkDomainAvailability, checkNameSiloDomain,
-  collectAvailableSuggestions, crmBeginSearch, crmRecordCopy, crmSaveDomainResult, crmSaveMoz, crmSearchResults, crmSetFavorite,
+  collectAvailableSuggestions, crmBeginSearch, crmHistory, crmRecordCopy, crmSaveDomainResult, crmSaveMoz, crmSearchResults, crmSetFavorite,
   crmUpdateSearch, detectInputMode, domainLabel, domainTld, getDomainConfig, isAbortError, makeId, normalizeDomain, normalizeTlds,
   oneYearPricePlan, requestMozMetrics,
 } from '../services/domainApi'
 import { asArray, asObject, asText } from '../lib/safe'
+import { useAuth } from '../contexts/AuthContext'
 
 const EMPTY_LAB = { round: 0, step: 0, candidates: [] }
 
@@ -54,43 +55,65 @@ function readSessionKey() {
   }
 }
 
+// The page's current search for each signed-in user while the app is open, so leaving for another section and coming
+// back shows the same search and results. A fresh visit (reload, other browser) opens the latest search from the CRM.
+const lastViews = new Map()
+
+// A view saved while a step was still running: the stopped step's names are shown as not screened.
+function settledView(view) {
+  if (!view) return null
+  return {
+    ...view,
+    results: asArray(view.results).map((item) => (item.stage === 'screening' ? { ...item, stage: 'unscreened' } : item)),
+    direct: view.direct?.status === 'loading' ? null : view.direct,
+  }
+}
+
 export default function Domain() {
+  const { user } = useAuth()
+  const viewKey = asText(user?.email).toLowerCase()
+  const [restored] = useState(() => settledView(lastViews.get(viewKey)))
   const { data: domainConfig, isError: configFailed, error: configError, refetch: retryConfig } = useQuery({ queryKey: ['domain-config'], queryFn: getDomainConfig, staleTime: Infinity, retry: 1 })
   const integrations = useMemo(() => domainConfig?.integrations || {}, [domainConfig])
   // 50 names per batch, up to 200 per search (services/domainApi.js).
   const batchSize = BATCH_SIZE
   const maxSuggestions = MAX_SUGGESTIONS
   const [sessionKey] = useState(readSessionKey)
-  const [input, setInput] = useState('')
-  const [mode, setMode] = useState('auto')
-  const [tlds, setTlds] = useState(DEFAULT_TLDS)
-  const [direct, setDirect] = useState(null)
-  const [context, setContext] = useState(null)
+  const [input, setInput] = useState(() => restored?.input ?? '')
+  const [mode, setMode] = useState(() => restored?.mode ?? 'auto')
+  const [tlds, setTlds] = useState(() => restored?.tlds ?? DEFAULT_TLDS)
+  const [direct, setDirect] = useState(() => restored?.direct ?? null)
+  const [context, setContext] = useState(() => restored?.context ?? null)
   const [phase, setPhase] = useState('idle')
   const [phaseStartedAt, setPhaseStartedAt] = useState(null)
   const [lab, setLab] = useState(EMPTY_LAB)
-  const [results, setResults] = useState([])
-  const [batch, setBatch] = useState(0)
+  const [results, setResults] = useState(() => restored?.results ?? [])
+  const [batch, setBatch] = useState(() => restored?.batch ?? 0)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [crmStatus, setCrmStatus] = useState('')
+  const [crmStatus, setCrmStatus] = useState(() => restored?.crmStatus ?? '')
   const [toast, setToast] = useState('')
   const [mozBusy, setMozBusy] = useState(() => new Set())
   const [saved, setSaved] = useState(null)
-  const [sort, setSort] = useState('rank')
-  const [tldFilter, setTldFilter] = useState('all')
+  const [sort, setSort] = useState(() => restored?.sort ?? 'rank')
+  const [tldFilter, setTldFilter] = useState(() => restored?.tldFilter ?? 'all')
   const [playOpen, setPlayOpen] = useState(false)
   // True once a batch finds no new names, so scrolling stops asking for more.
-  const [exhausted, setExhausted] = useState(false)
+  const [exhausted, setExhausted] = useState(() => restored?.exhausted ?? false)
   const loadMoreRef = useRef(null)
   const inputRef = useRef(null)
   const controllerRef = useRef(null)
   const flowRef = useRef(0)
-  const crmRef = useRef({ searchId: '', requestKey: '' })
+  const crmRef = useRef(restored?.crm ?? { searchId: '', requestKey: '' })
   const crmQueueRef = useRef(Promise.resolve())
   const resultsRef = useRef(results)
 
   useEffect(() => { resultsRef.current = results }, [results])
+  // Keep this search for when the user comes back from another section.
+  useEffect(() => {
+    if (!viewKey || (!context && !direct && !results.length)) return
+    lastViews.set(viewKey, { input, mode, tlds, direct, context, results, batch, crmStatus, sort, tldFilter, exhausted, crm: { ...crmRef.current } })
+  }, [viewKey, input, mode, tlds, direct, context, results, batch, crmStatus, sort, tldFilter, exhausted])
   useEffect(() => () => controllerRef.current?.abort(), [])
   useEffect(() => {
     if (!toast) return undefined
@@ -393,6 +416,23 @@ export default function Domain() {
       }
     }
   }
+
+  // A fresh visit (nothing kept from this session) opens the user's latest search from the CRM, with its results,
+  // unless they have already started something themselves.
+  const autoOpened = useRef(Boolean(restored))
+  useEffect(() => {
+    if (autoOpened.current || !domainConfig) return
+    autoOpened.current = true
+    // Why nothing was reopened is logged (browser console), so a missing CRM link or empty history is easy to spot.
+    if (!integrations.crm) { console.info('[Domain] Last search not reopened: the domain service has no CRM connection (integrations.crm is off).'); return }
+    crmHistory(1).then(({ history }) => {
+      const latest = asArray(history)[0]
+      if (!latest) { console.info('[Domain] Last search not reopened: no saved searches in the CRM for this user.'); return }
+      if (flowRef.current === 0 && !resultsRef.current.length) openSavedSearch(latest)
+    }).catch((historyError) => console.warn('[Domain] Last search could not be loaded from the CRM:', historyError))
+    // openSavedSearch reads only refs and setters, so running it from this one-time effect is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domainConfig, integrations.crm])
 
   const unfavoriteFromDrawer = async (item) => {
     try {

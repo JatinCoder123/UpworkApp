@@ -70,7 +70,7 @@ export function JobCardAside({ job, score, extra }) {
 }
 
 // `onUndo` (Applied and Rejected tabs) adds a button that puts the job back to Seen.
-export default function JobCard({ job, index, now, liked, saved, onLike, onSave, onOpen, onUndo, undoing = false, undoError = '' }) {
+export default function JobCard({ job, index, now, rejectReason = '', liked, saved, onLike, onSave, onOpen, onUndo, undoing = false, undoError = '' }) {
   const fit = job.match > 0 ? null : scoreJob(job)
   const score = fit ? fit.score : job.match
   const matchLabel = fit ? fit.verdict : job.fitLabel
@@ -88,6 +88,7 @@ export default function JobCard({ job, index, now, liked, saved, onLike, onSave,
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pr-48">
           {index != null && <span className="font-mono text-[11px] font-bold text-[var(--muted)]">{String(index + 1).padStart(2, '0')}</span>}
           <StatusPill status={job.status} />
+          {job.status === 'Rejected' && rejectReason && <span title={`Not a fit: ${rejectReason}`} className="max-w-[16rem] truncate rounded-full bg-[var(--reject-bg)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--reject-text)] ring-1 ring-[var(--reject-line)]">{rejectReason}</span>}
           {saved && (
             <span className="inline-flex items-center gap-1 rounded-full bg-[#e0f2fe] px-2.5 py-0.5 text-[10px] font-bold text-[#075985] ring-1 ring-[#bae6fd] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30">
               <BookmarkSimple size={11} weight="fill" className="text-[#0284c7] dark:text-[#7dd3fc]" /> Saved
