@@ -149,6 +149,10 @@ const DEFAULT_DATE_FILTERS = {
   jobs: { preset: '7days', from: '', to: '' },
 }
 
+// Saved date filters carry this version. An "Any time" saved without it dates from before the page had a default, so
+// the page opens on its default instead; an "Any time" the user picked (or cleared to) since then is kept.
+const DATE_FILTER_VERSION = 2
+
 export function defaultDateFilter(moduleName) {
   return { ...(DEFAULT_DATE_FILTERS[moduleName] || { preset: 'all', from: '', to: '' }) }
 }
@@ -160,8 +164,7 @@ export function loadDateFilter(moduleName) {
   try {
     const saved = JSON.parse(localStorage.getItem(key) || 'null')
     if (!saved || !DATE_PRESETS.has(saved.preset)) return fallback
-    // A page with its own default (Jobs: Last 7 days) always opens on it instead of a saved "Any time".
-    if (saved.preset === 'all' && DEFAULT_DATE_FILTERS[moduleName]) return fallback
+    if (saved.preset === 'all' && DEFAULT_DATE_FILTERS[moduleName] && saved.version !== DATE_FILTER_VERSION) return fallback
     if (saved.preset === 'custom' && (!saved.from || !saved.to)) return fallback
     return { preset: saved.preset, from: saved.from || '', to: saved.to || '' }
   } catch {
@@ -171,7 +174,7 @@ export function loadDateFilter(moduleName) {
 
 export function saveDateFilter(moduleName, value) {
   const key = DATE_FILTER_KEYS[moduleName]
-  if (key) localStorage.setItem(key, JSON.stringify(value))
+  if (key) localStorage.setItem(key, JSON.stringify({ ...value, version: DATE_FILTER_VERSION }))
 }
 
 const TECH_NEWS_FILTERS_KEY = 'pitchflow-tech-news-filters'
