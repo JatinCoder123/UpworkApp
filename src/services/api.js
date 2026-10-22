@@ -302,6 +302,9 @@ export function mapGatewayJob(input) {
     location: clientStats.location,
     posted: record.posted || record.date_entered_time_ago || "Recently",
     postedAt: parsePostedAt(record),
+    // When the job entered the feed (its CRM record was created), shown in its Activity.
+    added: record.date_entered_uni_format || record.date_entered || "",
+    addedAt: present(record.date_entered) ? parseEnteredAt(record) : "",
     budget: budget.amount,
     type: /hour|\/hr/i.test(budget.amount) ? "Hourly" : "Fixed price",
     level: budget.level || "Not specified",
