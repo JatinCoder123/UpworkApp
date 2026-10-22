@@ -88,7 +88,7 @@ export default function JobCard({ job, index, now, rejectReason = '', liked, sav
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pr-48">
           {index != null && <span className="font-mono text-[11px] font-bold text-[var(--muted)]">{String(index + 1).padStart(2, '0')}</span>}
           <StatusPill status={job.status} />
-          {job.status === 'Rejected' && rejectReason && <span title={`Not a fit: ${rejectReason}`} className="max-w-[16rem] truncate rounded-full bg-[var(--reject-bg)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--reject-text)] ring-1 ring-[var(--reject-line)]">{rejectReason}</span>}
+          {job.status === 'Rejected' && rejectReason && <span title={`Not a fit: ${rejectReason}`} className="max-w-[18rem] truncate rounded-full bg-[#fbe1d8] px-2.5 py-0.5 text-[11px] font-bold text-[#9a3412] ring-1 ring-[#f1b39c] dark:bg-[#4a2318] dark:text-[#fdba9a] dark:ring-[#7c3a26]">{rejectReason}</span>}
           {saved && (
             <span className="inline-flex items-center gap-1 rounded-full bg-[#e0f2fe] px-2.5 py-0.5 text-[10px] font-bold text-[#075985] ring-1 ring-[#bae6fd] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30">
               <BookmarkSimple size={11} weight="fill" className="text-[#0284c7] dark:text-[#7dd3fc]" /> Saved

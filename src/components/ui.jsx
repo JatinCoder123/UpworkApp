@@ -22,7 +22,7 @@ export function StatusPill({ status }) {
     Interview: 'bg-[#d8e8dd] text-[#28533a]',
     Won: 'bg-[#bce8cd] text-[#174b2b]',
     Lost: 'bg-[#e5e1dc] text-[#5b5550]',
-    Rejected: 'bg-[var(--reject-bg)] text-[var(--reject-text)] ring-1 ring-[var(--reject-line)]',
+    Rejected: 'bg-[#fbe1d8] text-[#9a3412] ring-1 ring-[#f1b39c] dark:bg-[#4a2318] dark:text-[#fdba9a] dark:ring-[#7c3a26]',
   }[status] || 'bg-[var(--paper)] text-[var(--muted)]'
   return <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[.14em] ${colors}`}><span className="size-1.5 rounded-full bg-current" />{status}</span>
 }
