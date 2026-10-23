@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CircleNotch, Plus } from '@phosphor-icons/react'
 import { DialogHeader, Modal, primaryButton } from './ui'
-import { useCreateFeed } from '../lib/feeds'
+import { FEEDS_READY, useCreateFeed } from '../lib/feeds'
 import { asArray } from '../lib/safe'
 
 const NAME_MAX = 40
@@ -27,7 +27,7 @@ export default function NewFeedDialog({ user, takenNames = [], onClose }) {
 
   const submit = (event) => {
     event.preventDefault()
-    if (!trimmed || !description.trim() || taken) return
+    if (!FEEDS_READY || !trimmed || !description.trim() || taken) return
     create.mutate({ name: trimmed, description }, {
       onSuccess: (id) => { onClose(); if (id) navigate(`/feeds/${id}`) },
     })
@@ -49,7 +49,7 @@ export default function NewFeedDialog({ user, takenNames = [], onClose }) {
 
       {create.error && <p role="alert" className="rounded-xl bg-[var(--bad-bg)] px-3 py-2 text-xs font-semibold text-[var(--bad)]">{create.error.message || 'The feed could not be created. Please try again.'}</p>}
       <div className="flex justify-end">
-        <button type="submit" disabled={!trimmed || !description.trim() || taken || create.isPending} className={primaryButton}>
+        <button type="submit" disabled={!FEEDS_READY || !trimmed || !description.trim() || taken || create.isPending} className={primaryButton}>
           <span>{create.isPending ? 'Creating…' : 'Create feed'}</span>
           <span className="grid size-8 place-items-center rounded-full bg-white/10">{create.isPending ? <CircleNotch size={14} className="animate-spin" /> : <Plus size={14} weight="bold" />}</span>
         </button>

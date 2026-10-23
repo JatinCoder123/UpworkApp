@@ -6,6 +6,9 @@ export default function CategoryFilterDialog({
   categories = [],
   categoryCounts = {},
   selectedCategory = 'All',
+  eyebrow = 'Content Filter',
+  title = 'Filter by Topic / Field',
+  description = 'Choose a content topic or field to filter your article ideas. Each category shows how many ideas are currently available.',
   onSelect,
   onClose,
 }) {
@@ -20,12 +23,12 @@ export default function CategoryFilterDialog({
   return (
     <Modal onClose={onClose}>
       <DialogHeader
-        eyebrow="Content Filter"
-        title="Filter by Topic / Field"
+        eyebrow={eyebrow}
+        title={title}
         onClose={onClose}
       />
       <p className="mt-2 text-sm text-[var(--muted)] leading-relaxed">
-        Choose a content topic or field to filter your article ideas. Each category shows how many ideas are currently available.
+        {description}
       </p>
 
       {/* Search Input */}

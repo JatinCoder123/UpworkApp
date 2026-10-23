@@ -1878,6 +1878,69 @@ export async function fetchSiteContent() {
   return (await fetchAllRecords(SITE_CONTENT_MODULE)).map(mapSiteContent);
 }
 
+// ----------------------------------------------------
+// WordPress market feed (outr_wordpress): trending plugins, themes, blocks... each with a build opportunity
+// ----------------------------------------------------
+
+export const WORDPRESS_MODULE = import.meta.env?.VITE_WORDPRESS_MODULE || "outr_wordpress";
+
+// Multi-select values arrive as "^ai^,^content^".
+const splitMultiEnum = (value) => asText(value).split(",").map((item) => item.replace(/\^/g, "").trim()).filter(Boolean);
+
+// "10/18/2026" or "10/20/2026 09:00" (CRM time, IST) -> ISO; "" when missing.
+function parseCrmDate(value) {
+  const match = asText(value).match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?$/);
+  if (!match) return "";
+  const [, month, day, year, hour = "00", minute = "00"] = match;
+  return new Date(`${year}-${month}-${day}T${hour}:${minute}:00+05:30`).toISOString();
+}
+
+function mapWordpressItem(record) {
+  return {
+    id: record.id,
+    name: decodeHtml(record.name),
+    summary: decodeHtml(record.summary),
+    description: decodeHtml(record.description),
+    opportunity: decodeHtml(record.opportunity),
+    itemType: asText(record.item_type),
+    category: asText(record.category),
+    pricingType: asText(record.pricing_type),
+    price: numberOrNull(record.price),
+    tags: splitMultiEnum(record.tags),
+    source: asText(record.source),
+    sourceUrl: asText(record.source_url),
+    demoUrl: asText(record.demo_url),
+    author: decodeHtml(record.author),
+    installs: numberOrNull(record.installs),
+    sales: numberOrNull(record.sales_count),
+    rating: numberOrNull(record.rating),
+    demandScore: numberOrNull(record.demand_score),
+    trend: asText(record.trend),
+    status: asText(record.feed_status) || "new",
+    lastUpdated: parseCrmDate(record.last_updated),
+    publishedAt: parseCrmDate(record.published_date) || parseEnteredAt(record),
+    addedAt: parseEnteredAt(record),
+  };
+}
+
+// Every feed item plus the module's dropdowns (type, category, pricing, tags, source, trend, status) as
+// { key: [{ value, label }] }, so the page shows the CRM's own labels and choices.
+export async function fetchWordpressFeed() {
+  const query = (page) => smartGateway({ action: "fetch", module: WORDPRESS_MODULE, order_by: "date_entered", order_dir: "DESC", page, per_page: 50 });
+  const first = await query(1);
+  const totalPages = Math.max(Number(first.total_pages) || 1, 1);
+  const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => query(index + 2)));
+  const items = [first, ...rest].flatMap((page) => asArray(page?.records)).filter((record) => record && typeof record === "object" && record.deleted !== "1").map(mapWordpressItem);
+  const choices = (list) => Object.entries(asObject(list)).map(([value, label]) => ({ value: asText(value), label: decodeHtml(asText(label)) })).filter((option) => option.value);
+  const options = Object.fromEntries(Object.entries(asObject(first.dropdown_lists)).map(([key, list]) => [key, choices(list)]));
+  return { items, options };
+}
+
+export async function setWordpressStatus(id, status) {
+  if (!id || !status) return;
+  await smartGateway({ action: "update", module: WORDPRESS_MODULE, id, data: { feed_status: status } });
+}
+
 export async function mcpSmartGateway(payload, { timeout = 60_000, signal } = {}) {
   const token = generateToken();
   const targetUrl = getMcpSmartGatewayUrl();
@@ -2079,6 +2142,8 @@ export const api = {
   saveLiveJobToCrm,
   getVideoFeeds: (options) => fetchVideoFeeds(options),
   getSiteContent: (options) => fetchSiteContent(options),
+  getWordpressFeed: () => fetchWordpressFeed(),
+  setWordpressStatus: (id, status) => setWordpressStatus(id, status),
   getNote: (id) => fetchNote(id),
   generateTechContentDoc: (contentId, options) => generateTechContentDoc(contentId, options),
   resolveCrmUser: (user) => resolveCrmUser(user),

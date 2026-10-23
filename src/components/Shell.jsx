@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { CaretDown, ChartLineUp, Clock, List, Plus, ShieldCheck, SignOut, SlidersHorizontal, User, UserCircle, WarningCircle, X } from '@phosphor-icons/react'
+import { Article, Brain, Briefcase, Browsers, CaretDown, ChartLineUp, Check, Clock, Cloud, Code, DotsThreeOutline, EnvelopeSimple, Globe, List, MagnifyingGlass, Megaphone, Newspaper, PlugsConnected, Plus, ShareNetwork, ShieldCheck, SignOut, SlidersHorizontal, User, UserCircle, VideoCamera, WarningCircle, X } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import gsap from 'gsap'
 import { Mark, iconButton } from './ui'
@@ -30,6 +30,30 @@ const navigationItems = [
   ['/api-playground', 'API Playground'],
 ]
 
+// Admins (who see every page) get the nav in three dropdowns instead. A page can be in more than one group (LLM).
+const NAV_GROUPS = [
+  { label: 'Development', icon: Code, items: [
+    ['/jobs', 'Jobs', Briefcase],
+    ['/appscript', 'AppScript', Code],
+    ['/api-playground', 'API Playground', PlugsConnected],
+    ['/wordpress', 'Wordpress', Browsers],
+    ['/llm', 'LLM', Brain],
+    ['/cloud', 'Cloud', Cloud],
+  ] },
+  { label: 'Digital Marketing', icon: Megaphone, items: [
+    ['/tech-news', 'AI News', Newspaper],
+    ['/llm', 'LLM', Brain],
+    ['/site-content', 'Site Content', Article],
+    ['/seo', 'SEO', MagnifyingGlass],
+    ['/email-to-blog', 'Email to Blog', EnvelopeSimple],
+    ['/video', 'Video', VideoCamera],
+  ] },
+  { label: 'Others', icon: DotsThreeOutline, items: [
+    ['/domain', 'Domain', Globe],
+    ['/social', 'Social', ShareNetwork],
+  ] },
+]
+
 export default function Shell({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -38,10 +62,13 @@ export default function Shell({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [feedsOpen, setFeedsOpen] = useState(false)
   const [newFeedOpen, setNewFeedOpen] = useState(false)
+  // The open nav dropdown (a group's label), or null.
+  const [navMenu, setNavMenu] = useState(null)
   const { user, logout: endAuthSession } = useAuth()
   const { data: feeds = [] } = useFeeds(user)
   const menuRef = useRef(null)
   const feedsMenuRef = useRef(null)
+  const navGroupsRef = useRef(null)
   const mobileMenuRef = useRef(null)
   const mobileBackdropRef = useRef(null)
   const mobilePanelRef = useRef(null)
@@ -51,9 +78,12 @@ export default function Shell({ children }) {
     const dismiss = (event) => {
       if (!menuRef.current?.contains(event.target)) setProfileOpen(false)
       if (!feedsMenuRef.current?.contains(event.target)) setFeedsOpen(false)
+      if (!navGroupsRef.current?.contains(event.target)) setNavMenu(null)
     }
+    const closeOnEscape = (event) => { if (event.key === 'Escape') { setNavMenu(null); setFeedsOpen(false) } }
     document.addEventListener('pointerdown', dismiss)
-    return () => document.removeEventListener('pointerdown', dismiss)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', closeOnEscape) }
   }, [])
   useEffect(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -113,6 +143,8 @@ export default function Shell({ children }) {
   const active = (path) => location.pathname.startsWith(path)
   // Only the pages the user's permissions allow, with the same rule as the routes (lib/permissions).
   const navItems = navigationItems.filter(([path]) => canAccess(user, path))
+  // Admins: the grouped dropdowns (a group with none of the admin's pages is hidden). Everyone else: navItems.
+  const navGroups = isAdminUser(user) ? NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter(([path]) => canAccess(user, path)) })).filter((group) => group.items.length) : []
   const roleLabel = labelForRole(user)
   const notice = accessNotice(user)
   const feedsActive = location.pathname.startsWith('/feeds/')
@@ -128,11 +160,31 @@ export default function Shell({ children }) {
       <div className="mx-auto flex max-w-[1500px] items-center justify-between rounded-full bg-[var(--surface)]/90 px-3 py-2 ring-1 ring-black/5 shadow-[0_18px_60px_rgba(30,32,25,.08)] backdrop-blur-xl">
         <Link to={homePath(user)} className="flex items-center gap-2.5 rounded-full pr-3 text-sm font-bold tracking-[-.02em]"><Mark /><span className="hidden sm:inline">Outright Feed Portal</span></Link>
         <nav className="hidden items-center gap-0.5 rounded-full bg-[var(--ink)]/[.045] p-1 xl:flex">
-          {navItems.map(([path, label]) => <Link key={path} to={path} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active(path) ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{label}</Link>)}
+          {/* Development, Digital Marketing and Others: each opens a dropdown of its pages. index.css gives buttons
+              `font: inherit`, so the size and weight come from this wrapper. */}
+          {!navGroups.length && navItems.map(([path, label]) => <Link key={path} to={path} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active(path) ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{label}</Link>)}
+          {navGroups.length > 0 && <div ref={navGroupsRef} className="flex items-center gap-0.5 text-[11px] font-semibold">
+            {navGroups.map((group) => {
+              const open = navMenu === group.label
+              const current = group.items.find(([path]) => active(path))
+              return <div key={group.label} className="relative">
+                <button type="button" aria-expanded={open} aria-haspopup="menu" onClick={() => { setFeedsOpen(false); setNavMenu(open ? null : group.label) }} title={current ? `${group.label}: ${current[1]}` : group.label} className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${current ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : open ? 'bg-[var(--surface)] text-[var(--ink)] ring-1 ring-[var(--line)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>
+                  <group.icon size={13} weight="bold" />{group.label}{current && <span className="font-bold opacity-70">· {current[1]}</span>}<CaretDown size={10} weight="bold" className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+                {open && <div role="menu" aria-label={group.label} className="absolute left-0 top-11 z-40 w-60 rounded-[1.25rem] bg-black/5 p-1.5 ring-1 ring-black/5 shadow-[0_24px_70px_rgba(30,32,25,.18)]"><div className="rounded-[calc(1.25rem-.375rem)] bg-[var(--surface)] p-1.5">
+                  <p className="px-3 pb-1.5 pt-2 text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">{group.label}</p>
+                  {group.items.map(([path, label, Icon]) => <Link key={path} role="menuitem" to={path} onClick={() => setNavMenu(null)} className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-semibold transition-colors ${active(path) ? 'bg-[var(--lime)]/40 text-[var(--ink)]' : 'text-[var(--muted)] hover:bg-black/[.04] hover:text-[var(--ink)] dark:hover:bg-white/[.06]'}`}>
+                    <span className={`grid size-7 shrink-0 place-items-center rounded-lg ${active(path) ? 'bg-[var(--lime)] text-[#26320b]' : 'bg-[var(--paper)] ring-1 ring-[var(--line)]/70'}`}><Icon size={14} weight={active(path) ? 'bold' : 'regular'} /></span>
+                    <span className="flex-1">{label}</span>{active(path) && <Check size={13} weight="bold" className="text-[var(--accent-strong)]" />}
+                  </Link>)}
+                </div></div>}
+              </div>
+            })}
+          </div>}
           {/* Custom feeds any user created (CRM), and "+ New feed". */}
           {/* index.css gives buttons `font: inherit`, so the button's size and weight are set here. */}
           <div ref={feedsMenuRef} className="relative text-[11px] font-semibold">
-            <button type="button" aria-expanded={feedsOpen} aria-haspopup="menu" onClick={() => setFeedsOpen((open) => !open)} className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${feedsActive ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Feeds<CaretDown size={10} weight="bold" className={`transition-transform ${feedsOpen ? 'rotate-180' : ''}`} /></button>
+            <button type="button" aria-expanded={feedsOpen} aria-haspopup="menu" onClick={() => { setNavMenu(null); setFeedsOpen((open) => !open) }} className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${feedsActive ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Feeds<CaretDown size={10} weight="bold" className={`transition-transform ${feedsOpen ? 'rotate-180' : ''}`} /></button>
             {feedsOpen && <div role="menu" className="absolute right-0 top-11 z-40 w-64 rounded-[1.25rem] bg-black/5 p-1.5 ring-1 ring-black/5 shadow-[0_24px_70px_rgba(30,32,25,.18)]"><div className="max-h-[60vh] overflow-y-auto rounded-[calc(1.25rem-.375rem)] bg-[var(--surface)] p-1.5 text-xs font-bold">
               {feeds.map((feed) => <Link key={feed.id} role="menuitem" to={feedPath(feed)} onClick={() => setFeedsOpen(false)} className={`block truncate rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${location.pathname === feedPath(feed) ? 'bg-[var(--lime)]/40 text-[var(--ink)]' : 'hover:bg-black/[.04]'}`}>{feed.name}</Link>)}
               {!feeds.length && <p className="px-3 py-2.5 text-[11px] text-[var(--muted)]">No custom feeds yet.</p>}
@@ -179,9 +231,17 @@ export default function Shell({ children }) {
           <div><p className="text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">Role</p><p className="mt-1 text-sm font-semibold">{roleLabel}</p></div>
           <span className="grid size-10 place-items-center rounded-xl bg-[var(--lime)]/35 text-[var(--accent-strong)]"><ChartLineUp size={18} weight="duotone" /></span>
         </div>
-        <nav className="mt-7 grid gap-1" aria-label="Mobile navigation links">
+        {!navGroups.length && <nav className="mt-7 grid gap-1" aria-label="Mobile navigation links">
           {navItems.map(([path, label]) => <Link data-mobile-nav key={path} to={path} onClick={(event) => navigateFromMobile(event, path)} className={`group flex items-center justify-between rounded-2xl px-4 py-4 text-base font-semibold transition-colors ${active(path) ? 'bg-[var(--lime)] !text-[#26320b]' : 'hover:bg-[var(--paper)]'}`}><span>{label}</span><ArrowLink /></Link>)}
-        </nav>
+        </nav>}
+        {navGroups.length > 0 && <nav className="mt-7 grid gap-5" aria-label="Mobile navigation links">
+          {navGroups.map((group) => <div key={group.label}>
+            <p data-mobile-nav className="flex items-center gap-2 px-4 text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]"><group.icon size={12} weight="bold" />{group.label}</p>
+            <div className="mt-1.5 grid gap-1">
+              {group.items.map(([path, label, Icon]) => <Link data-mobile-nav key={path} to={path} onClick={(event) => navigateFromMobile(event, path)} className={`group flex items-center justify-between rounded-2xl px-4 py-3.5 text-base font-semibold transition-colors ${active(path) ? 'bg-[var(--lime)] !text-[#26320b]' : 'hover:bg-[var(--paper)]'}`}><span className="flex items-center gap-3"><Icon size={18} />{label}</span><ArrowLink /></Link>)}
+            </div>
+          </div>)}
+        </nav>}
         <div className="mt-5">
           <p className="px-4 text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">Feeds</p>
           <div className="mt-2 grid gap-1 text-sm font-bold">

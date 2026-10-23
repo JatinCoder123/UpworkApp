@@ -10,6 +10,10 @@ import { api } from '../services/api'
  * connected to an endpoint, which will take the description as its prompt and return the feed's content.
  */
 
+// The outr_feeds module does not exist in the CRM yet: until it does, the Feeds menu and "New feed" are UI only and
+// nothing is fetched or saved. Set to true once the module is created.
+export const FEEDS_READY = false
+
 export const feedPath = (feed) => `/feeds/${feed.id}`
 
 /** True when this user may delete the feed: its creator or an admin. */
@@ -20,7 +24,7 @@ export function useFeeds(user) {
   return useQuery({
     queryKey: ['feeds'],
     queryFn: () => api.getFeeds(),
-    enabled: Boolean(user?.email),
+    enabled: FEEDS_READY && Boolean(user?.email),
     staleTime: 60_000,
     select: asArray,
   })
