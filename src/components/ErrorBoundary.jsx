@@ -2,7 +2,7 @@ import { Component } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowClockwise, ArrowUpRight, Bug, CaretDown, WarningCircle } from '@phosphor-icons/react'
 import Shell from './Shell'
-import { Mark, primaryButton } from './ui'
+import { DialogHeader, Mark, Modal, primaryButton } from './ui'
 import { useAuth } from '../contexts/AuthContext'
 import { homePath } from '../lib/permissions'
 
@@ -113,8 +113,8 @@ export function PageError({ error, componentStack, onReset }) {
 }
 
 /** A panel or the preview drawer failed; the rest of the page keeps working. */
-export function SectionError({ error, componentStack, onReset, title = 'This section could not load' }) {
-  return <div role="alert" className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
+export function SectionError({ error, componentStack, onReset, title = 'This section could not load', className = '' }) {
+  return <div role="alert" className={`rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 ${className}`}>
     <div className="flex items-start gap-3">
       <ErrorIcon size="size-9" iconSize={17} />
       <div className="min-w-0 flex-1">
@@ -127,13 +127,26 @@ export function SectionError({ error, componentStack, onReset, title = 'This sec
   </div>
 }
 
-/** One job card in a list failed; the other cards still render. */
-export function CardError({ onReset, error }) {
+/** One card in a list failed; the other cards still render. `what` names it ("job", "item", "post"). */
+export function CardError({ onReset, error, what = 'job' }) {
   return <div role="alert" title={errorMessage(error)} className="flex items-center gap-3 rounded-[1.6rem] bg-[var(--frame)] p-1 ring-1 ring-[var(--line)]/60">
     <div className="flex flex-1 items-center gap-3 rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] p-4">
       <ErrorIcon size="size-8" iconSize={15} />
-      <p className="min-w-0 flex-1 text-xs text-[var(--muted)]"><span className="font-semibold text-[var(--text)]">This job could not be displayed.</span> Its data may be incomplete.</p>
+      <p className="min-w-0 flex-1 text-xs text-[var(--muted)]"><span className="font-semibold text-[var(--text)]">This {what} could not be displayed.</span> Its data may be incomplete.</p>
       <button type="button" onClick={onReset} className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--paper)] px-3 text-[11px] font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)]"><ArrowClockwise size={12} weight="bold" />Retry</button>
     </div>
   </div>
+}
+
+/** A dialog failed while showing: it stays open with the error, Retry, and its close button; the page keeps working. */
+export function DialogError({ error, componentStack, onReset, onClose, title = 'This could not be shown' }) {
+  return <Modal onClose={onClose}>
+    <DialogHeader eyebrow="Something went wrong" title={title} onClose={onClose} />
+    <div role="alert" className="mt-5 flex items-start gap-3">
+      <ErrorIcon size="size-9" iconSize={17} />
+      <p className="min-w-0 flex-1 text-sm leading-6 text-[var(--muted)]">Its data may be incomplete. The rest of the page still works.</p>
+      <button type="button" onClick={onReset} className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--paper)] px-3 text-[11px] font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)]"><ArrowClockwise size={12} weight="bold" />Retry</button>
+    </div>
+    <ErrorDetails error={error} componentStack={componentStack} />
+  </Modal>
 }

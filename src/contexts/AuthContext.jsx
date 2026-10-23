@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { consumeLoginIntro, endSession, fetchSessionUser, startMicrosoftLogin } from "../lib/auth";
 import { findGatewayUserIdByEmail, saveUserRole } from "../services/api";
-import { fetchUserAccess } from "../services/accessApi";
+import { fetchPermissionCatalog, fetchUserAccess } from "../services/accessApi";
 import { can as canUser, needsRole, roleOf } from "../lib/permissions";
 
 const AuthContext = createContext(null);
@@ -11,7 +11,8 @@ const ACCESS_SYNC_MS = 60_000;
 
 /*
  * The signed-in user with their access: `role`, `isAdmin` and `permissions` (see lib/permissions).
- * /api/auth/me sends role and isAdmin today; once it also sends `permissions`, that list is used as is.
+ * /api/auth/me sends role and isAdmin today; once it also sends `permissions`, that list is used as is (not for admins:
+ * an admin always holds every permission that exists in the CRM's Permissions module, so a deleted one disappears).
  * Until then the CRM is read through the smart gateway (role defaults + extra permissions, or everything for an admin).
  * If the CRM cannot be reached, `accessChecked` is false: only the pages open to everyone work and a notice is shown,
  * the user stays signed in and is never sent to onboarding by mistake.
@@ -21,12 +22,16 @@ async function withAccess(sessionUser) {
   try {
     const crmUserId = sessionUser.crmUserId || await findGatewayUserIdByEmail(sessionUser.email);
     const access = await fetchUserAccess(crmUserId);
+    const isAdmin = sessionUser.isAdmin === true || access.isAdmin;
+    // An admin holds every permission that exists in the CRM (the Permissions module), whoever marks them admin and
+    // whatever their role or session lists, so a permission deleted there leaves an admin's nav too.
+    const adminPermissions = isAdmin ? (access.isAdmin ? access.permissions : (await fetchPermissionCatalog()).map((permission) => permission.name)) : null;
     return {
       ...sessionUser,
       crmUserId,
       role: access.role?.name || null,
-      isAdmin: sessionUser.isAdmin === true || access.isAdmin,
-      permissions: sessionPermissions ?? access.permissions,
+      isAdmin,
+      permissions: adminPermissions ?? sessionPermissions ?? access.permissions,
       accessChecked: true,
     };
   } catch (accessError) {

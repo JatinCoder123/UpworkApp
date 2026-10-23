@@ -27,7 +27,8 @@ export function StatusPill({ status }) {
   return <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[.14em] ${colors}`}><span className="size-1.5 rounded-full bg-current" />{status}</span>
 }
 
-export function Modal({ children, onClose, wide = false }) {
+// `contained`: the content scrolls inside the rounded frame (thin scrollbar), so a tall dialog's frame stays even.
+export function Modal({ children, onClose, wide = false, contained = false }) {
   const panel = useRef(null)
   const closeRef = useRef(onClose)
   useEffect(() => { closeRef.current = onClose }, [onClose])
@@ -39,7 +40,9 @@ export function Modal({ children, onClose, wide = false }) {
     return () => { tween.kill(); document.removeEventListener('keydown', closeOnEscape); document.body.style.overflow = '' }
   }, [])
   return createPortal(
-    <div role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()} className="fixed inset-0 z-[100] grid place-items-end bg-[var(--ink)]/55 p-2 backdrop-blur-md sm:place-items-center sm:p-5"><div ref={panel} role="dialog" aria-modal="true" className={`max-h-[92dvh] w-full overflow-y-auto rounded-[2rem] bg-black/10 p-1.5 ring-1 ring-white/15 ${wide ? 'max-w-3xl' : 'max-w-xl'}`}><div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 shadow-[0_40px_100px_rgba(0,0,0,.25)] sm:p-8">{children}</div></div></div>,
+    <div role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()} className="fixed inset-0 z-[100] grid place-items-end bg-[var(--ink)]/55 p-2 backdrop-blur-md sm:place-items-center sm:p-5"><div ref={panel} role="dialog" aria-modal="true" className={`max-h-[92dvh] w-full rounded-[2rem] bg-black/10 p-1.5 ring-1 ring-white/15 ${contained ? 'flex overflow-hidden' : 'overflow-y-auto'} ${wide ? 'max-w-3xl' : 'max-w-xl'}`}>{contained
+      ? <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[calc(2rem-.375rem)] bg-[var(--surface)] shadow-[0_40px_100px_rgba(0,0,0,.25)]"><div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [scrollbar-color:color-mix(in_srgb,var(--muted)_40%,transparent)_transparent] [scrollbar-gutter:stable_both-edges] [scrollbar-width:thin] sm:p-8">{children}</div></div>
+      : <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 shadow-[0_40px_100px_rgba(0,0,0,.25)] sm:p-8">{children}</div>}</div></div>,
     document.body,
   )
 }

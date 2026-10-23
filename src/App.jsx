@@ -26,6 +26,9 @@ const Seo = lazy(() => import('./pages/Seo'))
 const Domain = lazy(() => import('./pages/Domain'))
 const ApiPlayground = lazy(() => import('./pages/ApiPlayground'))
 const Wordpress = lazy(() => import('./pages/Wordpress'))
+const Llm = lazy(() => import('./pages/Llm'))
+const AppScript = lazy(() => import('./pages/AppScript'))
+const Social = lazy(() => import('./pages/Social'))
 const ComingSoon = lazy(() => import('./pages/ComingSoon'))
 const CustomFeed = lazy(() => import('./pages/CustomFeed'))
 const Onboarding = lazy(() => import('./pages/Onboarding'))
@@ -82,11 +85,11 @@ export default function App() {
       <Route path="/domain" element={<ProtectedRoute><Domain /></ProtectedRoute>} />
       <Route path="/video" element={<ProtectedRoute><Video /></ProtectedRoute>} />
       <Route path="/seo" element={<ProtectedRoute><Seo /></ProtectedRoute>} />
-      <Route path="/appscript" element={<ProtectedRoute><ComingSoon title="AppScript" subtitle="automation incoming." description="The AppScript workspace is being prepared for automation workflows and integrations." type="appscript" /></ProtectedRoute>} />
-      <Route path="/llm" element={<ProtectedRoute><ComingSoon title="LLM" subtitle="intelligence incoming." description="The LLM workspace is being prepared for model tools, prompts, and experiments." type="llm" /></ProtectedRoute>} />
+      <Route path="/appscript" element={<ProtectedRoute><AppScript /></ProtectedRoute>} />
+      <Route path="/llm" element={<ProtectedRoute><Llm /></ProtectedRoute>} />
       <Route path="/wordpress" element={<ProtectedRoute><Wordpress /></ProtectedRoute>} />
       <Route path="/cloud" element={<ProtectedRoute><ComingSoon title="Cloud" subtitle="infrastructure incoming." description="The Cloud workspace is being prepared for cloud infrastructure, deployments, and server management." type="cloud" /></ProtectedRoute>} />
-      <Route path="/social" element={<ProtectedRoute><ComingSoon title="Social" subtitle="connections incoming." description="The Social workspace is being prepared for social media integrations, channels, and community feeds." type="social" /></ProtectedRoute>} />
+      <Route path="/social" element={<ProtectedRoute><Social /></ProtectedRoute>} />
       <Route path="/email-to-blog" element={<ProtectedRoute><ComingSoon title="Email to Blog" subtitle="publishing incoming." description="The Email to Blog workspace is being prepared to turn emails into ready-to-publish blog posts." type="email-to-blog" /></ProtectedRoute>} />
       <Route path="/api-playground" element={<ProtectedRoute><ApiPlayground /></ProtectedRoute>} />
       {/* Feeds users created (CRM outr_feeds); open to every signed-in user. */}

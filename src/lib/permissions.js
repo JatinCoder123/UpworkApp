@@ -56,11 +56,17 @@ export const roleLabel = (user) => (isAdminUser(user) ? 'Admin' : roleOf(user) ?
 /** A permission name for comparing: case and extra spaces do not matter ("Api Playground" = "API Playground"). */
 export const permissionKey = (name) => asText(name).trim().replace(/\s+/g, ' ').toLowerCase()
 
-/** True when the user holds this permission name. No permission needed, or an admin: always true. */
+/**
+ * True when the user holds this permission name; no permission needed: always true. An admin holds every permission
+ * that exists in the CRM (the Permissions module), so one deleted there is gone for admins too (its page leaves the
+ * nav); until that list is known, or if it could not be read, an admin may open everything.
+ */
 export function can(user, permission) {
-  if (!permission || isAdminUser(user)) return true
+  if (!permission) return true
+  const held = asArray(user?.permissions)
+  if (isAdminUser(user) && (!user?.accessChecked || !held.length)) return true
   const wanted = permissionKey(permission)
-  return asArray(user?.permissions).some((held) => permissionKey(held) === wanted)
+  return held.some((name) => permissionKey(name) === wanted)
 }
 
 /** The permission a page needs, or null when every signed-in user may open it. */

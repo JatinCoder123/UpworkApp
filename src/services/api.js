@@ -590,6 +590,48 @@ export async function fetchMyAppliedJobs({ userEmail, dateFilter, search = "", c
 }
 
 // ----------------------------------------------------
+// Jobs page alerts
+// ----------------------------------------------------
+
+// The gateway compares date_from / date_to with the stored time in UTC (checked against the records), so the alerts'
+// windows ("the last 4 hours") are sent in UTC.
+const utcText = (time) => new Date(time).toISOString().slice(0, 19).replace("T", " ");
+function lastHours(hours) {
+  const now = Date.now();
+  return { date_field: "date_entered", date_from: utcText(now - hours * 3_600_000), date_to: utcText(now) };
+}
+
+// What the Jobs page alerts on when it opens. The feeder: how many jobs it added in the last 4 hours (all of them, and
+// how many of those are scored and ready in the user's scope) and when it last added one. Applications (only with
+// `applications`): how many jobs were applied to in the last 24 hours (the user's, or the team's with `allJobs`; a job
+// whose latest entry there is "Undo Applied" does not count) and when the last application was.
+export async function fetchJobAlerts({ userEmail, allJobs = false, applications = true } = {}) {
+  const userId = await findGatewayUserIdByEmail(userEmail);
+  const byUser = allJobs ? {} : { user_id: userId };
+  const [counts, newestJob, entries, lastApplied] = await Promise.all([
+    smartGateway({ action: "get_stats", date_range: "", ...lastHours(4), queries: [
+      { key: "added", module: JOBS_MODULE },
+      { key: "ready", module: JOBS_MODULE, filters: { ai_processed: 1, ...(allJobs ? {} : { assigned_user_id: userId }) } },
+    ] }),
+    smartGateway({ action: "fetch", module: JOBS_MODULE, order_by: "date_entered", order_dir: "DESC", page: 1, per_page: 1 }),
+    applications ? fetchEveryPage({ action: "fetch", module: JOB_ACTIVITY_MODULE, filters: { ...byUser, description: { in: ["Applied", "Undo Applied"] } }, ...lastHours(24), order_by: "date_entered", order_dir: "DESC" }) : [],
+    applications ? smartGateway({ action: "fetch", module: JOB_ACTIVITY_MODULE, filters: { ...byUser, description: "Applied" }, order_by: "date_entered", order_dir: "DESC", page: 1, per_page: 1 }) : {},
+  ]);
+  // Newest first, so the first entry seen for a job is its latest one in the window.
+  const latest = new Map();
+  for (const entry of entries) if (entry.job_id && !latest.has(entry.job_id)) latest.set(entry.job_id, entry.description);
+  const newest = asArray(newestJob.records).find((record) => record && record.deleted !== "1" && present(record.date_entered));
+  const last = asArray(lastApplied.records).find((record) => record && record.deleted !== "1" && present(record.date_entered));
+  return {
+    added: Number(counts.stats?.added?.count) || 0,
+    ready: Number(counts.stats?.ready?.count) || 0,
+    lastAddedAt: newest ? parseEnteredAt(newest) : "",
+    applied: [...latest.values()].filter((description) => description === "Applied").length,
+    lastAppliedAt: last ? parseEnteredAt(last) : "",
+  };
+}
+
+// ----------------------------------------------------
 // Feed preferences (outr_user_preferences): per user, saved in the CRM
 // ----------------------------------------------------
 
@@ -778,6 +820,9 @@ function mapFeed(record) {
     name: decodeHtml(asText(record.name)).trim(),
     // What the feed should show; later sent as the prompt to the endpoint the feed is connected to.
     description: decodeHtml(asText(record.description)).trim(),
+    department: asText(record.department),
+    skill: decodeHtml(asText(record.skill)).trim(),
+    customSkill: decodeHtml(asText(record.custom_skill)).trim(),
     userId: asText(record.user_id || record.assigned_user_id),
     userName: decodeHtml(asText(record.user_name || record.assigned_user_name || record.created_by_name)),
     createdAt: asText(record.date_entered_uni_format || record.date_entered),
@@ -795,13 +840,17 @@ export async function fetchFeeds() {
 }
 
 // Saves a new feed from the signed-in user and returns its id.
-export async function createFeed(userEmail, { name = "", description = "" } = {}) {
+export async function createFeed(userEmail, { name = "", description = "", department = "", skill = "", customSkill = "" } = {}) {
   const title = asText(name).trim();
   if (!title) throw createAppError("FEED_NAME_EMPTY", "Give the feed a name first.");
   const userId = await findGatewayUserIdByEmail(userEmail);
   const data = {
     name: title,
     description: asText(description).trim(),
+    // The Department (CRM dropdown key), Skill (name) and custom skill the feed is about.
+    department: asText(department).trim(),
+    skill: asText(skill).trim(),
+    custom_skill: asText(customSkill).trim(),
     user_id: userId,
     assigned_user_id: userId,
   };
@@ -1887,6 +1936,9 @@ export const WORDPRESS_MODULE = import.meta.env?.VITE_WORDPRESS_MODULE || "outr_
 // Multi-select values arrive as "^ai^,^content^".
 const splitMultiEnum = (value) => asText(value).split(",").map((item) => item.replace(/\^/g, "").trim()).filter(Boolean);
 
+// The CRM's edit form saves an empty URL field as "http://"; only a link with an address is kept.
+const linkOf = (value) => (/^https?:\/\/[^\s/]+\.[^\s]/i.test(asText(value).trim()) ? asText(value).trim() : "");
+
 // "10/18/2026" or "10/20/2026 09:00" (CRM time, IST) -> ISO; "" when missing.
 function parseCrmDate(value) {
   const match = asText(value).match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?$/);
@@ -1908,8 +1960,8 @@ function mapWordpressItem(record) {
     price: numberOrNull(record.price),
     tags: splitMultiEnum(record.tags),
     source: asText(record.source),
-    sourceUrl: asText(record.source_url),
-    demoUrl: asText(record.demo_url),
+    sourceUrl: linkOf(record.source_url),
+    demoUrl: linkOf(record.demo_url),
     author: decodeHtml(record.author),
     installs: numberOrNull(record.installs),
     sales: numberOrNull(record.sales_count),
@@ -1923,22 +1975,291 @@ function mapWordpressItem(record) {
   };
 }
 
-// Every feed item plus the module's dropdowns (type, category, pricing, tags, source, trend, status) as
-// { key: [{ value, label }] }, so the page shows the CRM's own labels and choices.
-export async function fetchWordpressFeed() {
-  const query = (page) => smartGateway({ action: "fetch", module: WORDPRESS_MODULE, order_by: "date_entered", order_dir: "DESC", page, per_page: 50 });
-  const first = await query(1);
-  const totalPages = Math.max(Number(first.total_pages) || 1, 1);
-  const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => query(index + 2)));
-  const items = [first, ...rest].flatMap((page) => asArray(page?.records)).filter((record) => record && typeof record === "object" && record.deleted !== "1").map(mapWordpressItem);
-  const choices = (list) => Object.entries(asObject(list)).map(([value, label]) => ({ value: asText(value), label: decodeHtml(asText(label)) })).filter((option) => option.value);
-  const options = Object.fromEntries(Object.entries(asObject(first.dropdown_lists)).map(([key, list]) => [key, choices(list)]));
-  return { items, options };
-}
-
 export async function setWordpressStatus(id, status) {
   if (!id || !status) return;
   await smartGateway({ action: "update", module: WORDPRESS_MODULE, id, data: { feed_status: status } });
+}
+
+// ----------------------------------------------------
+// LLM feed (outr_llm): model news, learning resources (some in step-by-step journeys) and project suggestions
+// ----------------------------------------------------
+
+export const LLM_MODULE = import.meta.env?.VITE_LLM_MODULE || "outr_llm";
+
+function mapLlmItem(record) {
+  const text = (value) => decodeHtml(asText(value)).trim();
+  return {
+    id: record.id,
+    name: text(record.name),
+    summary: text(record.summary),
+    description: text(record.description),
+    contentGroup: asText(record.content_group),
+    newsType: asText(record.news_type),
+    company: asText(record.company),
+    modelName: text(record.model_name),
+    modelType: asText(record.model_type),
+    access: asText(record.access),
+    impact: asText(record.impact_level),
+    priority: asText(record.priority),
+    status: asText(record.status) || "new",
+    tags: splitMultiEnum(record.tags),
+    keyHighlights: text(record.key_highlights),
+    specs: text(record.specs),
+    pricing: text(record.pricing),
+    benchmarks: text(record.benchmark_results),
+    availability: text(record.availability),
+    source: asText(record.source),
+    sourceUrl: linkOf(record.source_url),
+    docsUrl: linkOf(record.docs_url),
+    whyItMatters: text(record.why_it_matters),
+    useForUs: text(record.use_for_us),
+    notes: text(record.notes),
+    cost: asText(record.cost),
+    learningFormat: asText(record.learning_format),
+    topic: asText(record.topic),
+    skillLevel: asText(record.skill_level),
+    journeyName: text(record.journey_name),
+    stepNumber: numberOrNull(record.step_number),
+    totalSteps: numberOrNull(record.total_steps),
+    progress: asText(record.progress_status),
+    techStack: text(record.tech_stack),
+    hardware: text(record.hardware_needed),
+    outcome: text(record.outcome),
+    prerequisites: text(record.prerequisites),
+    duration: text(record.duration),
+    suggestedBecause: text(record.suggested_because),
+    publishedAt: parseCrmDate(record.published_date) || parseEnteredAt(record),
+    addedAt: parseEnteredAt(record),
+  };
+}
+
+// Saves an item's review status (status) or learning progress (progress_status).
+export async function setLlmFields(id, data) {
+  if (!id || !data) return;
+  await smartGateway({ action: "update", module: LLM_MODULE, id, data });
+}
+
+// ----------------------------------------------------
+// AppScript ideas (outr_appscripts): Google Apps Script tools worth building, with demand, earning model and our edge
+// ----------------------------------------------------
+
+export const APPSCRIPT_MODULE = import.meta.env?.VITE_APPSCRIPT_MODULE || "outr_appscripts";
+
+function mapAppScript(record) {
+  const text = (value) => decodeHtml(asText(value)).trim();
+  return {
+    id: record.id,
+    name: text(record.name),
+    pitch: text(record.short_pitch),
+    description: text(record.description),
+    problem: text(record.problem_solved),
+    features: text(record.key_features).split(/\s*,\s*/).filter(Boolean),
+    apps: splitMultiEnum(record.google_app),
+    category: asText(record.category),
+    demandScore: numberOrNull(record.demand_score),
+    demandProof: text(record.demand_proof),
+    trend: asText(record.trend),
+    difficulty: asText(record.difficulty),
+    buildTime: text(record.build_time),
+    earningModel: asText(record.earning_model),
+    priceRange: text(record.price_range),
+    tags: splitMultiEnum(record.tags),
+    integrations: splitMultiEnum(record.integrations),
+    targetUsers: splitMultiEnum(record.target_users),
+    source: asText(record.source),
+    sourceUrl: linkOf(record.source_url),
+    similarTools: text(record.similar_tools),
+    edge: text(record.your_edge),
+    status: asText(record.status) || "new",
+    priority: asText(record.priority),
+    notes: text(record.notes),
+    // Content to generate from the idea (checkboxes in the CRM).
+    generateScript: flag(record.generate_script),
+    generateBlog: flag(record.generate_blog),
+    generateVideo: flag(record.generate_video),
+    publishedAt: parseCrmDate(record.posted_date) || parseEnteredAt(record),
+    addedAt: parseEnteredAt(record),
+  };
+}
+
+// Saves an idea's status or its generate_* checkboxes (1 / 0).
+export async function setAppScriptFields(id, data) {
+  if (!id || !data) return;
+  await smartGateway({ action: "update", module: APPSCRIPT_MODULE, id, data });
+}
+
+// ----------------------------------------------------
+// Social posts (outr_socials): ready-to-post drafts per platform, from idea to posted (with results), some made from
+// a WordPress / LLM / AppScript feed item
+// ----------------------------------------------------
+
+export const SOCIAL_MODULE = import.meta.env?.VITE_SOCIAL_MODULE || "outr_socials";
+
+function mapSocialPost(record) {
+  const text = (value) => decodeHtml(asText(value)).trim();
+  return {
+    id: record.id,
+    name: text(record.name),
+    // The post as it will be published (keeps its line breaks and emojis).
+    post: decodeHtml(asText(record.description)).replace(/\r\n/g, "\n").trim(),
+    hook: text(record.hook),
+    summary: text(record.summary),
+    platform: asText(record.platform),
+    contentType: asText(record.content_type),
+    format: asText(record.post_format),
+    niche: asText(record.niche),
+    goal: asText(record.goal),
+    trend: asText(record.trend),
+    reachScore: numberOrNull(record.expected_reach_score),
+    bestTime: text(record.best_time_to_post),
+    outline: text(record.content_outline).split(/\s*\|\s*/).filter(Boolean),
+    callToAction: text(record.call_to_action),
+    hashtags: splitMultiEnum(record.hashtags),
+    mentions: text(record.mentions),
+    characters: numberOrNull(record.character_count),
+    mediaNeeded: text(record.media_needed),
+    mediaUrl: linkOf(record.media_url),
+    whyThisWorks: text(record.why_this_works),
+    exampleUrl: linkOf(record.example_post_url),
+    repurposeFor: splitMultiEnum(record.repurpose_for),
+    status: asText(record.status) || "suggested",
+    scheduledAt: parseCrmDate(record.scheduled_date),
+    postUrl: linkOf(record.our_post_url),
+    // Results once posted (null when not posted yet).
+    views: numberOrNull(record.views_count),
+    likes: numberOrNull(record.likes_count),
+    comments: numberOrNull(record.comments_count),
+    shares: numberOrNull(record.shares_count),
+    leads: numberOrNull(record.leads_generated),
+    notes: decodeHtml(asText(record.notes)).split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+    // The feed item the post was made from: its module (outr_wordpress / outr_llm / outr_appscripts) and name.
+    parentType: asText(record.parent_type),
+    parentId: asText(record.parent_id),
+    parentName: text(record.parent_name),
+    publishedAt: parseCrmDate(record.published_date) || parseEnteredAt(record),
+    addedAt: parseEnteredAt(record),
+  };
+}
+
+// ----------------------------------------------------
+// Feed sections (WordPress, LLM, AppScript, Social): filtering, search, sorting and paging (fetch) and counts
+// (get_stats) done by the smart gateway, like Jobs and AI News
+// ----------------------------------------------------
+
+// Per section: its module, how a record is shown, the fields a text search looks in, and the sorts the gateway does
+// ([field, direction]). Sorts it cannot do (rank order such as high > medium > low, empty values last going up) are
+// done on the page.
+const FEEDS = {
+  wordpress: {
+    module: WORDPRESS_MODULE, map: mapWordpressItem,
+    searchFields: ["name", "summary", "description", "opportunity", "author", "tags"],
+    sorts: { demand: ["demand_score", "DESC"], newest: ["published_date", "DESC"], installs: ["installs", "DESC"], sales: ["sales_count", "DESC"], rating: ["rating", "DESC"] },
+  },
+  llm: {
+    module: LLM_MODULE, map: mapLlmItem,
+    searchFields: ["name", "summary", "description", "model_name", "why_it_matters", "use_for_us", "outcome", "tech_stack", "journey_name", "company", "tags"],
+    sorts: { newest: ["published_date", "DESC"] },
+  },
+  appscript: {
+    module: APPSCRIPT_MODULE, map: mapAppScript,
+    searchFields: ["name", "short_pitch", "description", "problem_solved", "your_edge", "similar_tools", "key_features", "google_app", "tags"],
+    sorts: { demand: ["demand_score", "DESC"], newest: ["posted_date", "DESC"] },
+  },
+  // The post's "made from" name (parent_name) is not a column, so a search cannot look in it.
+  social: {
+    module: SOCIAL_MODULE, map: mapSocialPost,
+    searchFields: ["name", "description", "hook", "summary", "call_to_action", "why_this_works", "platform", "hashtags"],
+    sorts: { reach: ["expected_reach_score", "DESC"], newest: ["published_date", "DESC"], views: ["views_count", "DESC"] },
+  },
+};
+
+function feedOf(name) {
+  if (!FEEDS[name]) throw createAppError("FEED_UNKNOWN", `There is no feed named ${name}.`);
+  return FEEDS[name];
+}
+
+// The gateway searches with LIKE, where "_" stands for any one character. Keys and tags are stored with "_" for
+// spaces (lead_capture), so spaces are sent as "_": "lead capture" then matches both the text and the key.
+const feedSearchText = (search) => asText(search).trim().replace(/\s+/g, "_");
+
+// `picks` is { crmField: [values] }, for fields that hold one value per item: one value is an exact match, several
+// are an OR ({ in: [...] }, which fetch supports). Fields holding several values ("ai,seo") are matched on the page.
+function feedFilters(picks = {}) {
+  const filters = {};
+  for (const [field, values] of Object.entries(picks)) {
+    const list = asArray(values).filter(Boolean);
+    if (list.length) filters[field] = list.length === 1 ? list[0] : { in: list };
+  }
+  return filters;
+}
+
+function feedQuery(feed, { picks, search = "", dateFilter } = {}) {
+  const query = { action: "fetch", module: feed.module };
+  const filters = feedFilters(picks);
+  if (Object.keys(filters).length) query.filters = filters;
+  const text = feedSearchText(search);
+  if (text) Object.assign(query, { search: text, search_fields: feed.searchFields });
+  return addGatewayDateFilter(query, dateFilter);
+}
+
+// One page of a feed, filtered, searched and sorted by the gateway. `dateFilter` comes from toGatewayDateFilter; a
+// sort the gateway does not do falls back to the feed's first one.
+export async function fetchFeedPage(name, { picks, search, dateFilter, sort, page = 1, perPage = 20 } = {}) {
+  const feed = feedOf(name);
+  const [orderBy, orderDir] = feed.sorts[sort] || Object.values(feed.sorts)[0];
+  const data = await smartGateway({ ...feedQuery(feed, { picks, search, dateFilter }), order_by: orderBy, order_dir: orderDir, page, per_page: perPage });
+  const records = asArray(data.records).filter((record) => record && typeof record === "object" && record.deleted !== "1").map(feed.map);
+  const total = Number(data.total) || 0;
+  return { records, page: Number(data.page) || page, total, totalPages: Math.max(Number(data.total_pages) || 1, Math.ceil(total / perPage)) };
+}
+
+// Every item the gateway matches (every page, 50 at a time: the gateway's most), for what the page finishes itself:
+// an OR over fields holding several values, and sorts the gateway cannot do.
+export async function fetchFeedAll(name, params = {}) {
+  const first = await fetchFeedPage(name, { ...params, page: 1, perPage: 50 });
+  const rest = await Promise.all(Array.from({ length: first.totalPages - 1 }, (_, index) => fetchFeedPage(name, { ...params, page: index + 2, perPage: 50 })));
+  const seen = new Set();
+  return [first, ...rest].flatMap((page) => page.records).filter((item) => !seen.has(item.id) && seen.add(item.id));
+}
+
+// The module's dropdown lists (every choice and its label) and how many items it has, from a one-record fetch.
+export async function fetchFeedOptions(name) {
+  const data = await smartGateway({ action: "fetch", module: feedOf(name).module, page: 1, per_page: 1 });
+  const choices = (list) => Object.entries(asObject(list)).map(([value, label]) => ({ value: asText(value), label: decodeHtml(asText(label)) })).filter((option) => option.value);
+  return { options: Object.fromEntries(Object.entries(asObject(data.dropdown_lists)).map(([key, list]) => [key, choices(list)])), total: Number(data.total) || 0 };
+}
+
+// How many items each request would show, all in one get_stats call (like the Jobs and AI News counts).
+// `requests` is [{ key, picks, search, dateFilter }] (all with the same dateFilter; picks of one-value fields only);
+// returns { key: count }. get_stats takes exact values only (no `in`), so several values picked in a field become one
+// query per value, added up: such a field holds one value per item, so the parts do not overlap.
+export async function countFeed(name, requests = []) {
+  if (!requests.length) return {};
+  const feed = feedOf(name);
+  const queries = [];
+  const parts = requests.map((request, index) => {
+    const text = feedSearchText(request.search);
+    const combos = Object.entries(request.picks || {})
+      .filter(([, values]) => asArray(values).length)
+      .reduce((list, [field, values]) => list.flatMap((combo) => values.map((value) => ({ ...combo, [field]: value }))), [{}]);
+    return [request.key, combos.map((filters, part) => {
+      const key = `q${index}_${part}`;
+      const query = { key, module: feed.module };
+      if (Object.keys(filters).length) query.filters = filters;
+      if (text) Object.assign(query, { search: text, search_fields: feed.searchFields });
+      queries.push(query);
+      return key;
+    })];
+  });
+  const dateFilter = requests[0]?.dateFilter;
+  const data = await smartGateway({ action: "get_stats", date_range: "", date_field: dateFilter?.date_field || "", date_from: dateFilter?.date_from || "", date_to: dateFilter?.date_to || "", queries });
+  return Object.fromEntries(parts.map(([key, keys]) => [key, keys.reduce((sum, part) => sum + (Number(data.stats?.[part]?.count) || 0), 0)]));
+}
+
+// Every step of the given LLM learning journeys (by journey name), so a journey shows whole whatever the filters.
+export async function fetchLlmJourneys(names = []) {
+  const list = [...new Set(asArray(names).filter(Boolean))];
+  return list.length ? fetchFeedAll("llm", { picks: { journey_name: list } }) : [];
 }
 
 export async function mcpSmartGateway(payload, { timeout = 60_000, signal } = {}) {
@@ -2113,6 +2434,7 @@ export const api = {
   getJobsPage: (params) => fetchJobsPage(params),
   getJobStats: (params) => fetchJobStats(params),
   getMyAppliedJobs: (params) => fetchMyAppliedJobs(params),
+  getJobAlerts: (params) => fetchJobAlerts(params),
   getRejectReasons: (jobIds) => fetchRejectReasons(jobIds),
   getMyPreferences: (userEmail) => fetchMyPreferences(userEmail),
   saveMyPreference: (userEmail, preference, labels) => saveMyPreference(userEmail, preference, labels),
@@ -2142,8 +2464,14 @@ export const api = {
   saveLiveJobToCrm,
   getVideoFeeds: (options) => fetchVideoFeeds(options),
   getSiteContent: (options) => fetchSiteContent(options),
-  getWordpressFeed: () => fetchWordpressFeed(),
+  getFeedPage: (name, params) => fetchFeedPage(name, params),
+  getFeedAll: (name, params) => fetchFeedAll(name, params),
+  getFeedOptions: (name) => fetchFeedOptions(name),
+  countFeed: (name, requests) => countFeed(name, requests),
+  getLlmJourneys: (names) => fetchLlmJourneys(names),
   setWordpressStatus: (id, status) => setWordpressStatus(id, status),
+  setLlmFields: (id, data) => setLlmFields(id, data),
+  setAppScriptFields: (id, data) => setAppScriptFields(id, data),
   getNote: (id) => fetchNote(id),
   generateTechContentDoc: (contentId, options) => generateTechContentDoc(contentId, options),
   resolveCrmUser: (user) => resolveCrmUser(user),

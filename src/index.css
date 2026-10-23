@@ -249,5 +249,8 @@ button[class*="bg-[var(--lime)]"] { color: var(--ink) !important; }
 @keyframes domain-stamp { from { opacity: 0; transform: scale(1.6) rotate(-8deg); } to { opacity: 1; transform: scale(1) rotate(-3deg); } }
 @keyframes domain-pulse { 0%, 100% { opacity: .35; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
 @keyframes domain-ticker { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+/* Jobs page alerts (JobAlerts): slide in from the right as the page opens. */
+.job-alert { animation: job-alert-in .6s cubic-bezier(.32,.72,0,1) both; }
+@keyframes job-alert-in { from { opacity: 0; transform: translateX(1.75rem) scale(.98); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

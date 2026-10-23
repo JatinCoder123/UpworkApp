@@ -5,6 +5,7 @@ import { BookmarkSimple, Briefcase, Broadcast, CaretDown, CaretRight, Check, Clo
 import Shell from "../components/Shell";
 import JobCard from "../components/JobCard";
 import JobDrawer from "../components/JobDrawer";
+import JobAlerts from "../components/JobAlerts";
 import { SortMenu } from "../components/JobListControls";
 import LogoLoader from "../components/LogoLoader";
 import HScroll from "../components/HScroll";
@@ -619,6 +620,8 @@ export default function Jobs() {
                 </section>}
         </div>
 
+        {/* Feeder and applications alerts as the page opens; an extra, so a failure there hides them and nothing else. */}
+        <ErrorBoundary name="job-alerts" fallback={NoAlerts}><JobAlerts userEmail={user?.email} allJobs={showAllJobs} sort={sort} onShowNewest={() => changeSort("newest")} /></ErrorBoundary>
         {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={jobStatus.markApplied} applyError={jobStatus.errorId === preview.id ? `Could not mark this job as applied: ${jobStatus.error?.message || "please try again."}` : ""} />}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}
@@ -630,6 +633,7 @@ export default function Jobs() {
 }
 
 const withCount = (text, count) => (count == null ? text : `${text} (${count})`);
+const NoAlerts = () => null;
 
 // Pill-shaped dropdown for the category and sub category; the placeholder ("" value) means nothing picked.
 function FilterSelect({ label, value, placeholder, options, onChange }) {
