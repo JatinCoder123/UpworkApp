@@ -13,7 +13,7 @@ import FeedbackWidget from './FeedbackWidget'
 import NewFeedDialog from './NewFeedDialog'
 import FeedBuildStatus from './FeedBuildStatus'
 import { userInitials } from '../lib/auth'
-import { feedPath, useFeeds } from '../lib/feeds'
+import { canSeeFeed, feedPath, useFeeds } from '../lib/feeds'
 import { useAuth } from '../contexts/AuthContext'
 import { accessNotice, canAccess, homePath, isAdminUser, roleLabel as labelForRole } from '../lib/permissions'
 
@@ -69,7 +69,9 @@ export default function Shell({ children }) {
   // The open nav dropdown (a group's label), or null.
   const [navMenu, setNavMenu] = useState(null)
   const { user, logout: endAuthSession } = useAuth()
-  const { data: feeds = [] } = useFeeds(user)
+  // The feeds this user sees: admins every feed, anyone else the built ones their role (or own permissions) opens.
+  const { data: allFeeds = [] } = useFeeds(user)
+  const feeds = allFeeds.filter((feed) => canSeeFeed(user, feed))
   const menuRef = useRef(null)
   const feedsMenuRef = useRef(null)
   const navGroupsRef = useRef(null)
@@ -150,7 +152,8 @@ export default function Shell({ children }) {
   // Admins: the grouped dropdowns (a group with none of the admin's pages is hidden). Everyone else: navItems.
   const navGroups = isAdminUser(user) ? NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter(([path]) => canAccess(user, path)) })).filter((group) => group.items.length) : []
   const roleLabel = labelForRole(user)
-  const notice = accessNotice(user)
+  // A user whose only access is a feed made with "+ New feed" does have a module.
+  const notice = feeds.length && accessNotice(user) === 'none' ? null : accessNotice(user)
   const feedsActive = location.pathname.startsWith('/feeds/')
   const openNewFeed = () => { setFeedsOpen(false); setMobileOpen(false); setNewFeedOpen(true) }
   return <div className="relative isolate min-h-[100dvh] overflow-x-clip bg-[var(--paper)]">
@@ -167,6 +170,9 @@ export default function Shell({ children }) {
           {/* Development, Digital Marketing and Others: each opens a dropdown of its pages. index.css gives buttons
               `font: inherit`, so the size and weight come from this wrapper. */}
           {!navGroups.length && navItems.map(([path, label]) => <Link key={path} to={path} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${active(path) ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{label}</Link>)}
+          {/* Everyone but admins: their feeds are tabs like the sections, then "+" for a new feed. */}
+          {!isAdminUser(user) && feeds.map((feed) => <Link key={feed.id} to={feedPath(feed)} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${location.pathname === feedPath(feed) ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{feed.name}</Link>)}
+          {!isAdminUser(user) && <button type="button" onClick={openNewFeed} aria-label="New feed" title="New feed" className="grid size-8 place-items-center rounded-full text-[var(--muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--ink)]"><Plus size={13} weight="bold" /></button>}
           {navGroups.length > 0 && <div ref={navGroupsRef} className="flex items-center gap-0.5 text-[11px] font-semibold">
             {navGroups.map((group) => {
               const open = navMenu === group.label
@@ -185,9 +191,9 @@ export default function Shell({ children }) {
               </div>
             })}
           </div>}
-          {/* The feeds defined with "+ New feed" (CRM Auto Feed; not yet built ones show their status), and "+ New feed". */}
-          {/* index.css gives buttons `font: inherit`, so the button's size and weight are set here. */}
-          <div ref={feedsMenuRef} className="relative text-[11px] font-semibold">
+          {/* Admins: every feed defined with "+ New feed" (CRM Auto Feed; not yet built ones show their status), and
+              "+ New feed". index.css gives buttons `font: inherit`, so the button's size and weight are set here. */}
+          {isAdminUser(user) && <div ref={feedsMenuRef} className="relative text-[11px] font-semibold">
             <button type="button" aria-expanded={feedsOpen} aria-haspopup="menu" onClick={() => { setNavMenu(null); setFeedsOpen((open) => !open) }} className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${feedsActive ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Feeds<CaretDown size={10} weight="bold" className={`transition-transform ${feedsOpen ? 'rotate-180' : ''}`} /></button>
             {feedsOpen && <div role="menu" className="absolute right-0 top-11 z-40 w-64 rounded-[1.25rem] bg-black/5 p-1.5 ring-1 ring-black/5 shadow-[0_24px_70px_rgba(30,32,25,.18)]"><div className="max-h-[60vh] overflow-y-auto rounded-[calc(1.25rem-.375rem)] bg-[var(--surface)] p-1.5 text-xs font-bold">
               {feeds.map((feed) => <Link key={feed.id} role="menuitem" to={feedPath(feed)} onClick={() => setFeedsOpen(false)} className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${location.pathname === feedPath(feed) ? 'bg-[var(--lime)]/40 text-[var(--ink)]' : 'hover:bg-black/[.04]'}`}><span className="min-w-0 flex-1 truncate">{feed.name}</span>{feed.buildStatus !== 'built' && <FeedBuildStatus status={feed.buildStatus} />}</Link>)}
@@ -195,7 +201,7 @@ export default function Shell({ children }) {
               <div className="my-1 h-px bg-black/[.07]" />
               <button type="button" role="menuitem" onClick={openNewFeed} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-[var(--ink)] transition-colors hover:bg-black/[.04]"><Plus size={14} weight="bold" />New feed</button>
             </div></div>}
-          </div>
+          </div>}
         </nav>
         <div className="flex items-center gap-2">
           <div className="group relative" tabIndex={0} aria-label={`Role: ${roleLabel}`}>

@@ -1,20 +1,26 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowSquareOut, CaretDown, CircleNotch, PencilSimple, Rows } from '@phosphor-icons/react'
+import { ArrowSquareOut, CaretDown, CircleNotch, PencilSimple, Rows, X } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import NotFound from './NotFound'
 import SessionLoader from '../components/SessionLoader'
 import NewFeedDialog from '../components/NewFeedDialog'
 import FeedBuildStatus from '../components/FeedBuildStatus'
+import FeedSection from '../components/FeedSection'
+import { Modal, iconButton } from '../components/ui'
 import { sectionLabel } from '../components/SectionControls'
-import { BUILDING, useFeedBuild, useFeedDefinition } from '../lib/feeds'
+import { BUILDING, canSeeFeed, useFeedBuild, useFeedDefinition, useFeeds } from '../lib/feeds'
+import { useAuth } from '../contexts/AuthContext'
+import { isAdminUser } from '../lib/permissions'
 import { describeSchedule } from '../lib/prompts'
 import { asArray, asObject, asText } from '../lib/safe'
 
 /**
- * A feed (/feeds/:id), as defined with "+ New feed": its build (followed live while it runs, with the log), what it is
- * for, its fields, the documents it generates, who sees it and its schedule. Edit opens the builder; once built, the
- * module opens in the CRM.
+ * A feed (/feeds/:id), made with "+ New feed". Once built it is a section like the others: its records, searched,
+ * filtered and opened in a drawer, with Generate (FeedSection); admins open its settings from there. Until then, the
+ * feed as defined: its build (followed live while it runs, with the log), what it is for, its fields, the documents it
+ * generates, who sees it and its schedule; Edit opens the builder. A built feed opens for admins and for users holding its permission (from their role); one
+ * not built yet opens for anyone with the link (its creator lands here after saving it).
  */
 const TYPE_LABELS = { varchar: 'Short text', text: 'Long text', int: 'Whole number', decimal: 'Decimal', bool: 'Yes / No', date: 'Date', datetime: 'Date & time', url: 'Link', enum: 'Dropdown', multienum: 'Multi-select' }
 const ACTION_LABELS = { doc: 'Document', blog: 'Blog post', video: 'Video', image: 'Image' }
@@ -25,11 +31,14 @@ const optionsOf = (options) => (Array.isArray(options) ? options : Object.values
 export default function CustomFeed() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const feeds = useFeeds(user)
   const definition = useFeedDefinition(id)
   const build = useFeedBuild(id)
   const [editing, setEditing] = useState(false)
+  const [settings, setSettings] = useState(false)
 
-  if (definition.isLoading) return <SessionLoader />
+  if (definition.isLoading || feeds.isLoading) return <SessionLoader />
   if (definition.error) {
     if (/not found/i.test(definition.error.message)) return <NotFound />
     return <Shell>
@@ -40,68 +49,85 @@ export default function CustomFeed() {
   }
 
   const feed = definition.data
+  const listed = feeds.data?.find((item) => item.id === id)
+  if (listed?.buildStatus === 'built' && !canSeeFeed(user, listed)) return <NotFound type="forbidden" />
   const status = build.data?.status || feed.build_status || 'draft'
+  const edit = () => { setSettings(false); setEditing(true) }
+  const editor = editing && <NewFeedDialog feedId={id} onClose={() => setEditing(false)} onSaved={(savedId) => { setEditing(false); if (savedId && savedId !== id) navigate(`/feeds/${savedId}`) }} />
+  // Built: the feed's records, like the other sections; admins open its settings (build, fields, roles) from there.
+  if (status === 'built') return <>
+    <FeedSection definition={feed} onSettings={isAdminUser(user) ? () => setSettings(true) : null} />
+    {settings && <Modal onClose={() => setSettings(false)} full contained><FeedOverview feed={feed} build={build} status={status} onEdit={edit} onClose={() => setSettings(false)} /></Modal>}
+    {editor}
+  </>
+  return <Shell>
+    <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 sm:px-6 md:pt-8"><FeedOverview feed={feed} build={build} status={status} onEdit={edit} /></main>
+    {editor}
+  </Shell>
+}
+
+// The feed as defined: its build (followed live, with the log), context, fields, outputs, access and schedule.
+// `onClose`: shown in a dialog (the settings of a built feed).
+function FeedOverview({ feed, build, status, onEdit, onClose }) {
   const moduleUrl = build.data?.moduleUrl || feed.module_url
   const recordUrl = build.data?.recordUrl || feed.record_url
   const fields = asArray(feed.fields)
   const actions = asArray(feed.actions).map(asText)
   const roles = asArray(feed.roles).map(asText)
 
-  return <Shell>
-    <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
-      <header className="flex flex-wrap items-start gap-4">
-        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[var(--lime)] text-[#26320b]"><Rows size={22} weight="bold" /></span>
-        <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">Feed<FeedBuildStatus status={status} /></p>
-          <h1 className="mt-1.5 text-3xl font-semibold tracking-[-.05em] [overflow-wrap:anywhere]">{asText(feed.module_label) || asText(feed.name)}</h1>
-          <p className="mt-1 text-xs text-[var(--muted)]">{asText(feed.name)} · <span className="font-mono">{asText(feed.module_name)}</span></p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
-          {status === 'built' && moduleUrl && <a href={moduleUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-(--lime)/35 px-4 py-2 text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/40 transition-colors hover:bg-(--lime)/55"><ArrowSquareOut size={13} weight="bold" />Open in CRM</a>}
-          <button type="button" onClick={() => setEditing(true)} disabled={BUILDING.includes(status)} title={BUILDING.includes(status) ? 'It can be edited once the build ends' : undefined} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-4 py-2 text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)] disabled:opacity-50"><PencilSimple size={13} weight="bold" />Edit feed</button>
-        </div>
-      </header>
-
-      <BuildCard status={status} log={build.data?.log} builtAt={build.data?.builtAt} recordUrl={recordUrl} error={build.error} />
-
-      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <div className="space-y-5">
-          <section className={card}>
-            <p className={sectionLabel}>Context</p>
-            {asText(feed.context).trim()
-              ? <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-[var(--ink)] [overflow-wrap:anywhere]">{asText(feed.context)}</p>
-              : <p className="mt-3 text-[13px] text-[var(--muted)]">No context yet.</p>}
-          </section>
-          <section className={card}>
-            <p className={sectionLabel}>Fields · {fields.length}</p>
-            <ul className="mt-3 divide-y divide-[var(--line)]/70">
-              {fields.map((field) => {
-                const options = optionsOf(field.options)
-                return <li key={asText(field.name)} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-semibold text-[var(--ink)]">{asText(field.label)}{field.required && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-[.1em] text-[var(--accent-strong)]">Required</span>}</p>
-                    <p className="font-mono text-[11px] text-[var(--muted)]">{asText(field.name)}{asText(field.help) && <span className="font-sans"> · {asText(field.help)}</span>}</p>
-                    {options.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{options.map((option) => <span key={option} className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{option}</span>)}</div>}
-                  </div>
-                  <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[10px] font-bold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{TYPE_LABELS[field.type] || asText(field.type)}</span>
-                </li>
-              })}
-            </ul>
-          </section>
-        </div>
-        <div className="space-y-5">
-          <Facts title="Generates" items={actions.map((action) => ACTION_LABELS[action] || action)} empty="Nothing to generate" />
-          <Facts title="Access" items={roles} empty="No roles yet" note={ACCESS_LABELS[feed.role_access] || asText(feed.role_access)} />
-          <section className={card}>
-            <p className={sectionLabel}>Scheduler</p>
-            <p className="mt-3 text-[13px] font-semibold text-[var(--ink)]">{describeSchedule(feed.schedule)}</p>
-            <p className="mt-1 text-[11px] text-[var(--muted)]">{asText(feed.crm_instance) || 'No CRM instance'} · {feed.create_scheduler_prompt ? 'Claude writes the scheduler prompt' : 'No scheduler prompt'}</p>
-          </section>
-        </div>
+  return <>
+    <header className="flex flex-wrap items-start gap-4">
+      <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[var(--lime)] text-[#26320b]"><Rows size={22} weight="bold" /></span>
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">Feed<FeedBuildStatus status={status} /></p>
+        <h1 className="mt-1.5 text-3xl font-semibold tracking-[-.05em] [overflow-wrap:anywhere]">{asText(feed.module_label) || asText(feed.name)}</h1>
+        <p className="mt-1 text-xs text-[var(--muted)]">{asText(feed.name)} · <span className="font-mono">{asText(feed.module_name)}</span></p>
       </div>
-    </main>
-    {editing && <NewFeedDialog feedId={id} onClose={() => setEditing(false)} onSaved={(savedId) => { setEditing(false); if (savedId && savedId !== id) navigate(`/feeds/${savedId}`) }} />}
-  </Shell>
+      <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+        {status === 'built' && moduleUrl && <a href={moduleUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-(--lime)/35 px-4 py-2 text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/40 transition-colors hover:bg-(--lime)/55"><ArrowSquareOut size={13} weight="bold" />Open in CRM</a>}
+        <button type="button" onClick={onEdit} disabled={BUILDING.includes(status)} title={BUILDING.includes(status) ? 'It can be edited once the build ends' : undefined} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-4 py-2 text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)] disabled:opacity-50"><PencilSimple size={13} weight="bold" />Edit feed</button>
+        {onClose && <button type="button" aria-label="Close dialog" onClick={onClose} className={iconButton}><X size={16} /></button>}
+      </div>
+    </header>
+
+    <BuildCard status={status} log={build.data?.log} builtAt={build.data?.builtAt} recordUrl={recordUrl} error={build.error} />
+
+    <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div className="space-y-5">
+        <section className={card}>
+          <p className={sectionLabel}>Context</p>
+          {asText(feed.context).trim()
+            ? <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-[var(--ink)] [overflow-wrap:anywhere]">{asText(feed.context)}</p>
+            : <p className="mt-3 text-[13px] text-[var(--muted)]">No context yet.</p>}
+        </section>
+        <section className={card}>
+          <p className={sectionLabel}>Fields · {fields.length}</p>
+          <ul className="mt-3 divide-y divide-[var(--line)]/70">
+            {fields.map((field) => {
+              const options = optionsOf(field.options)
+              return <li key={asText(field.name)} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-semibold text-[var(--ink)]">{asText(field.label)}{field.required && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-[.1em] text-[var(--accent-strong)]">Required</span>}</p>
+                  <p className="font-mono text-[11px] text-[var(--muted)]">{asText(field.name)}{asText(field.help) && <span className="font-sans"> · {asText(field.help)}</span>}</p>
+                  {options.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{options.map((option) => <span key={option} className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{option}</span>)}</div>}
+                </div>
+                <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[10px] font-bold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{TYPE_LABELS[field.type] || asText(field.type)}</span>
+              </li>
+            })}
+          </ul>
+        </section>
+      </div>
+      <div className="space-y-5">
+        <Facts title="Generates" items={actions.map((action) => ACTION_LABELS[action] || action)} empty="Nothing to generate" />
+        <Facts title="Access" items={roles} empty="No roles yet" note={ACCESS_LABELS[feed.role_access] || asText(feed.role_access)} />
+        <section className={card}>
+          <p className={sectionLabel}>Scheduler</p>
+          <p className="mt-3 text-[13px] font-semibold text-[var(--ink)]">{describeSchedule(feed.schedule)}</p>
+          <p className="mt-1 text-[11px] text-[var(--muted)]">{asText(feed.crm_instance) || 'No CRM instance'} · {feed.create_scheduler_prompt ? 'Claude writes the scheduler prompt' : 'No scheduler prompt'}</p>
+        </section>
+      </div>
+    </div>
+  </>
 }
 
 function Facts({ title, items, empty, note }) {

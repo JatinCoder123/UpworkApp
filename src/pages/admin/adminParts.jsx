@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowClockwise, ShieldCheck, WarningCircle, X } from '@phosphor-icons/react'
 import { adminApi } from '../../services/adminApi'
+import { api } from '../../services/api'
 import { PAGE_PERMISSIONS, permissionKey } from '../../lib/permissions'
 import { asArray, asText } from '../../lib/safe'
 
@@ -23,13 +24,26 @@ export function useAdminCatalog() {
 
 const SECTION_NAMES = new Set(Object.values(PAGE_PERMISSIONS).map(permissionKey))
 
-/** Section permissions open a page in the portal; the rest (Reports, User Management, ...) have no page yet. */
-export function groupPermissions(permissions) {
+/**
+ * Section permissions open a page in the portal; feed permissions open a feed made with "+ New feed" (the build saves
+ * the feed's module name in the permission's description); the rest (Reports, User Management, ...) have no page yet.
+ */
+export function groupPermissions(permissions, feedModules = []) {
   const list = asArray(permissions)
+  const modules = new Set(asArray(feedModules).map(permissionKey))
+  const isSection = (permission) => SECTION_NAMES.has(permissionKey(permission.name))
+  const isFeed = (permission) => !isSection(permission) && modules.has(permissionKey(permission.description))
   return [
-    { title: 'Sections', note: 'Each opens a page in the portal.', items: list.filter((permission) => SECTION_NAMES.has(permissionKey(permission.name))) },
-    { title: 'Other access', note: 'No page in the portal uses these yet.', items: list.filter((permission) => !SECTION_NAMES.has(permissionKey(permission.name))) },
+    { title: 'Sections', note: 'Each opens a page in the portal.', items: list.filter(isSection) },
+    { title: 'Feeds', note: 'Each opens a feed made with “New feed”, in the top nav.', items: list.filter(isFeed) },
+    { title: 'Other access', note: 'No page in the portal uses these yet.', items: list.filter((permission) => !isSection(permission) && !isFeed(permission)) },
   ].filter((group) => group.items.length)
+}
+
+/** groupPermissions with the feeds read from the CRM (the same list, and cache, as the nav). */
+export function usePermissionGroups(permissions) {
+  const feeds = useQuery({ queryKey: ['feeds'], queryFn: () => api.getAutoFeeds(), staleTime: 60_000 })
+  return groupPermissions(permissions, asArray(feeds.data).map((feed) => feed.moduleName))
 }
 
 export const initialsOf = (name) => asText(name).split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join('').toUpperCase() || '?'

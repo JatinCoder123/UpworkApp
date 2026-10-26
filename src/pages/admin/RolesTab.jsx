@@ -4,7 +4,7 @@ import { ArrowCounterClockwise, Check, FloppyDisk } from '@phosphor-icons/react'
 import { primaryButton } from '../../components/ui'
 import { useAuth } from '../../contexts/AuthContext'
 import { adminApi } from '../../services/adminApi'
-import { ADMIN_KEYS, ErrorNote, Panel, SectionTitle, groupPermissions, skeleton } from './adminParts'
+import { ADMIN_KEYS, ErrorNote, Panel, SectionTitle, usePermissionGroups, skeleton } from './adminParts'
 import { asArray } from '../../lib/safe'
 
 /** Left: the roles. Right: the selected role's default permissions, which every user with that role gets. */
@@ -42,6 +42,7 @@ export default function RolesTab({ catalog }) {
 
 function RoleEditor({ role, permissions, userCount }) {
   const queryClient = useQueryClient()
+  const permissionGroups = usePermissionGroups(permissions)
   const { user: me, syncAccess } = useAuth()
   const saved = asArray(role.permissionIds)
   const [draft, setDraft] = useState(() => new Set(saved))
@@ -95,7 +96,7 @@ function RoleEditor({ role, permissions, userCount }) {
     </div>
     <div className="mt-4"><ErrorNote error={error} onDismiss={() => setError(null)} /></div>
     <div className="mt-2 space-y-4">
-      {groupPermissions(permissions).map((group) => <div key={group.title}>
+      {permissionGroups.map((group) => <div key={group.title}>
         <SectionTitle aside={<span className="text-[10px] text-[var(--muted)]">{group.note}</span>}>{group.title}</SectionTitle>
         <ul className="mt-2 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
           {group.items.map((permission) => {

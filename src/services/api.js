@@ -2145,7 +2145,8 @@ export const APPSCRIPT_MODULE = import.meta.env?.VITE_APPSCRIPT_MODULE || "outr_
 // user's notes for the generator), <type>_status (queued / processing / completed / failed, set by the generator) and,
 // once made, the document's <type>_view_url and <type>_download_url.
 export const APPSCRIPT_OUTPUTS = ["script", "blog", "video"];
-const generationOf = (record) => Object.fromEntries(APPSCRIPT_OUTPUTS.map((type) => [type, {
+// The same fields serve any module that generates (a feed made with "+ New feed" too); `types` are its outputs.
+const generationOf = (record, types = APPSCRIPT_OUTPUTS) => Object.fromEntries(types.map((type) => [type, {
   requested: flag(record[`generate_${type}`]),
   status: asText(record[`${type}_status`]).trim().toLowerCase(),
   suggestion: decodeHtml(asText(record[`${type}_suggestion`])).trim(),
@@ -2199,8 +2200,14 @@ export async function setAppScriptFields(id, data) {
 // status set to queued. The generator then sets processing and, at the end, completed (with the links) or failed.
 // Generating again (with a new suggestion) is the same save.
 export async function generateAppScriptOutput(id, type, suggestion = "") {
-  if (!id || !APPSCRIPT_OUTPUTS.includes(type)) throw createAppError("GENERATE_INVALID", "Nothing to generate.");
-  await smartGateway({ action: "update", module: APPSCRIPT_MODULE, id, data: { [`${type}_suggestion`]: asText(suggestion).trim(), [`generate_${type}`]: 1, [`${type}_status`]: "queued" } });
+  if (!APPSCRIPT_OUTPUTS.includes(type)) throw createAppError("GENERATE_INVALID", "Nothing to generate.");
+  return generateModuleOutput(APPSCRIPT_MODULE, id, type, suggestion);
+}
+
+// The same save for any module whose records generate outputs (the fields are named the same way).
+export async function generateModuleOutput(module, id, type, suggestion = "") {
+  if (!module || !id || !type) throw createAppError("GENERATE_INVALID", "Nothing to generate.");
+  await smartGateway({ action: "update", module, id, data: { [`${type}_suggestion`]: asText(suggestion).trim(), [`generate_${type}`]: 1, [`${type}_status`]: "queued" } });
 }
 
 // The generators' prompts and guidelines, which users can read and edit before generating.
@@ -2314,10 +2321,15 @@ export async function saveSchedulerPrompt(id, field, value) {
 
 // Where the outputs of a few ideas stand, read while they are being made: { [id]: generation } (as in mapAppScript).
 export async function fetchAppScriptGeneration(ids = []) {
+  return fetchModuleGeneration(APPSCRIPT_MODULE, APPSCRIPT_OUTPUTS, ids);
+}
+
+// The same read for any module that generates: { [id]: generation } for its outputs `types`.
+export async function fetchModuleGeneration(module, types, ids = []) {
   if (!ids.length) return {};
-  const fields = ["id", ...APPSCRIPT_OUTPUTS.flatMap((type) => [`generate_${type}`, `${type}_status`, `${type}_suggestion`, `${type}_view_url`, `${type}_download_url`, `${type}_doc_id`])];
-  const data = await smartGateway({ action: "fetch", module: APPSCRIPT_MODULE, filters: { id: { in: ids } }, fields, page: 1, per_page: 50 });
-  return Object.fromEntries(asArray(data.records).filter((record) => record?.id).map((record) => [record.id, generationOf(record)]));
+  const fields = ["id", ...types.flatMap((type) => [`generate_${type}`, `${type}_status`, `${type}_suggestion`, `${type}_view_url`, `${type}_download_url`, `${type}_doc_id`])];
+  const data = await smartGateway({ action: "fetch", module, filters: { id: { in: ids } }, fields, page: 1, per_page: 50 });
+  return Object.fromEntries(asArray(data.records).filter((record) => record?.id).map((record) => [record.id, generationOf(record, types)]));
 }
 
 // ----------------------------------------------------
@@ -2410,6 +2422,52 @@ function feedOf(name) {
   return FEEDS[name];
 }
 
+// A feed made with "+ New feed" (Auto Feed) works like the sections above once its definition is registered: its
+// module, its records as the page shows them, what a search looks in and its sorts, all from its fields. Its name in
+// the queries is "feed-<id>". Returns that name.
+const autoFeedValue = (field, value) => {
+  if (field.type === "multienum") return splitMultiEnum(value);
+  if (field.type === "bool") return flag(value);
+  if (field.type === "int" || field.type === "decimal") return numberOrNull(value);
+  if (field.type === "url") return linkOf(value);
+  return decodeHtml(asText(value)).trim();
+};
+// A field's choices from its definition ({ key: label } or ["A", "B"]), until the CRM's own lists are read.
+const definedChoices = (options) => (Array.isArray(options)
+  ? options.map((label) => ({ value: asText(label), label: asText(label) }))
+  : Object.entries(asObject(options)).map(([value, label]) => ({ value: asText(value), label: decodeHtml(asText(label)) }))).filter((option) => option.value);
+
+export function registerAutoFeed(definition) {
+  const id = asText(definition?.id);
+  const module = asText(definition?.module_name);
+  if (!id || !module) throw createAppError("FEED_UNKNOWN", "This feed has no module yet.");
+  const fields = asArray(definition.fields).filter((field) => field?.name && field.name !== "name");
+  const outputs = asArray(definition.actions).map(asText).filter(Boolean);
+  const numbers = fields.filter((field) => field.type === "int" || field.type === "decimal");
+  const name = `feed-${id}`;
+  FEEDS[name] = {
+    module,
+    map: (record) => ({
+      id: record.id,
+      name: decodeHtml(asText(record.name)).trim() || "Untitled",
+      description: decodeHtml(asText(record.description)).trim(),
+      // Each field's value as f_<field> (the filters match on these).
+      ...Object.fromEntries(fields.map((field) => [`f_${field.name}`, autoFeedValue(field, record[field.name])])),
+      generation: generationOf(record, outputs),
+      addedAt: parseEnteredAt(record),
+    }),
+    searchFields: ["name", "description", ...fields.filter((field) => ["varchar", "text", "enum", "multienum"].includes(field.type)).map((field) => field.name)],
+    sorts: {
+      newest: ["date_entered", "DESC"],
+      oldest: ["date_entered", "ASC"],
+      ...Object.fromEntries(numbers.map((field) => [`top_${field.name}`, [field.name, "DESC"]])),
+      name: ["name", "ASC"],
+    },
+    choices: Object.fromEntries(fields.filter((field) => field.type === "enum" || field.type === "multienum").map((field) => [field.name, definedChoices(field.options)])),
+  };
+  return name;
+}
+
 // The gateway searches with LIKE, where "_" stands for any one character. Keys and tags are stored with "_" for
 // spaces (lead_capture), so spaces are sent as "_": "lead capture" then matches both the text and the key.
 const feedSearchText = (search) => asText(search).trim().replace(/\s+/g, "_");
@@ -2464,9 +2522,12 @@ export async function fetchFeedItem(name, id) {
 
 // The module's dropdown lists (every choice and its label) and how many items it has, from a one-record fetch.
 export async function fetchFeedOptions(name) {
-  const data = await smartGateway({ action: "fetch", module: feedOf(name).module, page: 1, per_page: 1 });
+  const feed = feedOf(name);
+  const data = await smartGateway({ action: "fetch", module: feed.module, page: 1, per_page: 1 });
   const choices = (list) => Object.entries(asObject(list)).map(([value, label]) => ({ value: asText(value), label: decodeHtml(asText(label)) })).filter((option) => option.value);
-  return { options: Object.fromEntries(Object.entries(asObject(data.dropdown_lists)).map(([key, list]) => [key, choices(list)])), total: Number(data.total) || 0 };
+  // A feed made with "+ New feed" falls back on its definition's choices for a list the CRM does not send.
+  const options = { ...asObject(feed.choices), ...Object.fromEntries(Object.entries(asObject(data.dropdown_lists)).map(([key, list]) => [key, choices(list)])) };
+  return { options, total: Number(data.total) || 0 };
 }
 
 // How many items each request would show, all in one get_stats call (like the Jobs and AI News counts).
@@ -2715,6 +2776,9 @@ export const api = {
   getFeedAll: (name, params) => fetchFeedAll(name, params),
   getFeedOptions: (name) => fetchFeedOptions(name),
   getFeedItem: (name, id) => fetchFeedItem(name, id),
+  generateModuleOutput: (module, id, type, suggestion) => generateModuleOutput(module, id, type, suggestion),
+  getModuleGeneration: (module, types, ids) => fetchModuleGeneration(module, types, ids),
+  registerAutoFeed: (definition) => registerAutoFeed(definition),
   countFeed: (name, requests) => countFeed(name, requests),
   getLlmJourneys: (names) => fetchLlmJourneys(names),
   setWordpressStatus: (id, status) => setWordpressStatus(id, status),

@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { adminApi } from '../../services/adminApi'
 import { api } from '../../services/api'
 import SkillsPicker from '../../components/SkillsPicker'
-import { ADMIN_KEYS, AdminBadge, Avatar, ErrorNote, Panel, RoleBadge, SectionTitle, Switch, groupPermissions, skeleton } from './adminParts'
+import { ADMIN_KEYS, AdminBadge, Avatar, ErrorNote, Panel, RoleBadge, SectionTitle, Switch, usePermissionGroups, skeleton } from './adminParts'
 import { asArray, asText } from '../../lib/safe'
 
 const FILTERS = [
@@ -87,6 +87,7 @@ export default function UsersTab({ catalog, filter, onFilterChange }) {
 
 function UserAccess({ summary, roles, permissions, isSelf }) {
   const queryClient = useQueryClient()
+  const permissionGroups = usePermissionGroups(permissions)
   const { syncAccess } = useAuth()
   const accessQuery = useQuery({ queryKey: ADMIN_KEYS.access(summary.id), queryFn: async () => (await adminApi.getUserAccess(summary.id)).access })
   const access = accessQuery.data
@@ -175,7 +176,7 @@ function UserAccess({ summary, roles, permissions, isSelf }) {
           <span className="text-[11px] font-semibold text-[var(--muted)]">{access.isAdmin ? 'Admins have every permission' : `${effectiveCount} of ${permissions.length} granted`}</span>
         </div>
         <div className="mt-3 space-y-4">
-          {groupPermissions(permissions).map((group) => <div key={group.title}>
+          {permissionGroups.map((group) => <div key={group.title}>
             <SectionTitle aside={<span className="text-[10px] text-[var(--muted)]">{group.note}</span>}>{group.title}</SectionTitle>
             <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
               {group.items.map((permission) => <PermissionRow key={permission.id} permission={permission} state={stateOf(permission)} roleName={roleName} pending={pending === permission.id} disabled={Boolean(pending)} onToggle={togglePermission} />)}

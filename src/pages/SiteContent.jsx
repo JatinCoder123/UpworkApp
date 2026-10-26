@@ -37,6 +37,7 @@ import { Modal, primaryButton, stickyBand } from '../components/ui'
 import CategoryFilterDialog from '../components/CategoryFilterDialog'
 import { ShareDialog } from '../components/ShareJobDialog'
 import InstructionsDialog from '../components/InstructionsDialog'
+import LoginUrlPill from '../components/LoginUrlPill'
 import { api, downloadNoteDocument, getDocumentDownloadUrl, getDocumentViewUrl, resolveCrmUser } from '../services/api'
 import {
   subscribeDocStatus,
@@ -70,50 +71,6 @@ const ideaShareMessage = (item, noteId) => [
   ideaLink(item),
 ].filter(Boolean).join('\n')
 
-// WordPress login of the sites, where a ready document is published. Override with VITE_PUBLISH_SITE_URL.
-const PUBLISH_SITE_URL = import.meta.env?.VITE_PUBLISH_SITE_URL || 'https://sites.outrightcrm.in/wp-login.php?4dx-one'
-
-// "Login URL" pill: hovering stretches it to show the address, clicking opens it, the icon copies it.
-function LoginUrlPill() {
-  const [copied, setCopied] = useState(false)
-  const shownUrl = PUBLISH_SITE_URL.replace(/^https?:\/\//, '')
-  const copyUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(PUBLISH_SITE_URL)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    } catch {
-      window.prompt('Copy the login URL', PUBLISH_SITE_URL)
-    }
-  }
-  return (
-    <div className="group/login flex min-w-0 items-center rounded-full bg-[var(--paper)] ring-1 ring-[var(--line)] transition-shadow duration-300 hover:ring-[var(--lime-dark)] focus-within:ring-[var(--lime-dark)]">
-      <a
-        href={PUBLISH_SITE_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={`Open ${PUBLISH_SITE_URL}`}
-        className="flex min-w-0 items-center gap-1.5 py-1.5 pl-3 pr-1.5 text-[11px] font-bold text-[var(--ink)]"
-      >
-        <Key size={13} weight="bold" className="shrink-0 text-[var(--accent-strong)]" />
-        <span className="shrink-0">Login URL</span>
-        <span className="inline-block max-w-0 truncate font-mono text-[10px] font-medium text-[var(--muted)] opacity-0 transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] group-hover/login:max-w-[16rem] group-hover/login:opacity-100 group-focus-within/login:max-w-[16rem] group-focus-within/login:opacity-100">
-          {shownUrl}
-        </span>
-        <ArrowSquareOut size={12} className="shrink-0 text-[var(--muted)]" />
-      </a>
-      <button
-        type="button"
-        onClick={copyUrl}
-        aria-label={copied ? 'Login URL copied' : 'Copy login URL'}
-        title={copied ? 'Copied' : 'Copy login URL'}
-        className="mr-1 grid size-6 shrink-0 place-items-center rounded-full text-[var(--muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--ink)]"
-      >
-        {copied ? <Check size={12} weight="bold" className="text-[var(--accent-strong)]" /> : <Copy size={12} />}
-      </button>
-    </div>
-  )
-}
 const SITE_TONES = ['#c8e875', '#cbc6ef', '#f6c9a8', '#b8e0d2', '#f2d27a', '#a9c8f0', '#f0b5c4']
 
 function siteTone(site) {

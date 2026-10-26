@@ -1,5 +1,5 @@
 import { ArrowRight, Check, ShieldCheck, UserCircleDashed, UsersThree } from '@phosphor-icons/react'
-import { Avatar, Panel, SectionTitle, groupPermissions, skeleton } from './adminParts'
+import { Avatar, Panel, SectionTitle, usePermissionGroups, skeleton } from './adminParts'
 import { asArray } from '../../lib/safe'
 
 /** Everything at a glance: totals, people per role, which role gets which module, and who still needs a role. */
@@ -7,6 +7,7 @@ export default function OverviewTab({ catalog, onOpenUsers }) {
   const users = asArray(catalog.users.data)
   const roles = asArray(catalog.roles.data)
   const permissions = asArray(catalog.permissions.data)
+  const permissionGroups = usePermissionGroups(permissions)
   const loading = catalog.users.isLoading || catalog.roles.isLoading || catalog.permissions.isLoading
   const admins = users.filter((user) => user.isAdmin)
   const withoutRole = users.filter((user) => !user.isAdmin && !user.role)
@@ -50,7 +51,7 @@ export default function OverviewTab({ catalog, onOpenUsers }) {
                 </tr>
               </thead>
               <tbody>
-                {groupPermissions(permissions).flatMap((group) => [
+                {permissionGroups.flatMap((group) => [
                   <tr key={group.title}><td colSpan={roles.length + 1} className="pb-1 pt-3 text-[10px] font-bold uppercase tracking-[.14em] text-[var(--muted)]">{group.title}</td></tr>,
                   ...group.items.map((permission) => <tr key={permission.id} className="odd:bg-[var(--paper)]/60">
                     <th scope="row" className="sticky left-0 rounded-l-lg bg-inherit py-1.5 pl-2 pr-3 text-left font-semibold text-[var(--text)]">{permission.name}</th>
