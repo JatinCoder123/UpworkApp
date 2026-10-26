@@ -11,6 +11,7 @@ import ErrorBoundary, { DialogError } from './ErrorBoundary'
 import GridPattern from './GridPattern'
 import FeedbackWidget from './FeedbackWidget'
 import NewFeedDialog from './NewFeedDialog'
+import FeedBuildStatus from './FeedBuildStatus'
 import { userInitials } from '../lib/auth'
 import { feedPath, useFeeds } from '../lib/feeds'
 import { useAuth } from '../contexts/AuthContext'
@@ -184,13 +185,13 @@ export default function Shell({ children }) {
               </div>
             })}
           </div>}
-          {/* Custom feeds any user created (CRM), and "+ New feed". */}
+          {/* The feeds defined with "+ New feed" (CRM Auto Feed; not yet built ones show their status), and "+ New feed". */}
           {/* index.css gives buttons `font: inherit`, so the button's size and weight are set here. */}
           <div ref={feedsMenuRef} className="relative text-[11px] font-semibold">
             <button type="button" aria-expanded={feedsOpen} aria-haspopup="menu" onClick={() => { setNavMenu(null); setFeedsOpen((open) => !open) }} className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-semibold transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] ${feedsActive ? 'bg-[var(--lime)] text-[#26320b] ring-1 ring-[var(--lime-dark)]/25 shadow-[0_4px_18px_rgba(105,130,32,.14)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>Feeds<CaretDown size={10} weight="bold" className={`transition-transform ${feedsOpen ? 'rotate-180' : ''}`} /></button>
             {feedsOpen && <div role="menu" className="absolute right-0 top-11 z-40 w-64 rounded-[1.25rem] bg-black/5 p-1.5 ring-1 ring-black/5 shadow-[0_24px_70px_rgba(30,32,25,.18)]"><div className="max-h-[60vh] overflow-y-auto rounded-[calc(1.25rem-.375rem)] bg-[var(--surface)] p-1.5 text-xs font-bold">
-              {feeds.map((feed) => <Link key={feed.id} role="menuitem" to={feedPath(feed)} onClick={() => setFeedsOpen(false)} className={`block truncate rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${location.pathname === feedPath(feed) ? 'bg-[var(--lime)]/40 text-[var(--ink)]' : 'hover:bg-black/[.04]'}`}>{feed.name}</Link>)}
-              {!feeds.length && <p className="px-3 py-2.5 text-[11px] text-[var(--muted)]">No custom feeds yet.</p>}
+              {feeds.map((feed) => <Link key={feed.id} role="menuitem" to={feedPath(feed)} onClick={() => setFeedsOpen(false)} className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${location.pathname === feedPath(feed) ? 'bg-[var(--lime)]/40 text-[var(--ink)]' : 'hover:bg-black/[.04]'}`}><span className="min-w-0 flex-1 truncate">{feed.name}</span>{feed.buildStatus !== 'built' && <FeedBuildStatus status={feed.buildStatus} />}</Link>)}
+              {!feeds.length && <p className="px-3 py-2.5 text-[11px] text-[var(--muted)]">No feeds yet.</p>}
               <div className="my-1 h-px bg-black/[.07]" />
               <button type="button" role="menuitem" onClick={openNewFeed} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-[var(--ink)] transition-colors hover:bg-black/[.04]"><Plus size={14} weight="bold" />New feed</button>
             </div></div>}
@@ -249,7 +250,7 @@ export default function Shell({ children }) {
         <div className="mt-5">
           <p className="px-4 text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">Feeds</p>
           <div className="mt-2 grid gap-1 text-sm font-bold">
-            {feeds.map((feed) => <Link key={feed.id} to={feedPath(feed)} onClick={(event) => navigateFromMobile(event, feedPath(feed))} className={`group flex items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition-colors ${location.pathname === feedPath(feed) ? 'bg-[var(--lime)] !text-[#26320b]' : 'hover:bg-[var(--paper)]'}`}><span className="truncate">{feed.name}</span><ArrowLink /></Link>)}
+            {feeds.map((feed) => <Link key={feed.id} to={feedPath(feed)} onClick={(event) => navigateFromMobile(event, feedPath(feed))} className={`group flex items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition-colors ${location.pathname === feedPath(feed) ? 'bg-[var(--lime)] !text-[#26320b]' : 'hover:bg-[var(--paper)]'}`}><span className="min-w-0 flex-1 truncate">{feed.name}</span>{feed.buildStatus !== 'built' && <FeedBuildStatus status={feed.buildStatus} />}<ArrowLink /></Link>)}
             <button type="button" onClick={openNewFeed} className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-sm font-bold text-[var(--ink)] border border-dashed border-[var(--line)] transition-colors hover:bg-[var(--paper)]"><Plus size={16} weight="bold" />New feed</button>
           </div>
         </div>
@@ -273,7 +274,7 @@ export default function Shell({ children }) {
     {/* Feedback button on every signed-in page. */}
     <FeedbackWidget />
     {promptsOpen && <ErrorBoundary name="prompt-management" fallback={DialogError} fallbackProps={{ onClose: () => setPromptsOpen(false) }}><PromptManagerDialog onClose={() => setPromptsOpen(false)} /></ErrorBoundary>}
-    {newFeedOpen && <NewFeedDialog user={user} takenNames={[...navigationItems.map(([, label]) => label), ...feeds.map((feed) => feed.name)]} onClose={() => setNewFeedOpen(false)} />}
+    {newFeedOpen && <NewFeedDialog onClose={() => setNewFeedOpen(false)} onSaved={(id) => { setNewFeedOpen(false); if (id) navigate(`/feeds/${id}`) }} />}
   </div>
 }
 

@@ -5,7 +5,7 @@ import { DialogHeader, Modal } from './ui'
 import { sectionLabel as label } from './SectionControls'
 import { api } from '../services/api'
 import { asArray } from '../lib/safe'
-import { DESCRIPTION_PART, PROMPT_PARTS } from '../lib/prompts'
+import { DESCRIPTION_PART, PROMPT_PARTS, describeSchedule } from '../lib/prompts'
 
 /*
  * Prompt management (header): nearly full screen, three tabs, each a list beside the open item (the first one until
@@ -16,14 +16,6 @@ import { DESCRIPTION_PART, PROMPT_PARTS } from '../lib/prompts'
 
 const KEY = 'prompt-management'
 const known = (value) => value && value !== '0'
-
-// "0 8 * * *" -> "Every day at 08:00"; other cron patterns as they are.
-function describeSchedule(cron) {
-  const parts = String(cron || '').trim().split(/\s+/)
-  if (!cron) return 'Not scheduled'
-  if (parts.length === 5 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1]) && parts.slice(2).every((part) => part === '*')) return `Every day at ${parts[1].padStart(2, '0')}:${parts[0].padStart(2, '0')}`
-  return `Cron ${cron}`
-}
 
 const SECTIONS = [
   {

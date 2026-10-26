@@ -81,7 +81,7 @@ const FACT_COLOURS = {
   'Added to the feed': 'pink', Model: 'indigo', 'Model type': 'violet', 'Available on': 'sky', Topic: 'violet', 'Skill level': 'orange',
   Duration: 'amber', 'Build time': 'amber', Prerequisites: 'rose', 'Tech stack': 'indigo', Hardware: 'slate', 'Earning model': 'orange',
   'Similar tools': 'indigo', Platform: 'blue', Format: 'indigo', 'Content type': 'violet', Niche: 'orange', Goal: 'rose',
-  'Best time': 'amber', Scheduled: 'sky', 'Good time for post': 'sky', Characters: 'slate',
+  'Best time': 'amber', Characters: 'slate',
 }
 
 // The icon of a details-list row (Category, Author…), in a small tile in that row's colour.

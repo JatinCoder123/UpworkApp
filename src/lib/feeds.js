@@ -1,48 +1,63 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { asArray } from './safe'
-import { isAdminUser } from './permissions'
 import { api } from '../services/api'
 
 /*
- * Custom feeds: sections any signed-in user adds to the nav ("Feeds" menu) with just a name and a description, saved in
- * the CRM (outr_feeds) through the smart gateway; no developer needed. Every user sees every feed; the creator and
- * admins can delete one. A feed opens at /feeds/:id and shows a Coming Soon page with its description until it is
- * connected to an endpoint, which will take the description as its prompt and return the feed's content.
+ * Feeds: sections defined in the portal with "+ New feed" (the CRM's Auto Feed entry point). A feed is a CRM module:
+ * its fields, the documents it can generate (doc, blog, video, image), the roles that see it and a scheduler prompt
+ * that fills it. It is saved as a draft or saved and built; the build makes the module and writes the prompts.
+ * Every user sees every feed in the Feeds menu; a feed opens at /feeds/:id.
  */
-
-// The outr_feeds module does not exist in the CRM yet: until it does, the Feeds menu and "New feed" are UI only and
-// nothing is fetched or saved. Set to true once the module is created.
-export const FEEDS_READY = false
 
 export const feedPath = (feed) => `/feeds/${feed.id}`
 
-/** True when this user may delete the feed: its creator or an admin. */
-export const canDeleteFeed = (user, feed) => isAdminUser(user) || Boolean(feed?.userId && feed.userId === user?.crmUserId)
+// A build in progress is read again every few seconds until it is built or failed.
+export const BUILDING = ['queued', 'building']
+const BUILD_RECHECK_MS = 4000
 
-/** Every custom feed from the CRM, oldest first. Returns the query ({ data: feeds, isLoading, error, ... }). */
+/** Every feed, built or not. Returns the query ({ data: feeds, isLoading, error, ... }). */
 export function useFeeds(user) {
   return useQuery({
     queryKey: ['feeds'],
-    queryFn: () => api.getFeeds(),
-    enabled: FEEDS_READY && Boolean(user?.email),
+    queryFn: () => api.getAutoFeeds(),
+    enabled: Boolean(user?.email),
     staleTime: 60_000,
     select: asArray,
   })
 }
 
-/** Creates a feed for the signed-in user; resolves with the new feed's id. The menu refreshes afterwards. */
-export function useCreateFeed(user) {
+/** What a feed can be made of (field types, actions, roles, role access): fixed lists, read once. */
+export function useFeedOptions() {
+  return useQuery({ queryKey: ['feeds', 'options'], queryFn: () => api.getAutoFeedOptions(), staleTime: 30 * 60_000 })
+}
+
+/** One feed's full definition (to show or edit it). */
+export function useFeedDefinition(id) {
+  return useQuery({ queryKey: ['feeds', 'definition', id], queryFn: () => api.getAutoFeed(id), enabled: Boolean(id), staleTime: 30_000 })
+}
+
+/** A feed's build status and log; read again while it is queued or building. */
+export function useFeedBuild(id) {
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (feed) => api.createFeed(user?.email, feed),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['feeds'] }),
+  return useQuery({
+    queryKey: ['feeds', 'status', id],
+    queryFn: async () => {
+      const before = queryClient.getQueryData(['feeds', 'status', id])?.status
+      const build = await api.getAutoFeedStatus(id)
+      // Just built or failed: the menu and the definition show the new state too.
+      if (BUILDING.includes(before) && !BUILDING.includes(build.status)) queryClient.invalidateQueries({ predicate: ({ queryKey }) => queryKey[0] === 'feeds' && queryKey[1] !== 'status' })
+      return build
+    },
+    enabled: Boolean(id),
+    refetchInterval: (query) => (BUILDING.includes(query.state.data?.status) ? BUILD_RECHECK_MS : false),
   })
 }
 
-export function useDeleteFeed() {
+/** Saves a feed definition (spec.build: true also builds it); resolves with { id, recordUrl }. */
+export function useSaveFeed() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id) => api.deleteFeed(id),
+    mutationFn: (spec) => api.saveAutoFeed(spec),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['feeds'] }),
   })
 }

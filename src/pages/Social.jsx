@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowSquareOut, Article, CalendarBlank, CalendarCheck, Cards, ChartBarHorizontal, ChatCircle, Check, CircleDashed, Clock, Copy, DeviceMobile, Eye, FacebookLogo, FilePdf, FileText, FilmReel, Hash, Heart, Image, InstagramLogo, Lightbulb, LinkedinLogo, ListBullets, ListNumbers, Megaphone, Minus, PaperPlaneTilt, Recycle, RedditLogo, ShareFat, Sparkle, Stack, Tag, Target, TextAa, ThreadsLogo, TiktokLogo, Tray, TrendDown, TrendUp, UsersThree, VideoCamera, XLogo, YoutubeLogo } from '@phosphor-icons/react'
+import { ArrowSquareOut, Article, CalendarBlank, Cards, ChartBarHorizontal, ChatCircle, Check, CircleDashed, Clock, Copy, DeviceMobile, Eye, FacebookLogo, FilePdf, FileText, FilmReel, Hash, Heart, Image, InstagramLogo, Lightbulb, LinkedinLogo, ListBullets, ListNumbers, Megaphone, Minus, PaperPlaneTilt, Recycle, RedditLogo, ShareFat, Sparkle, Stack, Tag, Target, TextAa, ThreadsLogo, TiktokLogo, Tray, TrendDown, TrendUp, UsersThree, VideoCamera, XLogo, YoutubeLogo } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import LogoLoader from '../components/LogoLoader'
 import DateTimeRangeFilter from '../components/DateTimeRangeFilter'
@@ -22,9 +22,9 @@ import { useWideScreen } from '../lib/media'
 /*
  * Social section: the outr_socials drafts, ready-to-post social media posts per platform. Same panel as WordPress, LLM
  * and AppScript (search, sort, date, strips, universal filter): the queue of posts on the left (platform, title,
- * format, when it is planned or its results, expected reach) and, on a wide screen, the details of one post on the
+ * format, its results, expected reach) and, on a wide screen, the details of one post on the
  * right (the picked one, else the first), the same as its details dialog; on a phone a post opens in that dialog. The smart gateway does the filtering, search, sorting, paging and
- * counts; hashtags, "repurpose for" and the "scheduled soonest" sort are finished on the page (see useGatewayFeed).
+ * counts; hashtags and "repurpose for" are finished on the page (see useGatewayFeed).
  * Read only: no post status for now.
  */
 
@@ -48,11 +48,7 @@ const TREND = {
   stable: [Minus, 'text-[var(--muted)]', 'bg-[var(--paper)] text-[var(--muted)]'],
   declining: [TrendDown, 'text-[#9a3412] dark:text-[#fdba9a]', 'bg-[#fbe1d8] text-[#9a3412] dark:bg-[#4a2318] dark:text-[#fdba9a]'],
 }
-const SORTS = [{ id: 'reach', label: 'Highest expected reach' }, { id: 'newest', label: 'Newest first' }, { id: 'scheduled', label: 'Scheduled soonest' }, { id: 'views', label: 'Most views' }]
-// "Scheduled soonest" is done on the page: going up, the gateway puts the posts without a date first. Ties go by
-// expected reach. The other sorts are the gateway's.
-const scheduled = (item) => (item.scheduledAt ? new Date(item.scheduledAt).getTime() : Infinity)
-const LOCAL_SORTS = { scheduled: (a, b) => scheduled(a) - scheduled(b) || (b.reachScore ?? -1) - (a.reachScore ?? -1) }
+const SORTS = [{ id: 'reach', label: 'Highest expected reach' }, { id: 'newest', label: 'Newest first' }, { id: 'views', label: 'Most views' }]
 // Universal filter: key -> [CRM field, item field, matched on the page]. Hashtags and "repurpose for" hold several
 // values per post, which the gateway cannot OR, so they are matched on the page.
 const FIELDS = {
@@ -71,7 +67,6 @@ const FILTERS_ERROR = { title: 'The filters could not load', className: 'm-3' }
 const ALL_KEYS = Object.keys(FIELDS)
 const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 const formatDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
-const formatWhen = (iso) => (iso ? new Date(iso).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '')
 const platformOf = (key) => PLATFORMS[key] || NO_PLATFORM
 const posted = (item) => [item.views, item.likes, item.comments, item.shares, item.leads].some((value) => value != null)
 
@@ -87,7 +82,7 @@ export default function Social() {
 
   // Counts: the strips all the time, every group while the universal filter or a full list is open.
   const { options, labelOf, items, total, grandTotal, countOf, refresh, loading, isError, error, updating, hasMore, loadingMore, loadMoreRef } = useGatewayFeed({
-    feed: 'social', fields: FIELDS, filters, search, dateFilter, dateField: 'published_date', sort, localSorts: LOCAL_SORTS,
+    feed: 'social', fields: FIELDS, filters, search, dateFilter, dateField: 'published_date', sort,
     stripKeys: STRIP_KEYS, openKeys: filterDialog || listKey ? ALL_KEYS : undefined,
   })
   // Search suggestions: the most used hashtags among the posts shown (search matches hashtag names).
@@ -230,15 +225,6 @@ function Results({ item }) {
   </div>
 }
 
-// A good time to post it (its scheduled date), until it has results.
-function WhenBanner({ item, labelOf }) {
-  if (!item.scheduledAt || posted(item)) return null
-  return <p className="flex items-center gap-2 rounded-xl bg-[#e0f2fe] px-3.5 py-2.5 text-[13px] font-semibold text-[#0369a1] ring-1 ring-[#bae6fd] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30">
-    <CalendarCheck size={16} weight="bold" />Good time for post: {formatWhen(item.scheduledAt)}
-    <span className="ml-auto font-normal opacity-80">{labelOf('platform', item.platform)}</span>
-  </p>
-}
-
 function CopyPost({ item, labelOf, big = false }) {
   const [copied, setCopied] = useState(false)
   const text = [item.post, item.hashtags.map((tag) => labelOf('hashtags', tag)).join(' ')].filter(Boolean).join('\n\n')
@@ -273,9 +259,7 @@ function PostRow({ item, labelOf, selected, onPick }) {
         <span data-card-title className="line-clamp-2 text-sm font-semibold leading-5">{item.name}</span>
         <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-[var(--muted)]">
           <span className="inline-flex items-center gap-1"><FormatIcon size={12} />{labelOf('post_format', item.format)}</span>
-          {posted(item)
-            ? <span className="inline-flex items-center gap-1 font-semibold text-[#137333] dark:text-[#81c995]"><PaperPlaneTilt size={12} weight="bold" />Posted{item.views != null && ` · ${compact.format(item.views)} views`}</span>
-            : item.scheduledAt && <span className="inline-flex items-center gap-1 font-semibold text-[#0369a1] dark:text-[#7dd3fc]"><CalendarCheck size={12} weight="bold" />{formatWhen(item.scheduledAt)}</span>}
+          {posted(item) && <span className="inline-flex items-center gap-1 font-semibold text-[#137333] dark:text-[#81c995]"><PaperPlaneTilt size={12} weight="bold" />Posted{item.views != null && ` · ${compact.format(item.views)} views`}</span>}
         </span>
       </span>
       {item.reachScore != null && <span title={`Expected reach ${item.reachScore} / 100`} className="flex shrink-0 flex-col items-end gap-1">
@@ -316,7 +300,6 @@ function PostDetails({ item, labelOf, now }) {
     [Tag, 'Niche', labelOf('niche', item.niche)],
     [GOALS[item.goal] || Target, 'Goal', labelOf('goal', item.goal)],
     [Clock, 'Best time', item.bestTime],
-    [CalendarCheck, 'Good time for post', formatWhen(item.scheduledAt)],
     [TextAa, 'Characters', item.characters != null && `${item.characters} / ${(platformOf(item.platform).limit || 0).toLocaleString('en-US')}`],
     [CalendarBlank, 'Published', formatDate(item.publishedAt)],
     [Tray, 'Added to the feed', item.addedAt && `${formatDate(item.addedAt)} · ${timeAgo(item.addedAt, now)}`],
@@ -337,7 +320,6 @@ function PostDetails({ item, labelOf, now }) {
 
     <div className="mt-4"><Metrics item={item} labelOf={labelOf} /></div>
     {posted(item) && <div className="mt-3"><Results item={item} /></div>}
-    {item.scheduledAt && !posted(item) && <div className="mt-3"><WhenBanner item={item} labelOf={labelOf} /></div>}
 
     <div className="mt-5 grid gap-5 @2xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
       <div className="space-y-4 text-sm leading-6">

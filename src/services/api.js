@@ -822,58 +822,77 @@ export async function setFeedbackStatus(id, status) {
 }
 
 // ----------------------------------------------------
-// Custom feeds (outr_feeds): sections any user adds to the nav, one CRM record per feed, linked to its creator
+// Feeds (Auto Feed, CRM entryPoint=autoFeed): a feed is defined here (module, fields, generation actions, roles,
+// scheduler) and saved in outr_auto_feed; "Save & Build" makes it a CRM module with its prompts, guidelines and
+// scheduler prompt. The entry point takes the definition as JSON and reports the build's status.
 // ----------------------------------------------------
 
-export const FEEDS_MODULE = import.meta.env?.VITE_FEEDS_MODULE || "outr_feeds";
+export const AUTO_FEED_URL = import.meta.env?.VITE_AUTO_FEED_URL || `${CRM_BASE_URL}/index.php?entryPoint=autoFeed`;
 
-function mapFeed(record) {
+async function autoFeed(query = "", init = undefined) {
+  // In development through the dev proxy (same site); on the live site straight to the CRM.
+  const base = import.meta.env?.DEV ? "/crm-entrypoint/index.php?entryPoint=autoFeed" : AUTO_FEED_URL;
+  let response;
+  try {
+    response = await fetch(`${base}${query}`, init);
+  } catch {
+    throw createAppError("AUTO_FEED_UNREACHABLE", "The feed service could not be reached. Check the connection and try again.");
+  }
+  const data = await response.json().catch(() => null);
+  if (!data?.success) {
+    const errors = asArray(data?.errors).map(asText).filter(Boolean);
+    throw createAppError("AUTO_FEED_FAILED", errors.join("\n") || `The feed service failed (${response.status}).`, { errors });
+  }
+  return data;
+}
+
+// What a feed can be made of: field types, generation actions, CRM roles and role access.
+export async function fetchAutoFeedOptions() {
+  const data = await autoFeed("&action=options");
   return {
-    id: record.id,
-    name: decodeHtml(asText(record.name)).trim(),
-    // What the feed should show; later sent as the prompt to the endpoint the feed is connected to.
-    description: decodeHtml(asText(record.description)).trim(),
-    department: asText(record.department),
-    skill: decodeHtml(asText(record.skill)).trim(),
-    customSkill: decodeHtml(asText(record.custom_skill)).trim(),
-    userId: asText(record.user_id || record.assigned_user_id),
-    userName: decodeHtml(asText(record.user_name || record.assigned_user_name || record.created_by_name)),
-    createdAt: asText(record.date_entered_uni_format || record.date_entered),
-    createdAgo: asText(record.date_entered_time_ago),
+    fieldTypes: asArray(data.field_types).map(asText),
+    actions: asArray(data.actions).map(asText),
+    roles: asArray(data.roles).map(asText),
+    roleAccess: asArray(data.role_access).map(asText),
+    notes: asObject(data.notes),
   };
 }
 
-// Every user's feeds, oldest first so the menu order stays the same as feeds are added.
-export async function fetchFeeds() {
-  const query = { action: "fetch", module: FEEDS_MODULE, order_by: "date_entered", order_dir: "ASC" };
-  const first = await smartGateway({ ...query, page: 1, per_page: 50 });
-  const totalPages = Math.max(Number(first.total_pages) || 1, 1);
-  const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => smartGateway({ ...query, page: index + 2, per_page: 50 })));
-  return [first, ...rest].flatMap((page) => asArray(page?.records)).filter((record) => record && record.deleted !== "1").map(mapFeed).filter((feed) => feed.name);
+const mapAutoFeed = (feed) => ({
+  id: asText(feed.id),
+  name: decodeHtml(asText(feed.module_label || feed.name)),
+  feedName: decodeHtml(asText(feed.name)),
+  moduleName: asText(feed.module_name),
+  actions: asArray(feed.actions).map(asText),
+  buildStatus: asText(feed.build_status) || "draft",
+  builtAt: asText(feed.built_at),
+  modifiedAt: asText(feed.date_modified),
+  moduleUrl: asText(feed.module_url),
+  recordUrl: asText(feed.record_url),
+});
+
+// Every feed defined, built or not.
+export async function fetchAutoFeeds() {
+  const data = await autoFeed("&action=list");
+  return asArray(data.feeds).filter((feed) => feed?.id).map(mapAutoFeed);
 }
 
-// Saves a new feed from the signed-in user and returns its id.
-export async function createFeed(userEmail, { name = "", description = "", department = "", skill = "", customSkill = "" } = {}) {
-  const title = asText(name).trim();
-  if (!title) throw createAppError("FEED_NAME_EMPTY", "Give the feed a name first.");
-  const userId = await findGatewayUserIdByEmail(userEmail);
-  const data = {
-    name: title,
-    description: asText(description).trim(),
-    // The Department (CRM dropdown key), Skill (name) and custom skill the feed is about.
-    department: asText(department).trim(),
-    skill: asText(skill).trim(),
-    custom_skill: asText(customSkill).trim(),
-    user_id: userId,
-    assigned_user_id: userId,
-  };
-  const created = await smartGateway({ action: "create", module: FEEDS_MODULE, data });
-  return created.id ?? created.record?.id ?? created.data?.id ?? "";
+// One feed's full definition, as the builder edits it.
+export async function fetchAutoFeed(id) {
+  const data = await autoFeed(`&action=get&id=${encodeURIComponent(id)}`);
+  return { ...asObject(data.definition), build_status: asText(data.build_status), module_url: asText(data.module_url), record_url: asText(data.record_url) };
 }
 
-export async function deleteFeed(id) {
-  if (!id) return;
-  await smartGateway({ action: "delete", module: FEEDS_MODULE, id });
+// A feed's build: { status, log, builtAt, moduleUrl, recordUrl }.
+export async function fetchAutoFeedStatus(id) {
+  const data = await autoFeed(`&action=status&id=${encodeURIComponent(id)}`);
+  return { status: asText(data.build_status) || "draft", log: asText(data.build_log), builtAt: asText(data.built_at), moduleUrl: asText(data.module_url), recordUrl: asText(data.record_url) };
+}
+
+// Saves a feed definition (the entry point's JSON spec); with build: true it is also built. Returns { id, recordUrl }.
+export async function saveAutoFeed(spec) {
+  const data = await autoFeed("", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(spec) });
+  return { id: asText(data.id), recordUrl: asText(data.record_url) };
 }
 
 // Why each job was rejected: the reason in its latest "Rejected: …" activity entry, as { [jobId]: reason }.
@@ -2670,9 +2689,11 @@ export const api = {
   getFeedback: (params) => fetchFeedback(params),
   createFeedback: (userEmail, entry) => createFeedback(userEmail, entry),
   setFeedbackStatus: (id, status) => setFeedbackStatus(id, status),
-  getFeeds: () => fetchFeeds(),
-  createFeed: (userEmail, feed) => createFeed(userEmail, feed),
-  deleteFeed: (id) => deleteFeed(id),
+  getAutoFeedOptions: () => fetchAutoFeedOptions(),
+  getAutoFeeds: () => fetchAutoFeeds(),
+  getAutoFeed: (id) => fetchAutoFeed(id),
+  getAutoFeedStatus: (id) => fetchAutoFeedStatus(id),
+  saveAutoFeed: (spec) => saveAutoFeed(spec),
   getSkillCounts: (params) => fetchSkillCounts(params),
   getGroupOptions: (module) => fetchGroupOptions(module),
   getJobGroupCounts: (params) => fetchJobGroupCounts(params),

@@ -1,48 +1,149 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { CircleNotch, Trash } from '@phosphor-icons/react'
+import { ArrowSquareOut, CaretDown, CircleNotch, PencilSimple, Rows } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
-import ComingSoon from './ComingSoon'
 import NotFound from './NotFound'
 import SessionLoader from '../components/SessionLoader'
-import { useAuth } from '../contexts/AuthContext'
-import { canDeleteFeed, useDeleteFeed, useFeeds } from '../lib/feeds'
-import { homePath } from '../lib/permissions'
+import NewFeedDialog from '../components/NewFeedDialog'
+import FeedBuildStatus from '../components/FeedBuildStatus'
+import { sectionLabel } from '../components/SectionControls'
+import { BUILDING, useFeedBuild, useFeedDefinition } from '../lib/feeds'
+import { describeSchedule } from '../lib/prompts'
+import { asArray, asObject, asText } from '../lib/safe'
 
 /**
- * A custom feed (/feeds/:id): a Coming Soon page with its description, until the feed is connected to an endpoint that
- * takes the description as its prompt and returns the content to show. The creator and admins can delete it.
+ * A feed (/feeds/:id), as defined with "+ New feed": its build (followed live while it runs, with the log), what it is
+ * for, its fields, the documents it generates, who sees it and its schedule. Edit opens the builder; once built, the
+ * module opens in the CRM.
  */
+const TYPE_LABELS = { varchar: 'Short text', text: 'Long text', int: 'Whole number', decimal: 'Decimal', bool: 'Yes / No', date: 'Date', datetime: 'Date & time', url: 'Link', enum: 'Dropdown', multienum: 'Multi-select' }
+const ACTION_LABELS = { doc: 'Document', blog: 'Blog post', video: 'Video', image: 'Image' }
+const ACCESS_LABELS = { full: 'Full access', no_delete: 'All except delete', read_only: 'Read only' }
+const card = 'rounded-[1.5rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 sm:p-6'
+const optionsOf = (options) => (Array.isArray(options) ? options : Object.values(asObject(options))).map(asText).filter(Boolean)
+
 export default function CustomFeed() {
   const { id } = useParams()
-  const { user } = useAuth()
   const navigate = useNavigate()
-  const { data: feeds = [], isLoading, error, refetch } = useFeeds(user)
-  const remove = useDeleteFeed()
-  const [confirming, setConfirming] = useState(false)
-  const feed = feeds.find((item) => item.id === id)
+  const definition = useFeedDefinition(id)
+  const build = useFeedBuild(id)
+  const [editing, setEditing] = useState(false)
 
-  if (isLoading) return <SessionLoader />
-  if (error) return <Shell>
+  if (definition.isLoading) return <SessionLoader />
+  if (definition.error) {
+    if (/not found/i.test(definition.error.message)) return <NotFound />
+    return <Shell>
+      <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
+        <p role="alert" className="rounded-2xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]">This feed could not be loaded: {definition.error.message} <button type="button" onClick={() => definition.refetch()} className="ml-2 underline">Try again</button></p>
+      </main>
+    </Shell>
+  }
+
+  const feed = definition.data
+  const status = build.data?.status || feed.build_status || 'draft'
+  const moduleUrl = build.data?.moduleUrl || feed.module_url
+  const recordUrl = build.data?.recordUrl || feed.record_url
+  const fields = asArray(feed.fields)
+  const actions = asArray(feed.actions).map(asText)
+  const roles = asArray(feed.roles).map(asText)
+
+  return <Shell>
     <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
-      <p role="alert" className="rounded-2xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]">This feed could not be loaded: {error.message} <button type="button" onClick={() => refetch()} className="ml-2 underline">Try again</button></p>
+      <header className="flex flex-wrap items-start gap-4">
+        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[var(--lime)] text-[#26320b]"><Rows size={22} weight="bold" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">Feed<FeedBuildStatus status={status} /></p>
+          <h1 className="mt-1.5 text-3xl font-semibold tracking-[-.05em] [overflow-wrap:anywhere]">{asText(feed.module_label) || asText(feed.name)}</h1>
+          <p className="mt-1 text-xs text-[var(--muted)]">{asText(feed.name)} · <span className="font-mono">{asText(feed.module_name)}</span></p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+          {status === 'built' && moduleUrl && <a href={moduleUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-(--lime)/35 px-4 py-2 text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/40 transition-colors hover:bg-(--lime)/55"><ArrowSquareOut size={13} weight="bold" />Open in CRM</a>}
+          <button type="button" onClick={() => setEditing(true)} disabled={BUILDING.includes(status)} title={BUILDING.includes(status) ? 'It can be edited once the build ends' : undefined} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-4 py-2 text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)] disabled:opacity-50"><PencilSimple size={13} weight="bold" />Edit feed</button>
+        </div>
+      </header>
+
+      <BuildCard status={status} log={build.data?.log} builtAt={build.data?.builtAt} recordUrl={recordUrl} error={build.error} />
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="space-y-5">
+          <section className={card}>
+            <p className={sectionLabel}>Context</p>
+            {asText(feed.context).trim()
+              ? <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-[var(--ink)] [overflow-wrap:anywhere]">{asText(feed.context)}</p>
+              : <p className="mt-3 text-[13px] text-[var(--muted)]">No context yet.</p>}
+          </section>
+          <section className={card}>
+            <p className={sectionLabel}>Fields · {fields.length}</p>
+            <ul className="mt-3 divide-y divide-[var(--line)]/70">
+              {fields.map((field) => {
+                const options = optionsOf(field.options)
+                return <li key={asText(field.name)} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold text-[var(--ink)]">{asText(field.label)}{field.required && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-[.1em] text-[var(--accent-strong)]">Required</span>}</p>
+                    <p className="font-mono text-[11px] text-[var(--muted)]">{asText(field.name)}{asText(field.help) && <span className="font-sans"> · {asText(field.help)}</span>}</p>
+                    {options.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{options.map((option) => <span key={option} className="rounded-full bg-[var(--paper)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{option}</span>)}</div>}
+                  </div>
+                  <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[10px] font-bold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{TYPE_LABELS[field.type] || asText(field.type)}</span>
+                </li>
+              })}
+            </ul>
+          </section>
+        </div>
+        <div className="space-y-5">
+          <Facts title="Generates" items={actions.map((action) => ACTION_LABELS[action] || action)} empty="Nothing to generate" />
+          <Facts title="Access" items={roles} empty="No roles yet" note={ACCESS_LABELS[feed.role_access] || asText(feed.role_access)} />
+          <section className={card}>
+            <p className={sectionLabel}>Scheduler</p>
+            <p className="mt-3 text-[13px] font-semibold text-[var(--ink)]">{describeSchedule(feed.schedule)}</p>
+            <p className="mt-1 text-[11px] text-[var(--muted)]">{asText(feed.crm_instance) || 'No CRM instance'} · {feed.create_scheduler_prompt ? 'Claude writes the scheduler prompt' : 'No scheduler prompt'}</p>
+          </section>
+        </div>
+      </div>
     </main>
+    {editing && <NewFeedDialog feedId={id} onClose={() => setEditing(false)} onSaved={(savedId) => { setEditing(false); if (savedId && savedId !== id) navigate(`/feeds/${savedId}`) }} />}
   </Shell>
-  if (!feed) return <NotFound />
+}
 
-  const deleteFeed = () => remove.mutate(feed.id, { onSuccess: () => navigate(homePath(user), { replace: true }) })
-
-  return <ComingSoon title={feed.name} description={feed.description || `The ${feed.name} feed is being prepared.`}>
-    <div className="mx-auto mt-8 flex max-w-md flex-wrap items-center justify-center gap-x-3 gap-y-2 border-t border-[var(--line)] pt-5 text-[11px] text-[var(--muted)]">
-      <span>Created{feed.userName ? ` by ${feed.userName}` : ''}{feed.createdAgo ? ` · ${feed.createdAgo}` : ''}</span>
-      {canDeleteFeed(user, feed) && (confirming
-        ? <span className="inline-flex items-center gap-2">
-          <span className="font-semibold text-[var(--bad)]">Delete this feed for everyone?</span>
-          <button type="button" onClick={deleteFeed} disabled={remove.isPending} className="inline-flex items-center gap-1 rounded-full bg-[var(--bad)] px-3 py-1 font-bold text-white disabled:opacity-60">{remove.isPending && <CircleNotch size={11} className="animate-spin" />}Delete</button>
-          <button type="button" onClick={() => setConfirming(false)} disabled={remove.isPending} className="rounded-full px-2 py-1 font-semibold hover:text-[var(--ink)]">Cancel</button>
-        </span>
-        : <button type="button" onClick={() => setConfirming(true)} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-bold transition-colors hover:bg-[var(--bad-bg)] hover:text-[var(--bad)]"><Trash size={12} />Delete feed</button>)}
-      {remove.error && <span role="alert" className="w-full font-semibold text-[var(--bad)]">{remove.error.message || 'The feed could not be deleted.'}</span>}
+function Facts({ title, items, empty, note }) {
+  return <section className={card}>
+    <p className={sectionLabel}>{title}</p>
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {items.length ? items.map((item) => <span key={item} className="rounded-full bg-(--lime)/25 px-3 py-1 text-xs font-semibold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/35">{item}</span>) : <span className="text-[13px] text-[var(--muted)]">{empty}</span>}
     </div>
-  </ComingSoon>
+    {note && <p className="mt-2 text-[11px] text-[var(--muted)]">{note}</p>}
+  </section>
+}
+
+// The build: what is happening now, and the CRM's log (open while it runs or after it failed).
+function BuildCard({ status, log, builtAt, recordUrl, error }) {
+  const running = BUILDING.includes(status)
+  const [open, setOpen] = useState(null)
+  const shown = open ?? (running || status === 'failed')
+  const lines = asText(log).split('\n').filter(Boolean)
+  const text = {
+    draft: ['Saved as a draft', 'Nothing is built yet. Edit the feed and choose “Save & build” to make the CRM module.'],
+    queued: ['Waiting to build', 'The build starts in a moment. This page follows it; you can keep working elsewhere.'],
+    building: ['Building the module', 'Making the module, its fields and roles, then the prompts and the scheduler prompt.'],
+    built: ['Built', `The module is in the CRM${builtAt ? ` since ${builtAt}` : ''}.`],
+    failed: ['The build failed', 'See the log below, fix the feed and build it again.'],
+  }[status] || ['', '']
+
+  return <section className={`mt-6 overflow-hidden rounded-[1.5rem] ring-1 ${status === 'failed' ? 'bg-[var(--bad-bg)]/50 ring-[var(--bad)]/25' : running ? 'bg-[var(--warn-bg)]/50 ring-[var(--warn)]/25' : 'bg-[var(--surface)] ring-[var(--line)]/70'}`}>
+    {running && <div className="h-1 overflow-hidden bg-[var(--warn)]/15"><div className="h-full w-1/3 animate-[feed-build_1.4s_ease-in-out_infinite] rounded-full bg-[var(--warn)]" /></div>}
+    <div className="flex flex-wrap items-center gap-3 p-5 sm:px-6">
+      {running && <CircleNotch size={18} weight="bold" className="animate-spin text-[var(--warn)]" />}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-[var(--ink)]">{text[0]}</p>
+        <p className="mt-0.5 text-xs text-[var(--muted)]">{text[1]}</p>
+        {error && <p role="alert" className="mt-1 text-xs font-semibold text-[var(--bad)]">The build status could not be read: {error.message}</p>}
+      </div>
+      <div className="flex items-center gap-2 text-xs font-bold">
+        {recordUrl && <a href={recordUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[var(--muted)] ring-1 ring-[var(--line)] transition-colors hover:text-[var(--ink)]"><ArrowSquareOut size={12} weight="bold" />Feed record</a>}
+        {lines.length > 0 && <button type="button" aria-expanded={shown} onClick={() => setOpen(!shown)} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[var(--muted)] ring-1 ring-[var(--line)] transition-colors hover:text-[var(--ink)]">Build log<CaretDown size={11} weight="bold" className={`transition-transform ${shown ? 'rotate-180' : ''}`} /></button>}
+      </div>
+    </div>
+    {shown && lines.length > 0 && <ol className="max-h-72 overflow-y-auto border-t border-[var(--line)]/70 bg-[var(--paper)]/60 px-5 py-3 font-mono text-[11px] leading-5 text-[var(--ink)] [overflow-wrap:anywhere] [scrollbar-width:thin] sm:px-6">
+      {lines.map((line, index) => <li key={index}>{line}</li>)}
+    </ol>}
+  </section>
 }
