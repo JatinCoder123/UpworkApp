@@ -28,19 +28,26 @@ export function StatusPill({ status }) {
 }
 
 // `contained`: the content scrolls inside the rounded frame (thin scrollbar), so a tall dialog's frame stays even.
-export function Modal({ children, onClose, wide = false, contained = false }) {
+// `full`: nearly the whole screen at a fixed height (use with `contained`; the content can split into panes that
+// scroll on their own).
+export function Modal({ children, onClose, wide = false, contained = false, full = false }) {
   const panel = useRef(null)
   const closeRef = useRef(onClose)
   useEffect(() => { closeRef.current = onClose }, [onClose])
   useEffect(() => {
     const tween = gsap.fromTo(panel.current, { y: 34, autoAlpha: 0, scale: .97 }, { y: 0, autoAlpha: 1, scale: 1, duration: .55, ease: 'power4.out' })
-    const closeOnEscape = (event) => event.key === 'Escape' && closeRef.current()
+    // With dialogs stacked (one opened from another), Esc closes only the top one.
+    const closeOnEscape = (event) => {
+      if (event.key !== 'Escape') return
+      const panels = document.querySelectorAll('[data-modal-panel]')
+      if (panels[panels.length - 1] === panel.current) closeRef.current()
+    }
     document.addEventListener('keydown', closeOnEscape)
     document.body.style.overflow = 'hidden'
     return () => { tween.kill(); document.removeEventListener('keydown', closeOnEscape); document.body.style.overflow = '' }
   }, [])
   return createPortal(
-    <div role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()} className="fixed inset-0 z-[100] grid place-items-end bg-[var(--ink)]/55 p-2 backdrop-blur-md sm:place-items-center sm:p-5"><div ref={panel} role="dialog" aria-modal="true" className={`max-h-[92dvh] w-full rounded-[2rem] bg-black/10 p-1.5 ring-1 ring-white/15 ${contained ? 'flex overflow-hidden' : 'overflow-y-auto'} ${wide ? 'max-w-3xl' : 'max-w-xl'}`}>{contained
+    <div role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()} className="fixed inset-0 z-[100] grid place-items-end bg-[var(--ink)]/55 p-2 backdrop-blur-md sm:place-items-center sm:p-5"><div ref={panel} data-modal-panel role="dialog" aria-modal="true" className={`max-h-[92dvh] w-full rounded-[2rem] bg-black/10 p-1.5 ring-1 ring-white/15 ${contained ? 'flex overflow-hidden' : 'overflow-y-auto'} ${full ? 'h-[92dvh] max-w-[96rem]' : wide ? 'max-w-3xl' : 'max-w-xl'}`}>{contained
       ? <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[calc(2rem-.375rem)] bg-[var(--surface)] shadow-[0_40px_100px_rgba(0,0,0,.25)]"><div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [scrollbar-color:color-mix(in_srgb,var(--muted)_40%,transparent)_transparent] [scrollbar-gutter:stable_both-edges] [scrollbar-width:thin] sm:p-8">{children}</div></div>
       : <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 shadow-[0_40px_100px_rgba(0,0,0,.25)] sm:p-8">{children}</div>}</div></div>,
     document.body,

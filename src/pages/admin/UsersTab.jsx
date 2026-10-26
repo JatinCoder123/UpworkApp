@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, LockSimple, MagnifyingGlass, Minus, Plus, ShieldCheck } from '@phosphor-icons/react'
+import { Check, CircleNotch, FloppyDisk, LockSimple, MagnifyingGlass, Minus, Plus, ShieldCheck } from '@phosphor-icons/react'
 import { DialogHeader, Modal, primaryButton } from '../../components/ui'
 import ErrorBoundary, { SectionError } from '../../components/ErrorBoundary'
 import { useAuth } from '../../contexts/AuthContext'
 import { adminApi } from '../../services/adminApi'
+import { api } from '../../services/api'
+import SkillsPicker from '../../components/SkillsPicker'
 import { ADMIN_KEYS, AdminBadge, Avatar, ErrorNote, Panel, RoleBadge, SectionTitle, Switch, groupPermissions, skeleton } from './adminParts'
 import { asArray, asText } from '../../lib/safe'
 
@@ -21,7 +23,7 @@ function matchesFilter(user, filter) {
   return true
 }
 
-/** Left: searchable, filterable user list. Right: the selected user's role, admin switch and permissions. */
+/** Left: searchable, filterable user list. Right: the selected user's role, admin switch, skills and permissions. */
 export default function UsersTab({ catalog, filter, onFilterChange }) {
   const { user: me } = useAuth()
   const [search, setSearch] = useState('')
@@ -166,6 +168,8 @@ function UserAccess({ summary, roles, permissions, isSelf }) {
           </div>
         </div>
 
+        <UserSkills userId={summary.id} name={summary.name} isSelf={isSelf} />
+
         <div className="mt-5 flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-[var(--text)]">Permissions</h3>
           <span className="text-[11px] font-semibold text-[var(--muted)]">{access.isAdmin ? 'Admins have every permission' : `${effectiveCount} of ${permissions.length} granted`}</span>
@@ -194,6 +198,62 @@ function UserAccess({ summary, roles, permissions, isSelf }) {
       </div>
     </Modal>}
   </Panel>
+}
+
+// The user's skills (CRM: Users <-> Skills): the admin adds, removes or creates them (a skill typed in that the Skills
+// module does not have is created), then saves. A user left with no skills picks theirs at their next login. The
+// user's Jobs page shows the jobs for these skills.
+function UserSkills({ userId, name, isSelf }) {
+  const queryClient = useQueryClient()
+  const { user: me, skillsSaved } = useAuth()
+  const skillsQuery = useQuery({ queryKey: ['user-skills', userId], queryFn: () => api.getUserSkills(userId) })
+  const saved = asArray(skillsQuery.data)
+  const [draft, setDraft] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const skills = draft ?? saved
+  const changed = draft !== null && (draft.length !== saved.length || draft.some((skill) => !saved.some((item) => item.id === skill.id)))
+
+  const save = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const next = await api.saveUserSkills(userId, skills)
+      queryClient.setQueryData(['user-skills', userId], next)
+      setDraft(null)
+      await queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'skills' || query.queryKey[0] === 'my-skill-jobs' })
+      // The admin's own skills: their Jobs page follows at once.
+      if (isSelf) {
+        queryClient.setQueryData(['my-skills', me?.email], next)
+        if (next.length) skillsSaved()
+      }
+    } catch (saveError) {
+      setError(saveError)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <div className="mt-5">
+    <div className="flex items-center justify-between gap-3">
+      <h3 className="text-sm font-semibold text-[var(--text)]">Skills</h3>
+      <span className="text-[11px] font-semibold text-[var(--muted)]">{skillsQuery.isLoading ? '…' : saved.length ? `${saved.length} skill${saved.length === 1 ? '' : 's'}` : 'None yet: picked at their next login'}</span>
+    </div>
+    <div className="mt-3 rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-[var(--line)]/70">
+      {skillsQuery.isLoading
+        ? <span className={`${skeleton} h-10`} />
+        : skillsQuery.isError
+          ? <ErrorNote error={skillsQuery.error} onRetry={() => skillsQuery.refetch()} />
+          : <SkillsPicker skills={skills} onChange={(next) => { setDraft(next); setError(null) }} allowNew label={`${name}'s skills`} noneLabel="(none)" noneHint="No skills: they pick theirs at their next login" />}
+      {error && <div className="mt-3"><ErrorNote error={error} onDismiss={() => setError(null)} /></div>}
+      {changed && <div className="mt-3 flex items-center justify-end gap-2">
+        <button type="button" onClick={() => setDraft(null)} disabled={saving} className="rounded-full px-4 py-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--ink)]">Cancel</button>
+        <span className="text-xs font-bold"><button type="button" onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--text)] px-4 py-2 text-[var(--paper)] transition-transform hover:-translate-y-0.5 disabled:opacity-60">
+          {saving ? <CircleNotch size={13} className="animate-spin" /> : <FloppyDisk size={13} weight="bold" />}{saving ? 'Saving…' : 'Save skills'}
+        </button></span>
+      </div>}
+    </div>
+  </div>
 }
 
 // One permission: from the role (locked), extra (removable), not granted (addable), or admin (all locked).

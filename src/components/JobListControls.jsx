@@ -19,6 +19,8 @@ function usePopover() {
 
 const trigger = (active) => `flex h-10 shrink-0 items-center gap-2 rounded-full px-3 text-xs font-semibold ring-1 transition-all duration-300 ${active ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/35' : 'bg-[var(--paper)] text-[var(--muted)] ring-black/5 hover:text-[var(--ink)]'}`
 const sheet = 'absolute right-0 top-12 z-50 rounded-[1.5rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5'
+// A trigger on a --paper box (as fields there, see fieldTone): --surface, so it stands out in both themes.
+const triggerOnPaper = (active) => (active ? trigger(true) : 'flex h-10 shrink-0 items-center gap-2 rounded-full bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--muted)] ring-1 ring-[var(--line)] transition-all duration-300 hover:text-[var(--ink)]')
 
 export function SortMenu({ value, options, onChange, label = 'Sort jobs' }) {
   const { open, setOpen, root } = usePopover()
@@ -34,6 +36,29 @@ export function SortMenu({ value, options, onChange, label = 'Sort jobs' }) {
       </ul>
     </div>}
   </div>
+}
+
+// A dropdown like the sort menu, for any short list of choices: [{ id, label }]. `align` opens it from the left or
+// right edge; `icon` leads the button; `heading` titles the list; `onPaper` when it sits on a --paper box.
+export function SelectMenu({ value, options, onChange, label, heading = label, icon: Icon, align = 'left', onPaper = false }) {
+  const { open, setOpen, root } = usePopover()
+  const current = options.find((option) => option.id === value) || options[0]
+  return <div ref={root} className="relative shrink-0 text-xs font-semibold">
+    <button type="button" aria-expanded={open} aria-haspopup="listbox" aria-label={`${label}: ${current.label}`} onClick={() => setOpen((state) => !state)} className={onPaper ? triggerOnPaper(false) : trigger(false)}>
+      {Icon && <Icon size={15} weight="bold" />}<span className="max-w-48 truncate text-[var(--ink)]">{current.label}</span><CaretDown size={12} className={`transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+    </button>
+    {open && <div className={`${sheet} ${align === 'left' ? '!left-0 !right-auto' : ''} w-60`}>
+      <ul role="listbox" aria-label={label} className="rounded-[calc(1.5rem-.375rem)] bg-[var(--surface)] p-2">
+        {heading && <li className="px-3 pb-1.5 pt-1 text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">{heading}</li>}
+        {options.map((option) => <li key={option.id}><button type="button" role="option" aria-selected={option.id === value} onClick={() => { onChange(option.id); setOpen(false) }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${option.id === value ? 'bg-[var(--lime)]/35 text-[var(--ink)]' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{option.label}{option.id === value && <Check size={13} weight="bold" />}</button></li>)}
+      </ul>
+    </div>}
+  </div>
+}
+
+// A button with the same look as these menus that switches something on and off (green while on).
+export function ToggleChip({ pressed, onClick, icon: Icon, children, onPaper = false }) {
+  return <span className="shrink-0 text-xs font-semibold"><button type="button" onClick={onClick} aria-pressed={pressed} className={onPaper ? triggerOnPaper(pressed) : trigger(pressed)}>{Icon && <Icon size={15} weight="bold" />}{children}</button></span>
 }
 
 const JOB_TYPES = [['any', 'Any'], ['hourly', 'Hourly'], ['fixed', 'Fixed price']]

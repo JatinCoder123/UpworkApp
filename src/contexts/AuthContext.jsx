@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { consumeLoginIntro, endSession, fetchSessionUser, startMicrosoftLogin } from "../lib/auth";
-import { findGatewayUserIdByEmail, saveUserRole } from "../services/api";
+import { countUserSkills, findGatewayUserIdByEmail, saveUserRole } from "../services/api";
 import { fetchPermissionCatalog, fetchUserAccess } from "../services/accessApi";
 import { can as canUser, needsRole, roleOf } from "../lib/permissions";
 
@@ -26,6 +26,9 @@ async function withAccess(sessionUser) {
     // An admin holds every permission that exists in the CRM (the Permissions module), whoever marks them admin and
     // whatever their role or session lists, so a permission deleted there leaves an admin's nav too.
     const adminPermissions = isAdmin ? (access.isAdmin ? access.permissions : (await fetchPermissionCatalog()).map((permission) => permission.name)) : null;
+    // Whether the user has picked their skills (Users <-> Skills); without any, they pick them at login (onboarding).
+    // If that cannot be read, nobody is held back.
+    const skillCount = await countUserSkills(crmUserId).catch(() => null);
     return {
       ...sessionUser,
       crmUserId,
@@ -33,10 +36,12 @@ async function withAccess(sessionUser) {
       isAdmin,
       permissions: adminPermissions ?? sessionPermissions ?? access.permissions,
       accessChecked: true,
+      skillsChecked: skillCount !== null,
+      hasSkills: skillCount > 0,
     };
   } catch (accessError) {
     console.warn("Could not load the user's access from the CRM.", accessError);
-    return { ...sessionUser, role: roleOf(sessionUser), isAdmin: sessionUser.isAdmin === true, permissions: sessionPermissions ?? [], accessChecked: false };
+    return { ...sessionUser, role: roleOf(sessionUser), isAdmin: sessionUser.isAdmin === true, permissions: sessionPermissions ?? [], accessChecked: false, skillsChecked: false };
   }
 }
 
@@ -119,13 +124,16 @@ export function AuthProvider({ children }) {
     } : current));
   }, [user]);
 
+  // After the user saved their skills (onboarding or My skills): they no longer need to pick them.
+  const skillsSaved = useCallback(() => setUser((current) => (current ? { ...current, skillsChecked: true, hasSkills: true } : current)), []);
+
   // can("Jobs"): whether the signed-in user holds that permission (admins hold every permission).
   const can = useCallback((permission) => canUser(user, permission), [user]);
 
   const completeLoginIntro = useCallback(() => setShowLoginIntro(false), []);
   const value = useMemo(
-    () => ({ user, status, error, can, login: startMicrosoftLogin, logout, refresh, syncAccess, chooseRole, showLoginIntro, completeLoginIntro }),
-    [user, status, error, can, logout, refresh, syncAccess, chooseRole, showLoginIntro, completeLoginIntro],
+    () => ({ user, status, error, can, login: startMicrosoftLogin, logout, refresh, syncAccess, chooseRole, skillsSaved, showLoginIntro, completeLoginIntro }),
+    [user, status, error, can, logout, refresh, syncAccess, chooseRole, skillsSaved, showLoginIntro, completeLoginIntro],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

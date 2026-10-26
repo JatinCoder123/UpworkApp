@@ -456,7 +456,9 @@ export async function fetchSkillGroupCounts({ options, category = "" } = {}) {
   };
 }
 
-export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEmail, allJobs = false, search = "", status = "", orderBy = "date_entered", orderDir = "DESC", category = "", subcategory = "", skill = "" } = {}) {
+// `jobIds`: only these jobs (the "My skills" filter, see fetchSkillJobIds); an empty list means none.
+export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEmail, allJobs = false, search = "", status = "", orderBy = "date_entered", orderDir = "DESC", category = "", subcategory = "", skill = "", jobIds = null } = {}) {
+  if (Array.isArray(jobIds) && !jobIds.length) return { records: [], page: 1, perPage, total: 0, totalPages: 1 };
   const assignedUserId = allJobs ? null : await findGatewayUserIdByEmail(userEmail);
   const query = {
     action: "fetch",
@@ -469,6 +471,7 @@ export async function fetchJobsPage({ page = 1, perPage = 20, dateFilter, userEm
   const filters = { ai_processed: 1, ...(await engagementFilters(userEmail)) };
   if (assignedUserId) filters.assigned_user_id = assignedUserId;
   if (status) filters.status = status;
+  if (Array.isArray(jobIds)) filters.id = { in: jobIds };
   Object.assign(filters, skillGroupFilters({ category, subcategory, skill }));
   if (Object.keys(filters).length) query.filters = filters;
   const searchText = asText(search).trim();
@@ -506,7 +509,9 @@ function mapEngagement(value) {
   };
 }
 
-export async function fetchJobStats({ dateFilter, userEmail, category = "", subcategory = "", skill = "" } = {}) {
+// `jobIds`: count only these jobs (the user's skills, see fetchSkillJobIds); get_stats cannot filter by a list of ids,
+// so each count is then the total of a one-record fetch.
+export async function fetchJobStats({ dateFilter, userEmail, category = "", subcategory = "", skill = "", jobIds = null } = {}) {
   const assignedUserId = await findGatewayUserIdByEmail(userEmail);
   // The tab counts follow the skills section (category, sub category, single skill), like the list. get_stats ignores
   // the LIKE filter the list uses, so the skill is matched with its search on the skills field instead (same result).
@@ -524,6 +529,14 @@ export async function fetchJobStats({ dateFilter, userEmail, category = "", subc
       ];
     }),
   ].map((query) => ({ ...query, ...skillSearch, filters: { ...query.filters, ...group } }));
+  if (Array.isArray(jobIds)) {
+    const counts = await Promise.all(queries.map(async ({ key, module, filters, ...search }) => {
+      if (!jobIds.length) return [key, 0];
+      const data = await smartGateway(addGatewayDateFilter({ action: "fetch", module, filters: { ...filters, id: { in: jobIds } }, ...search, fields: ["id"], page: 1, per_page: 1 }, dateFilter));
+      return [key, Number(data.total) || 0];
+    }));
+    return Object.fromEntries(counts);
+  }
   const data = await smartGateway({
     action: "get_stats",
     date_range: "",
@@ -1441,6 +1454,67 @@ export async function deleteSkill(id) {
   return smartGateway({ action: "delete", module: SKILLS_MODULE, id });
 }
 
+// ---- The user's own skills (CRM: Users <-> Skills) and the jobs linked to them (Upwork Jobs <-> Skills) ----
+
+// Skill names compared: case and extra spaces do not matter ("Core  PHP" = "core php").
+const skillKey = (name) => asText(name).trim().replace(/\s+/g, " ").toLowerCase();
+
+// The skills linked to a CRM user, A-Z, as { id, name }.
+export async function fetchUserSkills(crmUserId) {
+  if (!crmUserId) return [];
+  const records = await fetchEveryPage({ action: "fetch_related", module: USERS_MODULE, id: crmUserId, related_module: SKILLS_MODULE, fields: ["id", "name"] });
+  return records.map((record) => ({ id: record.id, name: asText(record.name).trim() })).filter((skill) => skill.name).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// How many skills a CRM user has (for the "pick your skills" step at login).
+export async function countUserSkills(crmUserId) {
+  const data = await smartGateway({ action: "fetch_related", module: USERS_MODULE, id: crmUserId, related_module: SKILLS_MODULE, fields: ["id"], page: 1, per_page: 1 });
+  return Number(data.total) || asArray(data.records).length;
+}
+
+export async function fetchMySkills(userEmail) {
+  return fetchUserSkills(await findGatewayUserIdByEmail(userEmail));
+}
+
+export async function saveMySkills(userEmail, skills) {
+  return saveUserSkills(await findGatewayUserIdByEmail(userEmail), skills);
+}
+
+// Saves a CRM user's skills (the user's own, or any user's from the admin panel): links the picked ones and unlinks
+// the rest. A skill typed in ({ name }, no id) is matched by name first and created (active, no department) when the
+// Skills module does not have it. Returns the saved skills.
+export async function saveUserSkills(userId, skills) {
+  if (!userId) throw createAppError("USER_MISSING", "No user was given.");
+  const [current, all] = await Promise.all([fetchUserSkills(userId), fetchSkillsInGroup()]);
+  const idByName = new Map(all.map((skill) => [skillKey(skill.name), skill.id]));
+  const wanted = new Set();
+  for (const skill of asArray(skills)) {
+    const name = asText(skill?.name).trim().replace(/\s+/g, " ");
+    let id = skill?.id && !String(skill.id).startsWith("new:") ? skill.id : idByName.get(skillKey(name));
+    if (!id && name) {
+      const created = await smartGateway({ action: "create", module: SKILLS_MODULE, data: { name, is_active: 1 } });
+      id = created.id ?? created.record?.id ?? created.data?.id;
+      if (!id) throw createAppError("SKILL_NOT_CREATED", `The skill "${name}" could not be added. Please try again.`);
+      idByName.set(skillKey(name), id);
+    }
+    if (id) wanted.add(id);
+  }
+  const have = new Set(current.map((skill) => skill.id));
+  const relate = (action, skillId) => smartGateway({ action, module: USERS_MODULE, id: userId, related_module: SKILLS_MODULE, related_id: skillId });
+  await Promise.all([
+    ...[...wanted].filter((id) => !have.has(id)).map((id) => relate("add_relationship", id)),
+    ...[...have].filter((id) => !wanted.has(id)).map((id) => relate("remove_relationship", id)),
+  ]);
+  return fetchUserSkills(userId);
+}
+
+// The ids of every scored job linked to any of these skills, for the Jobs page's "My skills" filter.
+export async function fetchSkillJobIds(skillIds = []) {
+  const ids = [...new Set(asArray(skillIds).filter(Boolean))];
+  const lists = await Promise.all(ids.map((id) => fetchEveryPage({ action: "fetch_related", module: SKILLS_MODULE, id, related_module: JOBS_MODULE, filters: { ai_processed: 1 }, fields: ["id"] })));
+  return [...new Set(lists.flat().map((record) => record.id).filter(Boolean))];
+}
+
 export const cleanJobUrl = (value) => {
   let url;
   // A malformed URL (typed by the user or stored on a job) compares as plain text instead of throwing.
@@ -1891,6 +1965,7 @@ export async function generateTechContentDoc(contentId, options = {}) {
   if (!contentId) throw createAppError("INVALID_ID", "Content ID is required");
   const userName = typeof options === "string" ? options : (options?.userName || options?.user_name || options?.username || "");
   const userId = typeof options === "object" ? (options?.userId || options?.user_id || "") : "";
+  const suggestion = typeof options === "object" ? asText(options?.suggestion).trim() : "";
   const baseEntryPoint = import.meta.env?.DEV
     ? "/crm-entrypoint/index.php?entryPoint=TechContentDocx"
     : TECH_CONTENT_DOCX_URL;
@@ -1902,6 +1977,8 @@ export async function generateTechContentDoc(contentId, options = {}) {
   if (userId) {
     url += `&user_id=${encodeURIComponent(userId)}&assigned_user_id=${encodeURIComponent(userId)}`;
   }
+  // The user's suggestion for this generation (the Note's "suggestion"; the socket events echo it).
+  if (suggestion) url += `&suggestion=${encodeURIComponent(suggestion)}`;
   // The user also goes in the URL above. On the live site the request goes straight to the CRM, and custom
   // headers would make the browser ask TechContentDocx for CORS permission first; the CRM refuses (400, no CORS
   // headers), so the request was never sent and nothing was generated. Without them it is a simple request that
@@ -2045,6 +2122,19 @@ export async function setLlmFields(id, data) {
 
 export const APPSCRIPT_MODULE = import.meta.env?.VITE_APPSCRIPT_MODULE || "outr_appscripts";
 
+// What an idea can be turned into. Each has its own CRM fields: generate_<type> (the trigger), <type>_suggestion (the
+// user's notes for the generator), <type>_status (queued / processing / completed / failed, set by the generator) and,
+// once made, the document's <type>_view_url and <type>_download_url.
+export const APPSCRIPT_OUTPUTS = ["script", "blog", "video"];
+const generationOf = (record) => Object.fromEntries(APPSCRIPT_OUTPUTS.map((type) => [type, {
+  requested: flag(record[`generate_${type}`]),
+  status: asText(record[`${type}_status`]).trim().toLowerCase(),
+  suggestion: decodeHtml(asText(record[`${type}_suggestion`])).trim(),
+  viewUrl: linkOf(record[`${type}_view_url`]),
+  downloadUrl: linkOf(record[`${type}_download_url`]),
+  docId: asText(record[`${type}_doc_id`]).trim(),
+}]));
+
 function mapAppScript(record) {
   const text = (value) => decodeHtml(asText(value)).trim();
   return {
@@ -2073,10 +2163,8 @@ function mapAppScript(record) {
     status: asText(record.status) || "new",
     priority: asText(record.priority),
     notes: text(record.notes),
-    // Content to generate from the idea (checkboxes in the CRM).
-    generateScript: flag(record.generate_script),
-    generateBlog: flag(record.generate_blog),
-    generateVideo: flag(record.generate_video),
+    // The script, blog and video made from the idea: { script: { requested, status, suggestion, viewUrl, downloadUrl }, ... }.
+    generation: generationOf(record),
     publishedAt: parseCrmDate(record.posted_date) || parseEnteredAt(record),
     addedAt: parseEnteredAt(record),
   };
@@ -2086,6 +2174,131 @@ function mapAppScript(record) {
 export async function setAppScriptFields(id, data) {
   if (!id || !data) return;
   await smartGateway({ action: "update", module: APPSCRIPT_MODULE, id, data });
+}
+
+// Starts making one output of an idea, in one save: the user's suggestion, the generate_<type> box ticked and the
+// status set to queued. The generator then sets processing and, at the end, completed (with the links) or failed.
+// Generating again (with a new suggestion) is the same save.
+export async function generateAppScriptOutput(id, type, suggestion = "") {
+  if (!id || !APPSCRIPT_OUTPUTS.includes(type)) throw createAppError("GENERATE_INVALID", "Nothing to generate.");
+  await smartGateway({ action: "update", module: APPSCRIPT_MODULE, id, data: { [`${type}_suggestion`]: asText(suggestion).trim(), [`generate_${type}`]: 1, [`${type}_status`]: "queued" } });
+}
+
+// The generators' prompts and guidelines, which users can read and edit before generating.
+// Prompts: outr_machine_learning records (e.g. "appscript_<type>"), each in three parts: the system prompt
+// (role_prompt), the prompt (overwrite_prompt) and the output prompt (output_format).
+// Guidelines: outr_guidelines records (e.g. "appscript_<type>_guidelines"), the text in description.
+export const PROMPTS_MODULE = import.meta.env?.VITE_PROMPTS_MODULE || "outr_machine_learning";
+export const GUIDELINES_MODULE = import.meta.env?.VITE_GUIDELINES_MODULE || "outr_guidelines";
+const PROMPT_FIELDS = ["role_prompt", "overwrite_prompt", "output_format"];
+// The texts of a prompt record that can be edited: the three parts and, on older prompts, the task in description.
+const PROMPT_TEXT_FIELDS = ["description", ...PROMPT_FIELDS];
+
+// A generator's prompt and guidelines, by record name (e.g. "appscript_blog" and "appscript_blog_guidelines", or
+// "notes_blog" and "notes_blog_guidelines" for Site Content): { prompt: { id, role_prompt, overwrite_prompt,
+// output_format } | null, guidelines: { id, text } | null }.
+export async function fetchGenerationInstructions(promptName, guidelinesName) {
+  const named = (data, name) => asArray(data?.records).find((record) => record?.id && record.deleted !== "1" && record.name === name);
+  const [prompts, guidelines] = await Promise.all([
+    promptName ? smartGateway({ action: "fetch", module: PROMPTS_MODULE, filters: { name: promptName }, fields: ["id", "name", ...PROMPT_FIELDS], page: 1, per_page: 5 }) : null,
+    guidelinesName ? smartGateway({ action: "fetch", module: GUIDELINES_MODULE, filters: { name: guidelinesName }, fields: ["id", "name", "description"], page: 1, per_page: 5 }) : null,
+  ]);
+  const prompt = named(prompts, promptName);
+  const guideline = named(guidelines, guidelinesName);
+  return {
+    prompt: prompt ? { id: prompt.id, ...Object.fromEntries(PROMPT_FIELDS.map((field) => [field, decodeHtml(asText(prompt[field]))])) } : null,
+    guidelines: guideline ? { id: guideline.id, text: decodeHtml(asText(guideline.description)) } : null,
+  };
+}
+
+// Saves one text of a prompt (role_prompt, overwrite_prompt, output_format or description), or a guidelines text.
+export async function savePromptPart(id, field, value) {
+  if (!id || !PROMPT_TEXT_FIELDS.includes(field)) throw createAppError("PROMPT_INVALID", "This prompt cannot be saved.");
+  await smartGateway({ action: "update", module: PROMPTS_MODULE, id, data: { [field]: asText(value) } });
+}
+
+// Prompt management: every prompt in outr_machine_learning, A-Z, without its texts (they load when one is opened).
+export async function fetchPromptList() {
+  const records = await fetchEveryPage({ action: "fetch", module: PROMPTS_MODULE, fields: ["id", "name", "type", "stage", "motive", "date_modified"], order_by: "name", order_dir: "ASC" });
+  return records.filter((record) => record?.id).map((record) => ({
+    id: record.id,
+    name: decodeHtml(asText(record.name)).trim() || "Untitled prompt",
+    type: asText(record.type).trim(),
+    stage: asText(record.stage).trim(),
+    motive: decodeHtml(asText(record.motive)).trim(),
+    modifiedAt: asText(record.date_modified),
+  }));
+}
+
+// One prompt with its texts.
+export async function fetchPrompt(id) {
+  const data = await smartGateway({ action: "fetch", module: PROMPTS_MODULE, filters: { id }, fields: ["id", "name", "type", "stage", "motive", ...PROMPT_TEXT_FIELDS], page: 1, per_page: 1 });
+  const record = asArray(data.records)[0];
+  if (!record) throw createAppError("PROMPT_NOT_FOUND", "This prompt is no longer in the CRM.");
+  return {
+    id: record.id,
+    name: decodeHtml(asText(record.name)).trim() || "Untitled prompt",
+    type: asText(record.type).trim(),
+    stage: asText(record.stage).trim(),
+    motive: decodeHtml(asText(record.motive)).trim(),
+    ...Object.fromEntries(PROMPT_TEXT_FIELDS.map((field) => [field, decodeHtml(asText(record[field]))])),
+  };
+}
+export async function saveGuidelines(id, text) {
+  if (!id) throw createAppError("GUIDELINES_INVALID", "These guidelines cannot be saved.");
+  await smartGateway({ action: "update", module: GUIDELINES_MODULE, id, data: { description: asText(text) } });
+}
+
+// Guidelines management: every guidelines record, A-Z (the text loads when one is opened).
+export async function fetchGuidelineList() {
+  const records = await fetchEveryPage({ action: "fetch", module: GUIDELINES_MODULE, fields: ["id", "name", "date_modified"], order_by: "name", order_dir: "ASC" });
+  return records.filter((record) => record?.id).map((record) => ({ id: record.id, name: decodeHtml(asText(record.name)).trim() || "Untitled guidelines", modifiedAt: asText(record.date_modified) }));
+}
+export async function fetchGuideline(id) {
+  const data = await smartGateway({ action: "fetch", module: GUIDELINES_MODULE, filters: { id }, fields: ["id", "name", "description", "date_modified"], page: 1, per_page: 1 });
+  const record = asArray(data.records)[0];
+  if (!record) throw createAppError("GUIDELINES_NOT_FOUND", "These guidelines are no longer in the CRM.");
+  return { id: record.id, name: decodeHtml(asText(record.name)).trim() || "Untitled guidelines", text: decodeHtml(asText(record.description)), modifiedAt: asText(record.date_modified) };
+}
+
+// Prompt scheduler (outr_scheduler_prompts): the prompts the scheduler runs on its own, each with its cron schedule,
+// on / off, and when it last ran.
+export const SCHEDULER_PROMPTS_MODULE = import.meta.env?.VITE_SCHEDULER_PROMPTS_MODULE || "outr_scheduler_prompts";
+const SCHEDULER_TEXT_FIELDS = ["prompt", "description", "schedule"];
+const mapSchedulerPrompt = (record) => ({
+  id: record.id,
+  name: decodeHtml(asText(record.name)).trim() || "Untitled scheduled prompt",
+  schedule: asText(record.schedule).trim(),
+  active: flag(record.is_active),
+  instance: asText(record.crm_instance).trim(),
+  lastRunAt: asText(record.last_run_at).trim(),
+  lastRunAgo: asText(record.last_run_at_time_ago).trim(),
+  modifiedAt: asText(record.date_modified),
+});
+export async function fetchSchedulerPromptList() {
+  const records = await fetchEveryPage({ action: "fetch", module: SCHEDULER_PROMPTS_MODULE, fields: ["id", "name", "schedule", "is_active", "crm_instance", "last_run_at", "date_modified"], order_by: "name", order_dir: "ASC" });
+  return records.filter((record) => record?.id).map(mapSchedulerPrompt);
+}
+export async function fetchSchedulerPrompt(id) {
+  const data = await smartGateway({ action: "fetch", module: SCHEDULER_PROMPTS_MODULE, filters: { id }, fields: ["id", "name", "schedule", "is_active", "crm_instance", "last_run_at", "date_modified", "prompt", "description"], page: 1, per_page: 1 });
+  const record = asArray(data.records)[0];
+  if (!record) throw createAppError("SCHEDULED_PROMPT_NOT_FOUND", "This scheduled prompt is no longer in the CRM.");
+  return { ...mapSchedulerPrompt(record), prompt: decodeHtml(asText(record.prompt)), description: decodeHtml(asText(record.description)) };
+}
+// Saves one text of a scheduled prompt (prompt, description or schedule), or turns it on / off.
+export async function saveSchedulerPrompt(id, field, value) {
+  if (!id) throw createAppError("SCHEDULED_PROMPT_INVALID", "This scheduled prompt cannot be saved.");
+  if (field === "is_active") return smartGateway({ action: "update", module: SCHEDULER_PROMPTS_MODULE, id, data: { is_active: value ? 1 : 0 } });
+  if (!SCHEDULER_TEXT_FIELDS.includes(field)) throw createAppError("SCHEDULED_PROMPT_INVALID", "This scheduled prompt cannot be saved.");
+  return smartGateway({ action: "update", module: SCHEDULER_PROMPTS_MODULE, id, data: { [field]: field === "schedule" ? asText(value).trim() : asText(value) } });
+}
+
+// Where the outputs of a few ideas stand, read while they are being made: { [id]: generation } (as in mapAppScript).
+export async function fetchAppScriptGeneration(ids = []) {
+  if (!ids.length) return {};
+  const fields = ["id", ...APPSCRIPT_OUTPUTS.flatMap((type) => [`generate_${type}`, `${type}_status`, `${type}_suggestion`, `${type}_view_url`, `${type}_download_url`, `${type}_doc_id`])];
+  const data = await smartGateway({ action: "fetch", module: APPSCRIPT_MODULE, filters: { id: { in: ids } }, fields, page: 1, per_page: 50 });
+  return Object.fromEntries(asArray(data.records).filter((record) => record?.id).map((record) => [record.id, generationOf(record)]));
 }
 
 // ----------------------------------------------------
@@ -2220,6 +2433,14 @@ export async function fetchFeedAll(name, params = {}) {
   const rest = await Promise.all(Array.from({ length: first.totalPages - 1 }, (_, index) => fetchFeedPage(name, { ...params, page: index + 2, perPage: 50 })));
   const seen = new Set();
   return [first, ...rest].flatMap((page) => page.records).filter((item) => !seen.has(item.id) && seen.add(item.id));
+}
+
+// One item of a feed by its id (an item opened from a link may not be in the pages loaded); null when it is gone.
+export async function fetchFeedItem(name, id) {
+  const feed = feedOf(name);
+  const data = await smartGateway({ action: "fetch", module: feed.module, filters: { id }, page: 1, per_page: 1 });
+  const record = asArray(data.records).find((entry) => entry && typeof entry === "object" && entry.id === id && entry.deleted !== "1");
+  return record ? feed.map(record) : null;
 }
 
 // The module's dropdown lists (every choice and its label) and how many items it has, from a one-record fetch.
@@ -2435,6 +2656,11 @@ export const api = {
   getJobStats: (params) => fetchJobStats(params),
   getMyAppliedJobs: (params) => fetchMyAppliedJobs(params),
   getJobAlerts: (params) => fetchJobAlerts(params),
+  getMySkills: (userEmail) => fetchMySkills(userEmail),
+  saveMySkills: (userEmail, skills) => saveMySkills(userEmail, skills),
+  getUserSkills: (userId) => fetchUserSkills(userId),
+  saveUserSkills: (userId, skills) => saveUserSkills(userId, skills),
+  getSkillJobIds: (skillIds) => fetchSkillJobIds(skillIds),
   getRejectReasons: (jobIds) => fetchRejectReasons(jobIds),
   getMyPreferences: (userEmail) => fetchMyPreferences(userEmail),
   saveMyPreference: (userEmail, preference, labels) => saveMyPreference(userEmail, preference, labels),
@@ -2467,11 +2693,24 @@ export const api = {
   getFeedPage: (name, params) => fetchFeedPage(name, params),
   getFeedAll: (name, params) => fetchFeedAll(name, params),
   getFeedOptions: (name) => fetchFeedOptions(name),
+  getFeedItem: (name, id) => fetchFeedItem(name, id),
   countFeed: (name, requests) => countFeed(name, requests),
   getLlmJourneys: (names) => fetchLlmJourneys(names),
   setWordpressStatus: (id, status) => setWordpressStatus(id, status),
   setLlmFields: (id, data) => setLlmFields(id, data),
   setAppScriptFields: (id, data) => setAppScriptFields(id, data),
+  generateAppScriptOutput: (id, type, suggestion) => generateAppScriptOutput(id, type, suggestion),
+  getAppScriptGeneration: (ids) => fetchAppScriptGeneration(ids),
+  getGenerationInstructions: (promptName, guidelinesName) => fetchGenerationInstructions(promptName, guidelinesName),
+  savePromptPart: (id, field, value) => savePromptPart(id, field, value),
+  getPromptList: () => fetchPromptList(),
+  getPrompt: (id) => fetchPrompt(id),
+  saveGuidelines: (id, text) => saveGuidelines(id, text),
+  getGuidelineList: () => fetchGuidelineList(),
+  getGuideline: (id) => fetchGuideline(id),
+  getSchedulerPromptList: () => fetchSchedulerPromptList(),
+  getSchedulerPrompt: (id) => fetchSchedulerPrompt(id),
+  saveSchedulerPrompt: (id, field, value) => saveSchedulerPrompt(id, field, value),
   getNote: (id) => fetchNote(id),
   generateTechContentDoc: (contentId, options) => generateTechContentDoc(contentId, options),
   resolveCrmUser: (user) => resolveCrmUser(user),

@@ -8,7 +8,7 @@ import DocNotificationToast from './components/DocNotificationToast'
 import GlobalErrorToast from './components/GlobalErrorToast'
 import ErrorBoundary, { PageError } from './components/ErrorBoundary'
 import { useAuth } from './contexts/AuthContext'
-import { canAccess, homePath, needsRole } from './lib/permissions'
+import { canAccess, homePath, needsRole, needsSkills } from './lib/permissions'
 
 // Each page downloads only when it is first opened, so the app starts with a small bundle.
 const Jobs = lazy(() => import('./pages/Jobs'))
@@ -37,7 +37,7 @@ const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'))
 const NoFallback = () => null
 
 
-// Signed-in users only. A user without a role picks one on the onboarding page first.
+// Signed-in users only. A user without a role or without skills picks them on the onboarding page first.
 // A page the user has no permission for (or an admin page, for a non-admin) shows a 403 page at the same URL,
 // never a redirect; URLs that do not exist at all fall through to the 404 route. Rules: lib/permissions.
 function ProtectedRoute({ children }) {
@@ -45,17 +45,17 @@ function ProtectedRoute({ children }) {
   const location = useLocation()
   if (status === 'loading') return <SessionLoader />
   if (status !== 'authenticated') return <Navigate to="/login" replace />
-  if (needsRole(user)) return <Navigate to="/onboarding" replace />
+  if (needsRole(user) || needsSkills(user)) return <Navigate to="/onboarding" replace />
   if (!canAccess(user, location.pathname)) return <NotFound type="forbidden" />
   return children
 }
 
-// First-login role picker; a user who already has a role is sent on to their home page.
+// First-login role and skills picker; a user who has both is sent on to their home page.
 function OnboardingRoute() {
   const { status, user } = useAuth()
   if (status === 'loading') return <SessionLoader />
   if (status !== 'authenticated') return <Navigate to="/login" replace />
-  return needsRole(user) ? <Onboarding /> : <Navigate to={homePath(user)} replace />
+  return needsRole(user) || needsSkills(user) ? <Onboarding /> : <Navigate to={homePath(user)} replace />
 }
 
 export default function App() {

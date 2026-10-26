@@ -13,7 +13,7 @@ import {
 } from '@phosphor-icons/react'
 import { subscribeDocStatus } from '../services/docSocket'
 // Importing it also subscribes the notification store first, so it has judged each event before the toast sees it.
-import { isOwnDocEvent } from '../services/docNotifications'
+import { isOwnDocEvent, notificationOfEvent, OUTPUT_STATUS_TEXT } from '../services/docNotifications'
 import { downloadNoteDocument, getDocumentViewUrl } from '../services/api'
 import { asText } from '../lib/safe'
 
@@ -123,7 +123,10 @@ export default function DocNotificationToast() {
       if (!event.status || !isOwnDocEvent(event)) return
 
       const cfg = STATUS_CONFIG[event.status] || STATUS_CONFIG.processing
-      const toastId = `${event.noteId || event.contentId || 'doc'}-${event.status}-${Date.now()}`
+      // The notification it updated: an AppScript output has its own title, text and page.
+      const notif = notificationOfEvent(event)
+      const title = notif?.title || event.title || 'Technical Content Idea'
+      const toastId = `${event.noteId || event.contentId || 'doc'}-${notif?.docType || ''}-${event.status}-${Date.now()}`
       const noteId = event.noteId || ''
       const viewUrl = event.viewUrl || (noteId ? getDocumentViewUrl(noteId) : '')
 
@@ -132,7 +135,7 @@ export default function DocNotificationToast() {
         playSuccessChime()
         sendDesktopNotification(
           '🎉 Document Generated!',
-          event.title ? `${event.title} is ready.` : 'Your technical content document is ready.'
+          notif?.title || event.title ? `${title} is ready.` : 'Your technical content document is ready.'
         )
       }
 
@@ -141,9 +144,10 @@ export default function DocNotificationToast() {
         status: event.status,
         noteId,
         contentId: event.contentId,
-        title: event.title || 'Technical Content Idea',
+        title,
         userName: event.userName || '',
-        sub: event.message || cfg.sub,
+        sub: (notif?.docType && OUTPUT_STATUS_TEXT[event.status]) || event.message || cfg.sub,
+        path: notif?.path || '/site-content',
         viewUrl,
         documentUrl: event.documentUrl,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -168,8 +172,8 @@ export default function DocNotificationToast() {
 
   const handleOpenSiteContent = (toast) => {
     removeToast(toast.id)
-    if (location.pathname !== '/site-content') {
-      navigate('/site-content')
+    if (location.pathname !== toast.path) {
+      navigate(toast.path)
     }
   }
 
@@ -191,7 +195,8 @@ export default function DocNotificationToast() {
     }
 
     setDownloadingToastId(null)
-    window.open(viewUrl, '_blank')
+    // An AppScript document comes with its own download link.
+    window.open(toast.documentUrl || viewUrl, '_blank')
   }
 
   if (!toasts.length) return null
@@ -199,7 +204,7 @@ export default function DocNotificationToast() {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed top-4 right-4 z-50 flex w-full max-w-sm flex-col gap-2.5 sm:top-6 sm:right-6"
+      className="pointer-events-none fixed top-4 right-4 z-[110] flex w-full max-w-sm flex-col gap-2.5 sm:top-6 sm:right-6"
     >
       {toasts.map((toast) => {
         const cfg = STATUS_CONFIG[toast.status] || STATUS_CONFIG.processing
@@ -297,7 +302,7 @@ export default function DocNotificationToast() {
                     onClick={() => handleOpenSiteContent(toast)}
                     className="inline-flex items-center gap-1 rounded-full bg-[var(--paper)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] hover:bg-[var(--frame)] transition-colors"
                   >
-                    <span>Site Content</span>
+                    <span>{toast.path === '/appscript' ? 'AppScript' : 'Site Content'}</span>
                     <ArrowSquareOut size={10} weight="bold" />
                   </button>
                 </div>

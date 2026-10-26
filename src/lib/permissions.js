@@ -84,6 +84,14 @@ export function needsRole(user) {
   return Boolean(user?.accessChecked) && !isAdminUser(user) && !roleOf(user)
 }
 
+/**
+ * True when a signed-in user has not picked their skills yet (Users <-> Skills in the CRM): they pick them on the
+ * onboarding page first. Only once the CRM confirmed it (`skillsChecked`), so a failed read never holds anyone back.
+ */
+export function needsSkills(user) {
+  return Boolean(user?.accessChecked && user?.skillsChecked) && !user?.hasSkills
+}
+
 /** Whether the user may open this page: onboarding first, admin pages for admins, otherwise the page's permission. */
 export function canAccess(user, pathname) {
   if (needsRole(user)) return false
@@ -93,7 +101,7 @@ export function canAccess(user, pathname) {
 
 /** Where the user lands: onboarding, else the first page they can open, else Profile (open to everyone). */
 export function homePath(user) {
-  if (needsRole(user)) return '/onboarding'
+  if (needsRole(user) || needsSkills(user)) return '/onboarding'
   return HOME_ORDER.find((path) => canAccess(user, path)) || '/profile'
 }
 

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Check, Funnel, GearSix, X } from '@phosphor-icons/react'
 import HScroll from './HScroll'
 import { skillStyle } from '../lib/jobSignals'
@@ -125,9 +126,14 @@ export function Metric({ icon: Icon, tone = 'text-[var(--muted)]', value, captio
  * to its card; `activeId` is highlighted. `meta(item)` is the small line under the name, `mark(item)` an optional
  * badge on the right.
  */
-export function FeedIndex({ items, activeId, onJump, meta, mark }) {
-  return <nav aria-label="Jump to item" className="hidden lg:block">
-    <div className="sticky top-[calc(var(--shell-h)+1rem)] max-h-[calc(100dvh-var(--shell-h)-2rem)] overflow-y-auto overscroll-contain rounded-[1.5rem] bg-[var(--surface)] p-3 ring-1 ring-[var(--line)]/70 [scrollbar-width:thin]">
+// `fill`: the list fills its box (a drawer's side) instead of following the page, and keeps the active item in view.
+export function FeedIndex({ items, activeId, onJump, meta, mark, fill = false }) {
+  const list = useRef(null)
+  useEffect(() => {
+    if (fill) list.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [fill, activeId])
+  return <nav aria-label="Jump to item" className={fill ? 'h-full' : 'hidden lg:block'}>
+    <div ref={list} className={`${fill ? 'h-full' : 'sticky top-[calc(var(--shell-h)+1rem)] max-h-[calc(100dvh-var(--shell-h)-2rem)]'} overflow-y-auto overscroll-contain rounded-[1.5rem] bg-[var(--surface)] p-3 ring-1 ring-[var(--line)]/70 [scrollbar-width:thin]`}>
       <p className={`${label} px-2 pb-2`}>{items.length} {items.length === 1 ? 'item' : 'items'} shown</p>
       <ol className="space-y-0.5">{items.map((item, index) => {
         const active = activeId === item.id

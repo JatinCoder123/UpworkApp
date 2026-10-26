@@ -15,7 +15,7 @@ import ErrorBoundary, { CardError, DialogError } from '../components/ErrorBounda
 import { useAuth } from '../contexts/AuthContext'
 import { EMPTY_DATE_RANGE } from '../lib/dateRange'
 import { countFilters, useFeedIndex } from '../lib/feedView'
-import { useGatewayFeed } from '../lib/gatewayFeed'
+import { useGatewayFeed, useOpenItem } from '../lib/gatewayFeed'
 import { skillStyle } from '../lib/jobSignals'
 import { timeAgo, useNow } from '../lib/time'
 
@@ -90,7 +90,6 @@ export default function Wordpress() {
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [dateFilter, setDateFilter] = useState(EMPTY_DATE_RANGE)
   const [sort, setSort] = useState('demand')
-  const [openId, setOpenId] = useState(null)
   const [filterDialog, setFilterDialog] = useState(false)
   const [listKey, setListKey] = useState(null)
 
@@ -124,7 +123,8 @@ export default function Wordpress() {
   // Chips for every filter picked, so it is clear why the list is narrower.
   const activeChips = Object.entries(FIELDS).flatMap(([key, [field]]) => filters[key].map((value) => [key, value, labelOf(field, value)]))
   const listSection = filterSections.find((entry) => entry.key === listKey)
-  const open = items.find((item) => item.id === openId)
+  // The open item is in the link (?wordpress=id).
+  const { open, openItem, closeItem } = useOpenItem('wordpress', items, 'wordpress')
 
   return <Shell>
     <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">
@@ -172,7 +172,7 @@ export default function Wordpress() {
                 meta={(item) => { const [TypeIcon] = TYPES[item.itemType] || [Tag]; return <><TypeIcon size={10} />{labelOf('item_type', item.itemType)} · {timeAgo(item.publishedAt, now)}</> }}
                 mark={(item) => item.demandScore != null && <span title={`Demand score ${item.demandScore}`} className="mt-0.5 shrink-0 self-start rounded-md bg-[var(--paper)] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{item.demandScore}</span>} /></ErrorBoundary>
               <div className="min-w-0">
-                <section className={`grid content-start gap-4 transition-opacity min-[1400px]:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="wordpress-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><FeedCard item={item} labelOf={labelOf} now={now} onOpen={() => setOpenId(item.id)} /></ErrorBoundary>)}</section>
+                <section className={`grid content-start gap-4 transition-opacity min-[1400px]:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="wordpress-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><FeedCard item={item} labelOf={labelOf} now={now} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
                 <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} />
               </div>
             </div>
@@ -180,7 +180,7 @@ export default function Wordpress() {
               ? <NothingMatches onClear={clearAll} />
               : <p className="mt-8 rounded-[1.6rem] bg-[var(--surface)] px-6 py-12 text-center text-sm text-[var(--muted)] ring-1 ring-[var(--line)]/70">The WordPress feed is empty.</p>}
 
-      {open && <ErrorBoundary name="wordpress-details" fallback={DialogError} fallbackProps={{ onClose: () => setOpenId(null) }} resetKey={open.id}><FeedDialog item={open} labelOf={labelOf} now={now} onClose={() => setOpenId(null)} /></ErrorBoundary>}
+      {open && <ErrorBoundary name="wordpress-details" fallback={DialogError} fallbackProps={{ onClose: closeItem }} resetKey={open.id}><FeedDialog item={open} labelOf={labelOf} now={now} onClose={closeItem} /></ErrorBoundary>}
       {listSection && <ErrorBoundary name="wordpress-list" fallback={DialogError} fallbackProps={{ onClose: () => setListKey(null) }}><FilterListDialog title={`Pick the ${listSection.title.toLowerCase()}`} noun={listSection.title.toLowerCase()} options={listSection.options} value={filters[listKey]} countOf={(value) => countOf(listKey, value)} onApply={(values) => setFilters((current) => ({ ...current, [listKey]: values }))} onClose={() => setListKey(null)} /></ErrorBoundary>}
       {filterDialog && <ErrorBoundary name="wordpress-filter" fallback={DialogError} fallbackProps={{ onClose: () => setFilterDialog(false) }}><FeedFilterDialog title="Filter WordPress items" sections={filterSections} value={filters} countOf={countOf} onApply={(next) => setFilters({ ...EMPTY_FILTERS, ...next })} onClose={() => setFilterDialog(false)} /></ErrorBoundary>}
     </main>

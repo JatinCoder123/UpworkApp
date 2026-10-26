@@ -5,6 +5,8 @@ import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import {
   ArrowSquareOut,
+  BookOpenText,
+  CaretRight,
   ArrowsClockwise,
   Check,
   CheckCircle,
@@ -34,6 +36,7 @@ import HScroll from '../components/HScroll'
 import { Modal, primaryButton, stickyBand } from '../components/ui'
 import CategoryFilterDialog from '../components/CategoryFilterDialog'
 import { ShareDialog } from '../components/ShareJobDialog'
+import InstructionsDialog from '../components/InstructionsDialog'
 import { api, downloadNoteDocument, getDocumentDownloadUrl, getDocumentViewUrl, resolveCrmUser } from '../services/api'
 import {
   subscribeDocStatus,
@@ -980,9 +983,14 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
     }
   }, [note?.status, isTriggering, onDocUpdated, item.id, activeNoteId])
 
+  // Generate / Regenerate first ask for the user's suggestion, here in the details: null while not asked;
+  // { regenerate, text } while the box is open. The prompt and guidelines open in their own window.
+  const [askGenerate, setAskGenerate] = useState(null)
+  const [instructionsOpen, setInstructionsOpen] = useState(false)
+
   // Generate / Regenerate handler:
-  // Calls entryPoint=TechContentDocx&id=${item.id} with userName and userId!
-  const handleGenerateDoc = async (_isRegen = false) => {
+  // Calls entryPoint=TechContentDocx&id=${item.id} with userName, userId and the user's suggestion.
+  const handleGenerateDoc = async (_isRegen = false, suggestion = '') => {
     try {
       setIsTriggering(true)
       setTriggerError('')
@@ -1016,6 +1024,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
       const res = await api.generateTechContentDoc(item.id, {
         userName: effectiveUserName,
         userId: effectiveUserId,
+        suggestion,
       })
       if (res?.note_id) {
         setActiveNoteId(res.note_id)
@@ -1182,10 +1191,33 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
           triggerError={triggerError}
           justCompleted={justCompleted}
           onDismissCompleted={() => setJustCompleted(false)}
-          onGenerateDoc={() => handleGenerateDoc(false)}
-          onRegenerateDoc={() => handleGenerateDoc(true)}
+          onGenerateDoc={() => setAskGenerate({ regenerate: false, text: '' })}
+          onRegenerateDoc={() => setAskGenerate({ regenerate: true, text: '' })}
           onRefresh={() => refetchNote()}
         />
+
+        {/* The suggestion for the writer, asked here before the document is made (or remade). */}
+        {askGenerate && <form onSubmit={(event) => { event.preventDefault(); const { regenerate, text } = askGenerate; setAskGenerate(null); handleGenerateDoc(regenerate, text) }} className="mt-3 rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-[var(--line)]/70">
+          <label className="block">
+            <span className="text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Your suggestion for the writer (optional)</span>
+            <span className="block text-[13px] leading-5"><textarea autoFocus rows={3} maxLength={2000} value={askGenerate.text} onChange={(event) => setAskGenerate((current) => ({ ...current, text: event.target.value }))} placeholder="e.g. Focus on what changes for small businesses and end with a short FAQ" className="mt-1.5 w-full resize-y rounded-xl bg-[var(--surface)] px-3 py-2 text-[var(--ink)] outline-none ring-1 ring-[var(--line)] placeholder:text-[var(--muted)] focus:ring-[var(--lime-dark)]" /></span>
+          </label>
+          <div className="mt-2 flex items-center justify-end gap-2 text-xs font-bold">
+            <button type="button" onClick={() => setAskGenerate(null)} className="rounded-full px-3 py-1.5 text-[var(--muted)] hover:text-[var(--ink)]">Cancel</button>
+            <button type="submit" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[var(--text)] px-3.5 py-1.5 text-[var(--paper)] transition-transform hover:-translate-y-0.5"><Sparkle size={12} weight="fill" />{askGenerate.regenerate ? 'Start regenerating' : 'Start generating'}</button>
+          </div>
+        </form>}
+
+        {/* The prompt (notes_blog) and guidelines the writer uses, in their own window to read or edit. */}
+        <button type="button" onClick={() => setInstructionsOpen(true)} className="group mt-3 flex w-full items-center gap-3 rounded-2xl bg-(--lime)/20 px-4 py-3 text-left ring-1 ring-[var(--lime-dark)]/35 transition-colors hover:bg-(--lime)/35">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--lime)] text-[#26320b]"><BookOpenText size={17} weight="bold" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-bold text-[var(--ink)]">Prompt &amp; guidelines</span>
+            <span className="block text-[11px] leading-4 text-[var(--muted)]">See or edit what the writer is told before it makes the document</span>
+          </span>
+          <CaretRight size={14} weight="bold" className="shrink-0 text-[var(--accent-strong)] transition-transform group-hover:translate-x-0.5" />
+        </button>
+        {instructionsOpen && <InstructionsDialog title="Site Content documents" promptName="notes_blog" guidelinesName="notes_blog_guidelines" onClose={() => setInstructionsOpen(false)} />}
       </div>
 
       {/* Summary */}

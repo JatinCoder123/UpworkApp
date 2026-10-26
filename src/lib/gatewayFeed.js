@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../services/api'
 import { toGatewayDateFilter } from './dateRange'
@@ -142,4 +143,33 @@ export function patchFeedItem(queryClient, feed, id, changes) {
   const patch = (item) => (item.id === id ? { ...item, ...changes } : item)
   queryClient.setQueriesData({ queryKey: [`${feed}-feed`] }, (data) => data && { ...data, pages: data.pages.map((page) => ({ ...page, records: page.records.map(patch) })) })
   queryClient.setQueriesData({ queryKey: [`${feed}-all`] }, (data) => data && data.map(patch))
+  queryClient.setQueriesData({ queryKey: [`${feed}-item`] }, (data) => data && patch(data))
+}
+
+// The item whose details are open, kept in the link (?param=id, as the Jobs page does with ?job=), so the view can be
+// shared and survives a reload. The item comes from the list loaded, or is read on its own when it is not in it
+// (further down, or filtered out); a link to an item that is gone just closes. Opening one while another is open
+// replaces it in the history, so Back leaves the details instead of stepping through them.
+export function useOpenItem(feed, items, param) {
+  const [params, setParams] = useSearchParams()
+  const openId = params.get(param)
+  const listed = openId ? items.find((item) => item.id === openId) || null : null
+  const { data: fetched, isSuccess, isError } = useQuery({
+    queryKey: [`${feed}-item`, openId],
+    queryFn: () => api.getFeedItem(feed, openId),
+    enabled: Boolean(openId) && !listed,
+    staleTime: 60_000,
+  })
+  const open = listed || (fetched?.id === openId ? fetched : null)
+  const update = useCallback((id, replace) => setParams((current) => {
+    const next = new URLSearchParams(current)
+    if (id) next.set(param, id)
+    else next.delete(param)
+    return next
+  }, { replace }), [setParams, param])
+  const openItem = useCallback((id) => update(id, Boolean(openId)), [update, openId])
+  const closeItem = useCallback(() => update(null, true), [update])
+  const gone = Boolean(openId) && !listed && (isError || (isSuccess && !fetched))
+  useEffect(() => { if (gone) closeItem() }, [gone, closeItem])
+  return { openId, open, openItem, closeItem }
 }

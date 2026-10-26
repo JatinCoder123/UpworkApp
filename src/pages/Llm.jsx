@@ -17,7 +17,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { api } from '../services/api'
 import { EMPTY_DATE_RANGE } from '../lib/dateRange'
 import { countFilters, useFeedIndex } from '../lib/feedView'
-import { useGatewayFeed } from '../lib/gatewayFeed'
+import { useGatewayFeed, useOpenItem } from '../lib/gatewayFeed'
 import { skillStyle } from '../lib/jobSignals'
 import { timeAgo, useNow } from '../lib/time'
 
@@ -103,7 +103,6 @@ export default function Llm() {
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [dateFilter, setDateFilter] = useState(EMPTY_DATE_RANGE)
   const [sort, setSort] = useState('newest')
-  const [openId, setOpenId] = useState(null)
   const [filterDialog, setFilterDialog] = useState(false)
   const [listKey, setListKey] = useState(null)
 
@@ -157,7 +156,9 @@ export default function Llm() {
   const groups = options.content_group || NONE
   const listSection = filterSections.find((entry) => entry.key === listKey)
   // A journey step can be opened from the strip or the details even when the filters leave it out of the list.
-  const open = items.find((item) => item.id === openId) || journeySteps.find((item) => item.id === openId)
+  // The open item (a card or a journey step) is in the link (?llm=id).
+  const openable = useMemo(() => [...items, ...journeySteps], [items, journeySteps])
+  const { open, openItem, closeItem } = useOpenItem('llm', openable, 'llm')
 
   return <Shell>
     <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">
@@ -216,8 +217,8 @@ export default function Llm() {
                 meta={(item) => { const [GroupIcon] = GROUPS[item.contentGroup] || [Circle]; return <><GroupIcon size={10} /><span className="truncate">{labelOf('news_type', item.newsType)} · {timeAgo(item.publishedAt, now)}</span></> }}
                 mark={(item) => item.priority && <span title={`${labelOf('priority', item.priority)} priority`} className={`mt-1 size-2 shrink-0 self-start rounded-full ${(PRIORITY[item.priority] || PRIORITY.low)[1]}`} />} /></ErrorBoundary>
               <div className="min-w-0 space-y-4">
-                {journeys.map(([name, steps]) => <ErrorBoundary key={name} name="llm-journey" fallbackProps={JOURNEY_ERROR} resetKey={steps}><JourneyStrip name={name} steps={steps} labelOf={labelOf} onOpen={setOpenId} /></ErrorBoundary>)}
-                <section className={`grid content-start gap-4 transition-opacity min-[1400px]:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="llm-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><LlmCard item={item} labelOf={labelOf} onOpen={() => setOpenId(item.id)} /></ErrorBoundary>)}</section>
+                {journeys.map(([name, steps]) => <ErrorBoundary key={name} name="llm-journey" fallbackProps={JOURNEY_ERROR} resetKey={steps}><JourneyStrip name={name} steps={steps} labelOf={labelOf} onOpen={openItem} /></ErrorBoundary>)}
+                <section className={`grid content-start gap-4 transition-opacity min-[1400px]:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="llm-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><LlmCard item={item} labelOf={labelOf} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
                 <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} />
               </div>
             </div>
@@ -225,7 +226,7 @@ export default function Llm() {
               ? <NothingMatches onClear={() => { clearAll(); setGroup('all') }} />
               : <p className="mt-8 rounded-[1.6rem] bg-[var(--surface)] px-6 py-12 text-center text-sm text-[var(--muted)] ring-1 ring-[var(--line)]/70">The LLM feed is empty.</p>}
 
-      {open && <ErrorBoundary name="llm-details" fallback={DialogError} fallbackProps={{ onClose: () => setOpenId(null) }} resetKey={open.id}><LlmDialog item={open} steps={open.journeyName ? stepsOf(open.journeyName) : NONE} labelOf={labelOf} now={now} onOpen={setOpenId} onClose={() => setOpenId(null)} /></ErrorBoundary>}
+      {open && <ErrorBoundary name="llm-details" fallback={DialogError} fallbackProps={{ onClose: closeItem }} resetKey={open.id}><LlmDialog item={open} steps={open.journeyName ? stepsOf(open.journeyName) : NONE} labelOf={labelOf} now={now} onOpen={openItem} onClose={closeItem} /></ErrorBoundary>}
       {listSection && <ErrorBoundary name="llm-list" fallback={DialogError} fallbackProps={{ onClose: () => setListKey(null) }}><FilterListDialog title={`Pick the ${listSection.title.toLowerCase()}`} noun={listSection.title.toLowerCase()} options={listSection.options} value={filters[listKey]} countOf={(value) => countOf(listKey, value)} onApply={(values) => setFilters((current) => ({ ...current, [listKey]: values }))} onClose={() => setListKey(null)} /></ErrorBoundary>}
       {filterDialog && <ErrorBoundary name="llm-filter" fallback={DialogError} fallbackProps={{ onClose: () => setFilterDialog(false) }}><FeedFilterDialog title="Filter the LLM feed" sections={filterSections} value={filters} countOf={countOf} onApply={(next) => setFilters({ ...EMPTY_FILTERS, ...next })} onClose={() => setFilterDialog(false)} /></ErrorBoundary>}
     </main>

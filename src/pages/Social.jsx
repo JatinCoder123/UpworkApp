@@ -15,8 +15,9 @@ import ErrorBoundary, { CardError, DialogError } from '../components/ErrorBounda
 import { useAuth } from '../contexts/AuthContext'
 import { EMPTY_DATE_RANGE } from '../lib/dateRange'
 import { countFilters } from '../lib/feedView'
-import { useGatewayFeed } from '../lib/gatewayFeed'
+import { useGatewayFeed, useOpenItem } from '../lib/gatewayFeed'
 import { timeAgo, useNow } from '../lib/time'
+import { useWideScreen } from '../lib/media'
 
 /*
  * Social section: the outr_socials drafts, ready-to-post social media posts per platform. Same panel as WordPress, LLM
@@ -81,8 +82,6 @@ export default function Social() {
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [dateFilter, setDateFilter] = useState(EMPTY_DATE_RANGE)
   const [sort, setSort] = useState('reach')
-  const [openId, setOpenId] = useState(null)
-  const [selectedId, setSelectedId] = useState(null)
   const [filterDialog, setFilterDialog] = useState(false)
   const [listKey, setListKey] = useState(null)
 
@@ -115,10 +114,12 @@ export default function Social() {
   const removeFilter = (key, value) => setFilters((current) => ({ ...current, [key]: current[key].filter((entry) => entry !== value) }))
   const activeChips = Object.entries(FIELDS).flatMap(([key, [field]]) => filters[key].map((value) => [key, value, labelOf(field, value)]))
   const listSection = filterSections.find((entry) => entry.key === listKey)
-  const open = items.find((item) => item.id === openId)
-  // The post whose details show beside the queue: the one picked, else the first. On a phone a pick opens its dialog.
-  const shown = items.find((item) => item.id === selectedId) || items[0]
-  const pick = (id) => (window.matchMedia('(min-width: 1024px)').matches ? setSelectedId(id) : setOpenId(id))
+  // The picked post is in the link (?social=id). A wide screen shows it beside the queue (the first post until one is
+  // picked); a phone opens it in a dialog.
+  const wide = useWideScreen()
+  const { open, openItem, closeItem } = useOpenItem('social', items, 'social')
+  const shown = open || items[0]
+  const pick = openItem
 
   return <Shell>
     <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">
@@ -178,7 +179,7 @@ export default function Social() {
               ? <NothingMatches onClear={clearAll} />
               : <p className="mt-8 rounded-[1.6rem] bg-[var(--surface)] px-6 py-12 text-center text-sm text-[var(--muted)] ring-1 ring-[var(--line)]/70">No social posts yet.</p>}
 
-      {open && <ErrorBoundary name="social-details" fallback={DialogError} fallbackProps={{ onClose: () => setOpenId(null) }} resetKey={open.id}><PostDialog item={open} labelOf={labelOf} now={now} onClose={() => setOpenId(null)} /></ErrorBoundary>}
+      {open && !wide && <ErrorBoundary name="social-details" fallback={DialogError} fallbackProps={{ onClose: closeItem }} resetKey={open.id}><PostDialog item={open} labelOf={labelOf} now={now} onClose={closeItem} /></ErrorBoundary>}
       {listSection && <ErrorBoundary name="social-list" fallback={DialogError} fallbackProps={{ onClose: () => setListKey(null) }}><FilterListDialog title={`Pick the ${listSection.title.toLowerCase()}`} noun={listSection.title.toLowerCase()} options={listSection.options} value={filters[listKey]} countOf={(value) => countOf(listKey, value)} onApply={(values) => setFilters((current) => ({ ...current, [listKey]: values }))} onClose={() => setListKey(null)} /></ErrorBoundary>}
       {filterDialog && <ErrorBoundary name="social-filter" fallback={DialogError} fallbackProps={{ onClose: () => setFilterDialog(false) }}><FeedFilterDialog title="Filter social posts" sections={filterSections} value={filters} countOf={countOf} onApply={(next) => setFilters({ ...EMPTY_FILTERS, ...next })} onClose={() => setFilterDialog(false)} /></ErrorBoundary>}
     </main>

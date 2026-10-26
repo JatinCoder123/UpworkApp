@@ -12,7 +12,7 @@ import {
   Trash,
   Check,
 } from '@phosphor-icons/react'
-import { useDocNotifications } from '../services/docNotifications'
+import { OUTPUT_STATUS_TEXT, useDocNotifications } from '../services/docNotifications'
 import { downloadNoteDocument, getDocumentViewUrl } from '../services/api'
 import { iconButton } from './ui'
 
@@ -103,7 +103,7 @@ export default function DocNotificationBell() {
   const handleDownload = async (notif, e) => {
     e.stopPropagation()
     const viewUrl = notif.viewUrl || (notif.noteId ? getDocumentViewUrl(notif.noteId) : '')
-    if (!viewUrl) return
+    if (!viewUrl && !notif.documentUrl) return
 
     const baseName = (notif.title || 'document').slice(0, 48).toLowerCase().replace(/[^a-z0-9]+/g, '-')
 
@@ -121,7 +121,8 @@ export default function DocNotificationBell() {
     }
 
     setDownloadingId(null)
-    window.open(viewUrl, '_blank')
+    // An AppScript document comes with its own download link.
+    window.open(notif.documentUrl || viewUrl, '_blank')
     markAsRead(notif.id)
   }
 
@@ -129,7 +130,7 @@ export default function DocNotificationBell() {
   const handleOpenItem = (notif) => {
     markAsRead(notif.id)
     setOpen(false)
-    navigate('/site-content')
+    navigate(notif.path || '/site-content')
   }
 
   const hasActiveJob = notifications.some(
@@ -253,7 +254,7 @@ export default function DocNotificationBell() {
                   <p className="mt-1 px-6 text-[11px] text-[var(--muted)] leading-relaxed">
                     {filterTab === 'unread'
                       ? 'All current document updates have been marked as read.'
-                      : 'Updates will appear here as documents are generated in Site Content.'}
+                      : 'Updates will appear here as documents are generated in Site Content or AppScript.'}
                   </p>
                 </div>
               ) : (
@@ -325,7 +326,7 @@ export default function DocNotificationBell() {
 
                           {/* Natural human subtitle (NO TAGS) */}
                           <p className="mt-0.5 text-[11px] text-[var(--muted)] leading-tight">
-                            {notif.message || theme.subtitle}
+                            {(notif.docType && OUTPUT_STATUS_TEXT[notif.status]) || notif.message || theme.subtitle}
                           </p>
 
                           {/* Action Buttons for ready documents */}

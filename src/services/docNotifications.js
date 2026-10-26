@@ -28,16 +28,25 @@ function saveStoredNotifications(list) {
 // Only docs this user started are kept; notifications saved before ownership was tracked are dropped.
 let memoryNotifications = loadStoredNotifications().filter((n) => n.mine);
 const listeners = new Set();
-// Socket events that belong to one of this user's docs, so the toast can show only those.
-const ownEvents = new WeakSet();
+// Socket events that belong to one of this user's docs, each with the notification it updated, so the toast can show
+// only those (with the notification's title and page).
+const ownEvents = new WeakMap();
 
 const isFinal = (status) => status === 'completed' || status === 'failed';
 
+// AppScript outputs (script, blog, video) share their idea's id, so an event also names its output: the
+// notification's docType must match the event's type ("type" in the socket payload). The generator calls the
+// Apps Script code "appscript".
+const OUTPUT_TYPES = { appscript: 'script', script: 'script', blog: 'blog', video: 'video' };
+export const outputTypeOf = (event) => OUTPUT_TYPES[String(event?.raw?.type || '').trim().toLowerCase()] || '';
+const typeOf = (event) => String(event.docType || outputTypeOf(event) || event.raw?.type || '');
+
 // The user's own notification this event updates. The socket broadcasts every user's docs, so an event
-// counts only when it matches a doc this user started: same note, or the same content while that
-// generation is still running and its note id is not known on one side yet.
+// counts only when it matches a doc this user started: same note, or the same content (and output) while
+// that generation is still running and its note id is not known on one side yet.
 function findOwnIndex(event) {
-  return memoryNotifications.findIndex((n) => n.mine && (
+  const type = typeOf(event);
+  return memoryNotifications.findIndex((n) => n.mine && (!n.docType || !type || n.docType === type) && (
     (event.noteId && n.noteId === event.noteId) ||
     (event.contentId && n.contentId === event.contentId && (!event.noteId || !n.noteId) && !isFinal(n.status))
   ));
@@ -46,6 +55,19 @@ function findOwnIndex(event) {
 export function isOwnDocEvent(event) {
   return Boolean(event && typeof event === 'object' && ownEvents.has(event));
 }
+
+// The notification an own event updated (title, page to open, output type), or null.
+export function notificationOfEvent(event) {
+  return (event && typeof event === 'object' && ownEvents.get(event)) || null;
+}
+
+// What an AppScript output's notification says at each status.
+export const OUTPUT_STATUS_TEXT = {
+  queued: 'Waiting for the generator to start…',
+  processing: 'Generating…',
+  completed: 'Ready to view or download.',
+  failed: 'It could not be made. Regenerate it from AppScript.',
+};
 
 function emitChange() {
   listeners.forEach((listener) => {
@@ -60,20 +82,22 @@ function emitChange() {
 /**
  * Add or update a notification. `mine: true` marks a doc this user just started;
  * socket events only update those and are ignored for other users' docs.
+ * Optional on a new one: `docType` (an AppScript output: script, blog, video) and `path` (the page it opens,
+ * Site Content by default). Returns the notification's id (null when the event is not the user's).
  */
 export function recordDocNotification(event) {
-  if (!event || !event.status) return;
+  if (!event || !event.status) return null;
 
   const docKey = event.contentId || event.noteId;
-  if (!docKey) return;
+  if (!docKey) return null;
 
   const ownIndex = findOwnIndex(event);
-  if (!event.mine && ownIndex < 0) return;
-  if (typeof event === 'object') ownEvents.add(event);
+  if (!event.mine && ownIndex < 0) return null;
 
   const now = Date.now();
   const savedRecord = getDocInProgress(event.contentId, event.noteId);
-  const title = event.title || savedRecord?.title || 'Technical Content Document';
+  // An event without a title keeps the notification's own title.
+  const title = event.title || savedRecord?.title || '';
   const userName = event.userName || savedRecord?.userName || '';
   // A new generation has no note yet; the saved record may still hold the previous note's id.
   const noteId = event.noteId || (event.mine ? '' : savedRecord?.noteId) || '';
@@ -92,7 +116,7 @@ export function recordDocNotification(event) {
       status: event.status,
       noteId: noteId || existing.noteId,
       contentId: event.contentId || existing.contentId,
-      title: title || existing.title,
+      title: title || existing.title || 'Technical Content Document',
       userName: userName || existing.userName || '',
       viewUrl: viewUrl || existing.viewUrl,
       documentUrl: documentUrl || existing.documentUrl,
@@ -105,13 +129,16 @@ export function recordDocNotification(event) {
       updated,
       ...memoryNotifications.filter((_, idx) => idx !== existingIndex),
     ];
+    if (typeof event === 'object') ownEvents.set(event, updated);
   } else {
     const newNotif = {
-      id: `${docKey}-${now}`,
+      id: `${event.docType || 'doc'}-${docKey}-${now}`,
       mine: true,
       contentId: event.contentId || '',
       noteId,
-      title,
+      docType: event.docType || '',
+      path: event.path || '',
+      title: title || 'Technical Content Document',
       userName: userName || '',
       status: event.status,
       viewUrl,
@@ -120,10 +147,30 @@ export function recordDocNotification(event) {
       read: false,
     };
     memoryNotifications = [newNotif, ...memoryNotifications];
+    if (typeof event === 'object') ownEvents.set(event, newNotif);
   }
 
   saveStoredNotifications(memoryNotifications);
   emitChange();
+  return memoryNotifications[0].id;
+}
+
+/**
+ * A finished AppScript output's links, read from the CRM, for the user's notification of it when the socket
+ * event did not carry them.
+ */
+export function fillOutputNotificationLinks(contentId, docType, { viewUrl = '', documentUrl = '' } = {}) {
+  if (!contentId || !docType || (!viewUrl && !documentUrl)) return;
+  let changed = false;
+  memoryNotifications = memoryNotifications.map((n) => {
+    if (!n.mine || n.contentId !== contentId || n.docType !== docType || n.status !== 'completed' || n.viewUrl || n.documentUrl) return n;
+    changed = true;
+    return { ...n, viewUrl, documentUrl };
+  });
+  if (changed) {
+    saveStoredNotifications(memoryNotifications);
+    emitChange();
+  }
 }
 
 /**
