@@ -45,7 +45,7 @@ export default function TechNewsCard({ story, layout = 'grid' }) {
     return (
       <article
         data-card
-        className="group relative overflow-hidden rounded-[1.6rem] bg-black/[.045] p-1.5 ring-1 ring-black/5 transition-all duration-500 hover:-translate-y-0.5 hover:bg-black/[.07]"
+        className="group relative overflow-hidden rounded-[1.6rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70 transition-all duration-500 hover:-translate-y-0.5 hover:bg-black/[.07]"
       >
         <div className="rounded-[calc(1.6rem-.375rem)] bg-[var(--surface)] p-4 sm:p-5 flex flex-col sm:flex-row gap-5 items-start sm:items-center">
           {story.image && (
@@ -158,7 +158,7 @@ export default function TechNewsCard({ story, layout = 'grid' }) {
   return (
     <article
       data-card
-      className="group flex flex-col overflow-hidden rounded-[1.8rem] bg-black/[.045] p-1.5 ring-1 ring-black/5 transition-all duration-700 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-1 hover:bg-black/[.07]"
+      className="group flex flex-col overflow-hidden rounded-[1.8rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70 transition-all duration-700 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-1 hover:bg-black/[.07]"
     >
       <div className="relative flex flex-1 flex-col overflow-hidden rounded-[calc(1.8rem-.375rem)] bg-[var(--surface)] shadow-[inset_0_1px_1px_rgba(255,255,255,.9)] dark:shadow-none">
         {/* Topic-Matching Banner Image */}

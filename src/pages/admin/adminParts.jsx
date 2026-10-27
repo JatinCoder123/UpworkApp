@@ -25,18 +25,17 @@ export function useAdminCatalog() {
 const SECTION_NAMES = new Set(Object.values(PAGE_PERMISSIONS).map(permissionKey))
 
 /**
- * Section permissions open a page in the portal; feed permissions open a feed made with "+ New feed" (the build saves
- * the feed's module name in the permission's description); the rest (Reports, User Management, ...) have no page yet.
+ * Section permissions open a page in the portal: the built-in pages and the feeds made with "+ New feed" (the build
+ * saves the feed's module name in the permission's description), listed together; the rest (Reports, User
+ * Management, ...) have no page yet.
  */
 export function groupPermissions(permissions, feedModules = []) {
   const list = asArray(permissions)
   const modules = new Set(asArray(feedModules).map(permissionKey))
-  const isSection = (permission) => SECTION_NAMES.has(permissionKey(permission.name))
-  const isFeed = (permission) => !isSection(permission) && modules.has(permissionKey(permission.description))
+  const isSection = (permission) => SECTION_NAMES.has(permissionKey(permission.name)) || modules.has(permissionKey(permission.description))
   return [
     { title: 'Sections', note: 'Each opens a page in the portal.', items: list.filter(isSection) },
-    { title: 'Feeds', note: 'Each opens a feed made with “New feed”, in the top nav.', items: list.filter(isFeed) },
-    { title: 'Other access', note: 'No page in the portal uses these yet.', items: list.filter((permission) => !isSection(permission) && !isFeed(permission)) },
+    { title: 'Other access', note: 'No page in the portal uses these yet.', items: list.filter((permission) => !isSection(permission)) },
   ].filter((group) => group.items.length)
 }
 

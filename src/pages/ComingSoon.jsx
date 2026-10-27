@@ -29,7 +29,7 @@ export default function ComingSoon({
   return (
     <Shell>
       <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
-        <section className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+        <section className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
           <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] px-6 py-16 text-center sm:px-12 sm:py-20">
             <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[var(--paper)] text-[var(--ink)] ring-1 ring-black/5">
               <Icon size={26} weight="duotone" />
@@ -40,9 +40,9 @@ export default function ComingSoon({
               Coming Soon
             </span>
 
-            <h2 className="mt-2 text-2xl sm:text-3xl font-semibold tracking-[-.04em] text-[var(--ink)]">
+            <h1 className="mt-2 text-2xl sm:text-3xl font-semibold tracking-[-.04em] text-[var(--ink)]">
               {title} is on the way.
-            </h2>
+            </h1>
 
             <p className="mx-auto mt-3 max-w-md text-xs sm:text-sm leading-6 text-[var(--muted)]">
               {description}

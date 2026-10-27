@@ -40,10 +40,17 @@ export function getDocumentDownloadUrl(noteId) {
 export async function downloadNoteDocument(noteId, { filename = "" } = {}) {
   const url = getDocumentDownloadUrl(noteId);
   if (!url) throw createAppError("DOC_MISSING", "This document has no file yet.");
+  return downloadFile(url, { filename });
+}
+
+// Saves the file at a CRM download link (one sent as an attachment, e.g. entryPoint=outrDoc&download=1) without
+// leaving the page: a link to another site opens a new tab, and its `download` attribute is ignored.
+export async function downloadFile(url, { filename = "" } = {}) {
+  if (!url) throw createAppError("DOC_MISSING", "This document has no file yet.");
   const response = await fetch(url);
   const type = response.headers.get("content-type") || "";
   // An HTML reply is a CRM error page, not the document.
-  if (!response.ok || /text\/html/i.test(type)) throw createAppError("DOC_DOWNLOAD_FAILED", `The document could not be downloaded (${response.status}).`);
+  if (!response.ok || /text\/html/i.test(type)) throw createAppError("DOC_DOWNLOAD_FAILED", `The document could not be downloaded (${response.status}).`, { status: response.status });
   const disposition = response.headers.get("content-disposition") || "";
   const headerName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1] || /filename="?([^";]+)"?/i.exec(disposition)?.[1] || "";
   let name = filename || "document.docx";

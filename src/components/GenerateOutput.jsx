@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import gsap from 'gsap'
-import { ArrowClockwise, BookOpenText, CheckCircle, CircleNotch, DownloadSimple, Eye, Hourglass, Quotes, Sparkle, WarningCircle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, BookOpenText, CheckCircle, CircleNotch, Eye, Hourglass, Quotes, Sparkle, WarningCircle, X } from '@phosphor-icons/react'
+import DownloadButton from './DownloadButton'
 import LoginUrlPill from './LoginUrlPill'
 import { FeedIndex } from './FeedParts'
 import { sectionLabel as label } from './SectionControls'
@@ -63,7 +64,7 @@ export function OutputRow({ output, type, icon: Icon, name, short, example, pane
       <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
         <button type="button" onClick={onPanel} aria-pressed={panelOpen} title={panelOpen ? 'Close the prompt and guidelines' : 'Open the prompt and guidelines beside the details'} className={`${pill} ring-1 ${panelOpen ? 'bg-(--lime)/35 text-[var(--ink)] ring-[var(--lime-dark)]/40' : 'text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}><BookOpenText size={13} weight="bold" />Prompt &amp; guidelines</button>
         {stage === 'completed' && output.viewUrl && <a href={output.viewUrl} target="_blank" rel="noreferrer" className={`${pill} bg-[var(--lime)] text-[#26320b] hover:-translate-y-0.5`}><Eye size={13} weight="bold" />View</a>}
-        {stage === 'completed' && output.downloadUrl && <a href={output.downloadUrl} target="_blank" rel="noreferrer" className={`${pill} bg-[var(--paper)] text-[var(--ink)] ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)]`}><DownloadSimple size={13} weight="bold" />Download</a>}
+        {stage === 'completed' && output.downloadUrl && <DownloadButton url={output.downloadUrl} className={`${pill} bg-[var(--paper)] text-[var(--ink)] ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)] disabled:opacity-70`} />}
         {stage === 'completed' && published && <LoginUrlPill />}
         {!running && draft === null && <button type="button" onClick={() => { generate.reset(); setDraft(output?.suggestion || '') }} className={`${pill} ${stage === 'idle' ? 'bg-[var(--text)] text-[var(--paper)] hover:-translate-y-0.5' : 'bg-[var(--paper)] text-[var(--ink)] ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)]'}`}>
           {stage === 'idle' ? <><Sparkle size={12} weight="fill" />Generate</> : <><ArrowClockwise size={12} weight="bold" />Regenerate</>}

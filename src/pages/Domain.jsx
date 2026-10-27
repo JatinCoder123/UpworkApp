@@ -489,7 +489,8 @@ export default function Domain() {
   return (
     <Shell>
       <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
-        <header className="flex justify-end">
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold tracking-[-.04em]">Domain</h1>
           <div className="flex gap-2">
             <button type="button" onClick={() => setSaved('history')} className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-4 py-2.5 text-xs font-bold ring-1 ring-[var(--line)] transition-all hover:-translate-y-0.5"><ClockCounterClockwise size={15} />Recent</button>
             <button type="button" onClick={() => setSaved('favorites')} className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-4 py-2.5 text-xs font-bold ring-1 ring-[var(--line)] transition-all hover:-translate-y-0.5"><Star size={15} />Favorites</button>

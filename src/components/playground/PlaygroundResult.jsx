@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ArrowClockwise, ArrowSquareOut, BracketsCurly, CaretDown, Check, CircleNotch, Copy, DownloadSimple, Eye, WarningCircle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, ArrowSquareOut, BracketsCurly, CaretDown, Check, CircleNotch, Copy, Eye, WarningCircle, X } from '@phosphor-icons/react'
+import DownloadButton from '../DownloadButton'
 import { ActionIcon, ClaudeText, JsonView, StatusChip } from './PlaygroundParts'
 import { actionName, card, smallButton } from './playgroundUi'
 import { isRunning, usePlaygroundTest, useRerunTest } from '../../lib/playground'
@@ -74,7 +75,7 @@ export default function PlaygroundResult({ summary, onClose }) {
             </div>
             {hasFile && <div className="mt-3 flex flex-wrap gap-2">
               {test.viewUrl && <a href={test.viewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-[var(--text)] px-5 py-2.5 text-xs font-bold text-[var(--paper)] transition-transform hover:-translate-y-0.5"><Eye size={14} weight="bold" />Open</a>}
-              {test.downloadUrl && <a href={test.downloadUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-5 py-2.5 text-xs font-bold text-[var(--ink)] ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)]"><DownloadSimple size={14} weight="bold" />Download</a>}
+              {test.downloadUrl && <span className="text-xs font-bold"><DownloadButton url={test.downloadUrl} iconSize={14} className="inline-flex items-center gap-2 rounded-full bg-[var(--surface)] px-5 py-2.5 text-[var(--ink)] ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)] disabled:opacity-70" /></span>}
             </div>}
           </>}
       {result.error && <p className="mt-2 text-[11px] font-semibold text-[var(--bad)]">The latest status could not be read: {result.error.message}</p>}

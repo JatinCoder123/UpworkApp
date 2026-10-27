@@ -334,10 +334,11 @@ export default function TechNews() {
     <Shell>
       <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
         {/* Top Horizontal Navigation & Search/Filter Toolbar */}
-        <section className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+        <section className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
           <div className="space-y-4 rounded-[calc(2rem-.375rem)] bg-[var(--surface)] px-4 py-4 sm:px-6">
             {/* Top Row: Source Types (Left) + Search & Filter (Right) */}
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              <h1 className="shrink-0 text-2xl font-semibold tracking-[-.04em]">AI News</h1>
               {/* Source Type Tabs in rounded-full pill container (multi-select, "All" inside filter) */}
               <HScroll className="rounded-full bg-[var(--paper)] p-1" innerClassName="gap-1" fade="var(--paper)" label="source types">
                 {SOURCE_TYPE_TABS.map((item) => {
@@ -601,7 +602,7 @@ export default function TechNews() {
                 />
               </div>
             ) : isError ? (
-              <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+              <div className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
                 <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] py-20 text-center">
                   <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-[var(--paper)] text-rose-500">
                     <Newspaper size={24} weight="light" />
@@ -620,7 +621,7 @@ export default function TechNews() {
                 </div>
               </div>
             ) : filteredArticles.length === 0 ? (
-              <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+              <div className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
                 <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] py-20 text-center">
                   <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-[var(--paper)] text-[var(--muted)]">
                     <Newspaper size={24} weight="light" />
@@ -678,7 +679,7 @@ export default function TechNews() {
 
           {/* RIGHT: "Latest News" Sidebar (Natural scroll + sticky on desktop) */}
           <aside className="lg:sticky lg:top-24 space-y-6">
-            <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+            <div className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
               <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 sm:p-6 space-y-4">
                 {/* Header: Latest News */}
                 <div className="flex items-center justify-between border-b border-black/[.06] dark:border-white/[.08] pb-3">

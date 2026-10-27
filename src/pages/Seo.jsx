@@ -129,7 +129,8 @@ export default function Seo() {
   return (
     <Shell>
       <main className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
-        <header className="flex justify-end">
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold tracking-[-.04em]">SEO</h1>
           <label className="flex items-center gap-2 rounded-full bg-[var(--surface)] p-1.5 pl-4 ring-1 ring-[var(--line)] shadow-[0_12px_36px_rgba(36,49,38,.08)] focus-within:ring-[var(--lime-dark)]">
             <MagnifyingGlass className="shrink-0 text-[var(--muted)]" size={16} />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search the journal" className="min-w-0 flex-1 bg-transparent px-1 text-xs outline-none sm:w-56" />

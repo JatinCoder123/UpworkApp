@@ -81,7 +81,7 @@ export default function SearchConsole({ value, onChange, mode, onModeChange, tld
     onSubmit()
   }
 
-  return <form onSubmit={submit} className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+  return <form onSubmit={submit} className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
     <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-4 shadow-[0_24px_70px_rgba(30,32,25,.08)] sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="radiogroup" aria-label="Search by" className="flex gap-1 rounded-full bg-[var(--paper)] p-1 ring-1 ring-[var(--line)]/70">

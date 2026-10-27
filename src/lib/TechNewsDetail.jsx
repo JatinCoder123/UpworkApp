@@ -163,7 +163,7 @@ export default function TechNewsDetail() {
             )}
 
             {/* Summary & In-Depth Details */}
-            <article className="mt-10 rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+            <article className="mt-10 rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
               <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-6 sm:p-8 space-y-5">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">
@@ -225,7 +225,7 @@ export default function TechNewsDetail() {
           {/* Sidebar / Aside */}
           <aside className="lg:sticky lg:top-28 lg:self-start space-y-6">
             {/* Quick Metrics Card */}
-            <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+            <div className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
               <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-6 space-y-5">
                 <div className="flex items-center justify-between border-b border-black/[.07] dark:border-white/[.08] pb-4">
                   <span className="text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">
@@ -306,7 +306,7 @@ export default function TechNewsDetail() {
 
             {/* Up Next / Latest News in Sidebar */}
             {upNextStories.length > 0 && (
-              <div className="rounded-[2rem] bg-black/[.045] p-1.5 ring-1 ring-black/5">
+              <div className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
                 <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 space-y-4">
                   <div className="flex items-center justify-between border-b border-black/[.06] dark:border-white/[.08] pb-3">
                     <div>

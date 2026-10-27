@@ -321,7 +321,8 @@ export default function SiteContent() {
   return (
     <Shell>
       <main ref={root} className="mx-auto w-full max-w-[1560px] px-4 pb-28 pt-6 sm:px-6 md:pt-8">
-        <header className="flex justify-end">
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold tracking-[-.04em]">Site Content</h1>
           <dl
             data-hero-fade
             className="grid grid-cols-4 gap-px overflow-hidden rounded-[1.4rem] bg-[var(--line)]/70 ring-1 ring-[var(--line)]/70"

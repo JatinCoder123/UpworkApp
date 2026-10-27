@@ -128,7 +128,8 @@ export default function Login() {
         </div>
       </section>
 
-      <section className="relative m-2 flex min-h-[calc(100dvh-1rem)] items-end overflow-hidden rounded-[2rem] p-5 sm:p-10 lg:m-3 lg:p-14">
+      {/* The sign-in card sits in the middle of the photo (it was at the bottom, easy to miss on a tall screen). */}
+      <section className="relative m-2 flex min-h-[calc(100dvh-1rem)] items-center justify-center overflow-hidden rounded-[2rem] p-5 sm:p-10 lg:m-3 lg:p-14">
         <img
           src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1800&q=88"
           className="absolute inset-0 size-full object-cover"
