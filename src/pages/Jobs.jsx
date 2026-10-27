@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import gsap from "gsap";
-import { BookmarkSimple, Briefcase, Broadcast, CaretDown, CaretRight, Check, ClockCounterClockwise, Fire, Funnel, GearSix, Heart, MagnifyingGlass, Plus, SlidersHorizontal, Sparkle, X } from "@phosphor-icons/react";
+import { BookmarkSimple, Briefcase, Broadcast, CaretDown, CaretRight, Check, ClockCounterClockwise, Fire, Funnel, GearSix, Heart, MagnifyingGlass, Plus, SlidersHorizontal, X } from "@phosphor-icons/react";
 import Shell from "../components/Shell";
 import JobCard from "../components/JobCard";
 import JobDrawer from "../components/JobDrawer";
@@ -18,7 +18,7 @@ import LiveSearchDialog from "../components/LiveSearchDialog";
 import { ActiveDateFilterChip, RefreshFilterButton } from "../components/FilterToolbarControls";
 import { iconButton, primaryButton } from "../components/ui";
 import { api } from "../services/api";
-import { EMPTY_EXTRA_FILTERS, EMPTY_REACTION_FILTER, JOB_SORTS, loadDateFilter, loadExtraFilters, loadJobScope, loadJobSort, loadJobStatus, loadReactionFilter, saveDateFilter, saveExtraFilters, saveJobScope, saveJobSort, saveJobStatus, saveReactionFilter } from "../lib/preferences";
+import { EMPTY_EXTRA_FILTERS, EMPTY_REACTION_FILTER, JOB_SORTS, loadDateFilter, loadExtraFilters, loadJobScope, loadJobSort, loadJobStatus, loadMySkillsFilter, loadReactionFilter, saveDateFilter, saveExtraFilters, saveJobScope, saveJobSort, saveJobStatus, saveMySkillsFilter, saveReactionFilter } from "../lib/preferences";
 import { EMPTY_DATE_RANGE, toGatewayDateFilter } from "../lib/dateRange";
 import { clientLocation, countExtraFilters, forgetSearch, loadRecentSearches, matchesExtraFilters, rememberSearch, skillStyle, usePreviewParam } from "../lib/jobSignals";
 import { useCrmReactions } from "../lib/crmReactions";
@@ -98,6 +98,7 @@ export default function Jobs() {
   const likedOnly = reactionFilter.liked && reactionsApply;
   const reactionView = savedOnly || likedOnly;
   const [mySkillsOpen, setMySkillsOpen] = useState(false);
+  const [mySkillsChecked, setMySkillsChecked] = useState(loadMySkillsFilter);
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounced(searchInput.trim(), 450);
   const [recentSearches, setRecentSearches] = useState(() => loadRecentSearches(user?.email));
@@ -135,14 +136,16 @@ export default function Jobs() {
     const params = { userEmail: user?.email, dateFilter: gatewayDateFilter, search: withSearch ? search : "", category: jobCategory, subcategory: jobSubcategory, skill: serverSkill };
     return { queryKey: ["my-applied", params], queryFn: () => api.getMyAppliedJobs(params) };
   };
-  // My skills (picked at login, edited with the gear): the jobs shown are always the ones linked to the user's skills
-  // in the CRM, and so are the counts (the gateway still filters, searches, sorts and pages them). Like Saved and
-  // Liked, the Applied tab is the exception: it lists every job the user applied to. If the skills cannot be read,
-  // every job shows.
+  // My skills (picked with the gear, ticked / unticked with the checkbox): while ticked, the jobs shown are the ones
+  // linked to the user's skills in the CRM, and so are the counts (the gateway still filters, searches, sorts and pages
+  // them). Like Saved and Liked, the Applied tab is the exception: it lists every job the user applied to. Unticked,
+  // with no skills yet, or if the skills cannot be read, every job shows.
   const { data: mySkillsData, isError: mySkillsFailed } = useQuery({ queryKey: ["my-skills", user?.email], queryFn: () => api.getMySkills(user.email), enabled: Boolean(user?.email), staleTime: 5 * 60_000 });
   const mySkills = useMemo(() => asArray(mySkillsData), [mySkillsData]);
+  // The jobs linked to these skills in the CRM (outr_skills <-> outr_upwork_jobs).
   const mySkillIds = useMemo(() => mySkills.map((skill) => skill.id), [mySkills]);
-  const skillsOn = !mySkillsFailed;
+  // Still on while the skills load, so the unfiltered list never flashes in first.
+  const skillsOn = mySkillsChecked && !mySkillsFailed && (!mySkillsData || mySkills.length > 0);
   const skillsApply = skillsOn && reactionsApply;
   const { data: skillJobIds, isError: skillJobsFailed } = useQuery({ queryKey: ["my-skill-jobs", mySkillIds], queryFn: () => api.getSkillJobIds(mySkillIds), enabled: skillsOn && mySkillIds.length > 0, staleTime: 5 * 60_000 });
   // The jobs linked to the user's skills (none without skills); null until known.
@@ -151,7 +154,6 @@ export default function Jobs() {
   const jobIds = skillsApply && !skillJobsFailed ? skillJobs : null;
   const statsJobIds = skillsOn && !skillJobsFailed ? skillJobs : null;
   const waitingForSkills = skillsApply && !skillJobsReady;
-  const noSkillsYet = skillsApply && Boolean(mySkillsData) && !mySkills.length;
   const { data: jobPages, isLoading, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, isError, error, refetch } = useInfiniteQuery({
     queryKey: ["jobs", status === "Applied" ? "mine" : showAllJobs ? "all" : user?.email, gatewayDateFilter, search, status, order.orderBy, order.orderDir, jobCategory, jobSubcategory, serverSkill, jobIds],
     queryFn: ({ pageParam }) => status === "Applied" ? queryClient.fetchQuery(myAppliedQuery(true)) : api.getJobsPage({ page: pageParam, perPage: 20, dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs, search, status, orderBy: order.orderBy, orderDir: order.orderDir, category: jobCategory, subcategory: jobSubcategory, skill: serverSkill, jobIds }),
@@ -183,6 +185,8 @@ export default function Jobs() {
     queryFn: ({ pageParam }) => api.getSkills({ page: pageParam, perPage: 50 }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => (lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined),
+    // Only loaded when something shows it: the skill chips (Department and Role picked), the filters or Live search.
+    enabled: Boolean(jobCategory && jobSubcategory) || Boolean(skillDialog) || liveSearching,
   });
   const root = useRef(null);
   const loadMoreRef = useRef(null);
@@ -212,20 +216,6 @@ export default function Jobs() {
     () => uniqueById(asArray(skillPages?.pages).flatMap((page) => asArray(page?.records))).sort((a, b) => asText(a.name).localeCompare(asText(b.name))),
     [skillPages],
   );
-  // Job counts per skill follow the scope and date window, like the pipeline counts; fetched once every skill page is in.
-  const skillNames = useMemo(() => skillRecords.map((record) => record.name), [skillRecords]);
-  const { data: skillCountsData, isFetching: isFetchingSkillCounts, refetch: refetchSkillCounts } = useQuery({
-    queryKey: ["skill-counts", showAllJobs ? "all" : user?.email, gatewayDateFilter, skillNames, jobCategory, jobSubcategory],
-    queryFn: () => api.getSkillCounts({ skills: skillNames, dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs, category: jobCategory, subcategory: jobSubcategory }),
-    enabled: Boolean(user?.email) && skillNames.length > 0 && !hasMoreSkills,
-    placeholderData: (previous) => previous,
-  });
-  const skillCounts = asObject(skillCountsData);
-  // Most jobs first; ties and not-yet-counted skills stay alphabetical.
-  const rankedSkillRecords = useMemo(
-    () => [...skillRecords].sort((a, b) => (skillCounts[b.name] ?? -1) - (skillCounts[a.name] ?? -1) || asText(a.name).localeCompare(asText(b.name))),
-    [skillRecords, skillCounts],
-  );
   // Category / sub category choices: the outr_skills dropdown_lists (the same keys the jobs use), with job counts from get_stats.
   const { data: groupOptionsData } = useQuery({ queryKey: ["skills", "group-options"], queryFn: () => api.getGroupOptions(), staleTime: 10 * 60_000 });
   const groupOptions = groupOptionsData || EMPTY_GROUP_OPTIONS;
@@ -244,6 +234,24 @@ export default function Jobs() {
     enabled: skillsReady,
     placeholderData: (previous) => previous,
   });
+  // Job counts per skill follow the scope and date window, like the pipeline counts. Only the chips shown are counted
+  // (that Role's skills and any picked ones), and only once a Role is picked.
+  const countedSkillNames = useMemo(
+    () => (skillsReady ? [...new Set([...asArray(groupSkillRecords).map((record) => record.name), ...skills])].filter(Boolean).sort() : []),
+    [skillsReady, groupSkillRecords, skills],
+  );
+  const { data: skillCountsData, isFetching: isFetchingSkillCounts, refetch: refetchSkillCounts } = useQuery({
+    queryKey: ["skill-counts", showAllJobs ? "all" : user?.email, gatewayDateFilter, countedSkillNames, jobCategory, jobSubcategory],
+    queryFn: () => api.getSkillCounts({ skills: countedSkillNames, dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs, category: jobCategory, subcategory: jobSubcategory }),
+    enabled: Boolean(user?.email) && countedSkillNames.length > 0,
+    placeholderData: (previous) => previous,
+  });
+  const skillCounts = asObject(skillCountsData);
+  // Most jobs first; ties and not-yet-counted skills stay alphabetical.
+  const rankedSkillRecords = useMemo(
+    () => [...skillRecords].sort((a, b) => (skillCounts[b.name] ?? -1) - (skillCounts[a.name] ?? -1) || asText(a.name).localeCompare(asText(b.name))),
+    [skillRecords, skillCounts],
+  );
   // Every sub category in the CRM dropdown is offered, each with its job count.
   const subcategoryOptions = groupOptions.subcategory;
   // Chips appear once a sub category is picked. Skills already picked stay so they can still be removed.
@@ -396,6 +404,9 @@ export default function Jobs() {
   const changeSort = (value) => { setSort(value); saveJobSort(value); };
   const toggleSkill = (skill) => setSkills((current) => (current.includes(skill) ? current.filter((item) => item !== skill) : [...current, skill]));
   const changeTab = (item) => { const next = tab === item ? "All" : item; setTab(next); saveJobStatus(next); };
+  const changeMySkills = (on) => { setMySkillsChecked(on); saveMySkillsFilter(on); };
+  // Ticking My skills with none picked yet opens the picker; it turns on once some are saved.
+  const toggleMySkills = (on) => (on && !mySkills.length ? setMySkillsOpen(true) : changeMySkills(on));
   const toggleReactionFilter = (key) => setReactionFilter((current) => ({ ...current, [key]: !current[key] }));
   const noSavedYet = savedOnly && !reactions.saved.length;
   const noLikedYet = likedOnly && !reactions.liked.length;
@@ -475,7 +486,7 @@ export default function Jobs() {
                   <Funnel size={16} weight={filterCount ? "fill" : "regular"} />
                   {filterCount > 0 && <span className="absolute -right-1 -top-1 grid size-4.5 place-items-center rounded-full bg-[var(--text)] text-[9px] font-bold text-[var(--paper)] ring-2 ring-[var(--surface)]">{filterCount}</span>}
                 </button>
-                <RefreshFilterButton onClick={() => { refetch(); refetchStats(); refetchSkillCounts(); }} loading={isFetching || isFetchingStats || isFetchingSkillCounts} label="Refresh jobs" />
+                <RefreshFilterButton onClick={() => { refetch(); refetchStats(); if (countedSkillNames.length) refetchSkillCounts(); }} loading={isFetching || isFetchingStats || isFetchingSkillCounts} label="Refresh jobs" />
               </div>
             </div>
 
@@ -500,12 +511,16 @@ export default function Jobs() {
                   {preferencesApply && preferredJobsData && <span title={`${hotJobsCount} hot job${hotJobsCount === 1 ? "" : "s"} match your preferences`} className="mr-0.5 inline-flex items-center gap-1 rounded-full bg-[#fff1e6] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#c2410c] ring-1 ring-[#fed7aa] dark:bg-[#3b1d0e] dark:text-[#fdba74] dark:ring-[#7c2d12]"><Fire size={10} weight="fill" className="text-[#f97316]" />{hotJobsCount}</span>}
                   <button type="button" onClick={() => setPreferencesOpen(true)} aria-label="Edit my preferences" title="Edit my preferences" className="mr-1 grid size-7 place-items-center rounded-full text-[var(--muted)] transition-colors hover:bg-black/5 hover:text-[var(--ink)] dark:hover:bg-white/10"><GearSix size={14} weight="bold" /></button>
                 </span>
-                {/* My skills: the jobs always follow them; click to add, remove or create skills (saved in the CRM). */}
-                <span className="text-xs font-semibold"><button type="button" onClick={() => setMySkillsOpen(true)} aria-label="Edit my skills" title={mySkills.length ? `Jobs shown for my skills: ${mySkills.map((skill) => skill.name).join(", ")}. Click to add or remove skills.` : "No skills yet: click to add yours"} className={`inline-flex shrink-0 items-center gap-2 rounded-full py-2 pl-3.5 pr-2 ring-1 transition-colors ${mySkills.length ? "bg-(--lime)/35 text-[var(--ink)] ring-[var(--lime-dark)]/40 hover:ring-[var(--lime-dark)]" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[var(--lime-dark)]/60"}`}>
-                  <Sparkle size={14} weight="fill" className="text-[var(--accent-strong)]" />My skills
+                {/* My skills: ticked, only the jobs for the user's skills show; the gear picks the skills (saved in the CRM).
+                    Ticking it with no skills yet opens the picker. */}
+                <span className={`inline-flex shrink-0 items-center rounded-full ring-1 transition-colors ${skillsOn && mySkills.length ? "bg-(--lime)/35 ring-[var(--lime-dark)]/40" : "bg-[var(--surface)] ring-[var(--line)]"}`}>
+                  <label className="inline-flex cursor-pointer items-center gap-2 py-2 pl-3.5 pr-2 text-xs font-semibold text-[var(--ink)]" title={mySkills.length ? `Show only the jobs for my skills: ${mySkills.map((skill) => skill.name).join(", ")}` : "No skills yet: tick to pick yours"}>
+                    <input type="checkbox" checked={mySkillsChecked && mySkills.length > 0} onChange={(event) => toggleMySkills(event.target.checked)} className="size-3.5 accent-[var(--lime-dark)]" />
+                    My skills
+                  </label>
                   {mySkills.length > 0 && <span className="rounded-full bg-[var(--surface)] px-2 py-0.5 font-mono text-[10px] tabular-nums text-[var(--muted)] ring-1 ring-[var(--line)]">{mySkills.length}</span>}
-                  <GearSix size={14} weight="bold" className="text-[var(--muted)]" />
-                </button></span>
+                  <button type="button" onClick={() => setMySkillsOpen(true)} aria-label="Edit my skills" title="Pick my skills" className="mx-1 grid size-7 place-items-center rounded-full text-[var(--muted)] transition-colors hover:bg-black/5 hover:text-[var(--ink)] dark:hover:bg-white/10"><GearSix size={14} weight="bold" /></button>
+                </span>
               </div>
               <span aria-hidden="true" className="hidden h-6 w-px shrink-0 bg-[var(--line)] sm:block" />
               {/* Skills: Department (CRM category) -> Role (CRM sub category) -> that role's skills. The gateway filters each step. */}
@@ -630,8 +645,7 @@ export default function Jobs() {
                       : <Briefcase size={22} />}
                   </div>
                   <h3 className="mt-5 text-xl font-semibold">
-                    {noSkillsYet ? "No skills yet"
-                      : noSavedYet ? "No saved jobs yet"
+                    {noSavedYet ? "No saved jobs yet"
                       : noLikedYet ? "No liked jobs yet"
                       : savedOnly || likedOnly ? "No liked or saved jobs match these filters"
                       : skillsApply ? "No jobs for your skills match these filters"
@@ -639,16 +653,14 @@ export default function Jobs() {
                       : "No matching jobs"}
                   </h3>
                   <p className="mt-2 text-sm text-[var(--muted)]">
-                    {noSkillsYet ? "Add the skills you work with to see the jobs for them."
-                      : noSavedYet ? "Click the bookmark icon on any job card to save it here for fast review."
+                    {noSavedYet ? "Click the bookmark icon on any job card to save it here for fast review."
                       : noLikedYet ? "Click the heart icon on any job card to save it to your liked jobs list."
                       : savedOnly || likedOnly ? "Try another status tab, skill or time window, or turn off Saved or Liked."
-                      : skillsApply ? "Try another status tab, time window or search, or add more skills with My skills."
+                      : skillsApply ? "Try another status tab, time window or search, or add more skills with My skills, or untick it."
                       : hasNextPage ? "Loading more results from the next page."
                       : search ? `Nothing matches “${search}”. Try another word.`
                       : "Try another skill, time window, or search term."}
                   </p>
-                  {noSkillsYet && <button type="button" onClick={() => setMySkillsOpen(true)} className={`${primaryButton} mt-5`}>Add my skills</button>}
                   {(savedOnly || likedOnly) && (
                     <button type="button" onClick={() => setReactionFilter(EMPTY_REACTION_FILTER)} className={`${primaryButton} mt-5`}>
                       Browse all jobs
@@ -662,7 +674,7 @@ export default function Jobs() {
         {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={jobStatus.markApplied} applyError={jobStatus.errorId === preview.id ? `Could not mark this job as applied: ${jobStatus.error?.message || "please try again."}` : ""} />}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}
-        {mySkillsOpen && <MySkillsDialog onClose={() => setMySkillsOpen(false)} />}
+        {mySkillsOpen && <MySkillsDialog onClose={() => setMySkillsOpen(false)} onSaved={(saved) => saved.length && changeMySkills(true)} />}
         {preferencesOpen && <JobPreferencesDialog user={user} enabled={usePreferences} allJobs={showAllJobs} preferences={preferences} options={preferenceOptions} onClose={() => setPreferencesOpen(false)} />}
         {skillDialog && <OpportunityFilterDialog key={skillDialog} skillsOnly={skillDialog === "skills"} skills={skills} extraFilters={extraFilters} skillRecords={skillRecords} groupOptions={groupOptions} group={skillGroup} isLoading={skillsLoading || isFetchingMoreSkills} error={skillsError ? skillsQueryError : null} onClose={() => setSkillDialog(false)} onApply={({ skills: nextSkills, extraFilters: nextFilters, group }) => { setSkills(nextSkills); setExtraFilters(nextFilters); if (group) setSkillGroup(group); setSkillDialog(false); }} onRemove={({ skills: nextSkills, extraFilters: nextFilters }) => { setSkills(nextSkills); setExtraFilters(nextFilters); }} />}
       </main>

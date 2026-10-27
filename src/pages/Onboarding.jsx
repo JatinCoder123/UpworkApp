@@ -6,11 +6,10 @@ import { ArrowRight, Brain, Briefcase, Broadcast, Bug, CaretDown, Check, Code, M
 import { Mark, primaryButton } from '../components/ui'
 import ThemeToggle from '../components/ThemeToggle'
 import GridPattern from '../components/GridPattern'
-import SkillsPicker from '../components/SkillsPicker'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../services/api'
 import { asArray, asText } from '../lib/safe'
-import { needsRole, needsSkills } from '../lib/permissions'
+import { needsRole } from '../lib/permissions'
 
 const ROLE_ICONS = {
   developer: Code,
@@ -179,18 +178,15 @@ function HowItWorks() {
 }
 
 /**
- * First login: a user with no role picks one (saved in their CRM user's Role field) and a user with no skills picks theirs
- * (linked to their CRM user; one not in the list can be typed in and is created), then the app opens their workspace.
+ * First login: a user with no role picks one (saved in their CRM user's Role field), then the app opens their workspace.
+ * Skills are picked later on the Jobs page (My skills).
  */
 export default function Onboarding() {
-  const { user, chooseRole, skillsSaved, logout } = useAuth()
+  const { user, chooseRole, logout } = useAuth()
   const navigate = useNavigate()
   const root = useRef(null)
   const [roleId, setRoleId] = useState('')
-  const [skills, setSkills] = useState([])
-  // Only what is still missing is asked for.
   const askRole = needsRole(user)
-  const askSkills = needsSkills(user)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const { data, isLoading, isError, error: loadError, refetch } = useQuery({ queryKey: ['crm-roles'], queryFn: api.getRoles, staleTime: 5 * 60_000, enabled: askRole })
@@ -208,22 +204,17 @@ export default function Onboarding() {
     return () => ctx.revert()
   }, [])
 
-  const ready = (!askRole || Boolean(selected)) && (!askSkills || skills.length > 0)
+  const ready = !askRole || Boolean(selected)
   const submit = async (event) => {
     event.preventDefault()
     if (!ready || saving) return
     setSaving(true)
     setError('')
     try {
-      // Skills first (new ones are created), then the role. Once both are saved, the onboarding route sends the user
-      // on to the first page they can open.
-      if (askSkills) {
-        await api.saveMySkills(user.email, skills)
-        skillsSaved()
-      }
+      // Once the role is saved, the onboarding route sends the user on to the first page they can open.
       if (askRole) await chooseRole(selected)
     } catch (saveError) {
-      setError(saveError?.message || (askRole ? 'Your role and skills could not be saved. Please try again.' : 'Your skills could not be saved. Please try again.'))
+      setError(saveError?.message || 'Your role could not be saved. Please try again.')
       setSaving(false)
     }
   }
@@ -262,7 +253,7 @@ export default function Onboarding() {
       </div>
     </section>
 
-    {/* Role and skills step: follows the light / dark theme. */}
+    {/* Role step: follows the light / dark theme. */}
     <section className="relative isolate flex min-h-[100dvh] min-w-0 flex-col overflow-hidden px-4 py-5 sm:px-8 lg:px-14 lg:py-6">
       <GridPattern width={72} height={72} squares={[[2, 2], [7, 4], [12, 1], [5, 9]]} className="app-grid-pattern pointer-events-none absolute inset-0 -z-10" />
       <div className="flex items-center justify-between gap-3">
@@ -277,7 +268,7 @@ export default function Onboarding() {
         <form data-enter onSubmit={submit} className="mx-auto w-full max-w-[29rem] rounded-[2rem] bg-[var(--ink)]/[.04] p-2 ring-1 ring-[var(--line)]/70 dark:bg-white/[.03]">
           <div className="rounded-[calc(2rem-.5rem)] bg-[var(--surface)] px-5 py-7 shadow-[0_30px_80px_rgba(30,40,25,.1)] dark:shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:px-8 sm:py-10">
             <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">Workspace setup</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-.045em] text-[var(--text)]">{askRole && askSkills ? 'Your role and skills' : askRole ? 'Select your role' : 'Select your skills'}</h2>
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-.045em] text-[var(--text)]">Select your role</h2>
 
             {askRole && <>
               <p id="onboarding-role-label" className="mt-8 text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Role</p>
@@ -287,13 +278,6 @@ export default function Onboarding() {
                   : <RolePicker roles={roles} value={roleId} onChange={(id) => { setRoleId(id); setError('') }} loading={isLoading} disabled={saving} />}
               </div>
             </>}
-
-            {/* Skills: from the Skills list, or typed in when not there (created when saved). The Jobs page can show
-                the jobs for them (My skills). */}
-            {askSkills && <div className={askRole ? 'mt-6' : 'mt-8'}>
-              <SkillsPicker skills={skills} onChange={(next) => { setSkills(next); setError('') }} allowNew label="Your skills" noneLabel="(pick at least one)" noneHint="Pick at least one skill" />
-              <p className="mt-2 text-[11px] leading-5 text-[var(--muted)]">Can't find yours? Type it in the search and add it as a new skill.</p>
-            </div>}
 
             {error && <p role="alert" className="mt-4 flex items-start gap-2 rounded-2xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" />{error}</p>}
 

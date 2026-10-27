@@ -10,14 +10,6 @@ export const DOWNLOAD_URL = import.meta.env?.VITE_DOWNLOAD_URL || `${CRM_BASE_UR
 export const VIEW_DOC_URL = import.meta.env?.VITE_VIEW_DOC_URL || `${CRM_BASE_URL}/index.php?entryPoint=viewdoc`;
 export const MCP_CRM_BASE_URL = (import.meta.env?.VITE_MCP_CRM_BASE_URL || "https://crm.outrightsystems.org").replace(/\/$/, "");
 export const MCP_SMART_GATEWAY_URL = import.meta.env?.VITE_MCP_SMART_GATEWAY_URL || `${MCP_CRM_BASE_URL}/index.php?entryPoint=smart_gateway`;
-export const MCP_AGENT_URL = import.meta.env?.VITE_MCP_AGENT_URL || `${MCP_CRM_BASE_URL}/index.php?entryPoint=mcp`;
-
-export const getMcpAgentUrl = () => {
-  if (import.meta.env.DEV && typeof window !== "undefined" && window.location.origin.includes("localhost")) {
-    return "/mcp-proxy/index.php?entryPoint=mcp";
-  }
-  return MCP_AGENT_URL;
-};
 
 export const getMcpSmartGatewayUrl = () => {
   if (import.meta.env.DEV && typeof window !== "undefined" && window.location.origin.includes("localhost")) {
@@ -509,25 +501,24 @@ function mapEngagement(value) {
   };
 }
 
-// `jobIds`: count only these jobs (the user's skills, see fetchSkillJobIds); get_stats cannot filter by a list of ids,
-// so each count is then the total of a one-record fetch.
+// The counts the Jobs page shows: My Jobs / All Jobs, and per scope New (New + Seen) and Rejected (Applied is counted
+// from the user's own applications). `jobIds`: count only these jobs (the user's skills, see fetchSkillJobIds);
+// get_stats cannot filter by a list of ids, so each count is then the total of a one-record fetch, with New and Seen
+// counted together (returned as *_new) to keep it to 6 requests.
 export async function fetchJobStats({ dateFilter, userEmail, category = "", subcategory = "", skill = "", jobIds = null } = {}) {
   const assignedUserId = await findGatewayUserIdByEmail(userEmail);
   // The tab counts follow the skills section (category, sub category, single skill), like the list. get_stats ignores
   // the LIKE filter the list uses, so the skill is matched with its search on the skills field instead (same result).
   const group = skillGroupFilters({ category, subcategory });
   const skillSearch = asText(skill).trim() ? { search: asText(skill).trim(), search_fields: ["skills"] } : {};
-  const statuses = ["New", "Seen", "Applied", "Rejected"];
+  const statuses = Array.isArray(jobIds) ? [["new", { in: ["New", "Seen"] }], ["rejected", "Rejected"]] : [["new", "New"], ["seen", "Seen"], ["rejected", "Rejected"]];
   const queries = [
     { key: "my_total", module: JOBS_MODULE, filters: { ai_processed: 1, assigned_user_id: assignedUserId } },
     { key: "all_total", module: JOBS_MODULE, filters: { ai_processed: 1 } },
-    ...statuses.flatMap((status) => {
-      const statusKey = status.toLowerCase();
-      return [
-        { key: `my_${statusKey}`, module: JOBS_MODULE, filters: { ai_processed: 1, assigned_user_id: assignedUserId, status } },
-        { key: `all_${statusKey}`, module: JOBS_MODULE, filters: { ai_processed: 1, status } },
-      ];
-    }),
+    ...statuses.flatMap(([statusKey, status]) => [
+      { key: `my_${statusKey}`, module: JOBS_MODULE, filters: { ai_processed: 1, assigned_user_id: assignedUserId, status } },
+      { key: `all_${statusKey}`, module: JOBS_MODULE, filters: { ai_processed: 1, status } },
+    ]),
   ].map((query) => ({ ...query, ...skillSearch, filters: { ...query.filters, ...group } }));
   if (Array.isArray(jobIds)) {
     const counts = await Promise.all(queries.map(async ({ key, module, filters, ...search }) => {
@@ -893,6 +884,96 @@ export async function fetchAutoFeedStatus(id) {
 export async function saveAutoFeed(spec) {
   const data = await autoFeed("", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(spec) });
   return { id: asText(data.id), recordUrl: asText(data.record_url) };
+}
+
+// ----------------------------------------------------
+// API Playground (CRM entryPoint=apiPlayground): a test sends a requirement to Claude, either as is ("custom", the
+// reply comes back at once) or to generate a doc, blog, appscript, video or image (queued, then run by the CRM's
+// worker). A stored prompt and guideline can be picked; left out, the action's defaults are used. Every test is a
+// record in the CRM's Playground module (outr_playground) and its result a Note linked to it.
+// ----------------------------------------------------
+
+export const API_PLAYGROUND_URL = import.meta.env?.VITE_API_PLAYGROUND_URL || `${CRM_BASE_URL}/index.php?entryPoint=apiPlayground`;
+export const PLAYGROUND_MODULE_URL = `${CRM_BASE_URL}/index.php?module=outr_playground&action=index`;
+
+async function apiPlayground(query = "", init = undefined) {
+  // In development through the dev proxy (same site); on the live site straight to the CRM.
+  const base = import.meta.env?.DEV ? "/crm-entrypoint/index.php?entryPoint=apiPlayground" : API_PLAYGROUND_URL;
+  let response;
+  try {
+    response = await fetch(`${base}${query}`, init);
+  } catch (err) {
+    if (err?.name === "AbortError") throw err;
+    throw createAppError("PLAYGROUND_UNREACHABLE", "The API Playground could not be reached. Check the connection and try again.");
+  }
+  const data = await response.json().catch(() => null);
+  // Errors come as { success: false, errors: [...] }; the examples reply has no `success` at all.
+  if (!data || typeof data !== "object" || data.success === false || !response.ok) {
+    const errors = asArray(data?.errors).map(asText).filter(Boolean);
+    throw createAppError("PLAYGROUND_FAILED", errors.join("\n") || asText(data?.message) || `The API Playground failed (${response.status}).`, { errors });
+  }
+  return data;
+}
+
+const namedRef = (value) => (value?.id || value?.name ? { id: asText(value.id), name: asText(value.name) } : null);
+
+// One test, as `status`, `list` and a POST return it.
+const mapPlaygroundTest = (test) => ({
+  id: asText(test.id),
+  title: decodeHtml(asText(test.title)),
+  action: asText(test.action),
+  status: asText(test.status) || "queued",
+  response: asText(test.response),
+  result: test.result ?? null,
+  requirement: asText(test.requirement),
+  viewUrl: asText(test.view_url),
+  downloadUrl: asText(test.download_url),
+  noteId: asText(test.note_id),
+  prompt: namedRef(test.prompt),
+  guideline: namedRef(test.guideline),
+  error: asText(test.error),
+  updated: asText(test.updated),
+  recordUrl: asText(test.record_url),
+  raw: test,
+});
+
+// What a test can use: { actions, defaultPrompts: { action: prompt name }, prompts: [{ id, name, type }], guidelines: [{ id, name }] }.
+export async function fetchPlaygroundOptions() {
+  const data = await apiPlayground("&action=options");
+  const named = (list) => asArray(list).filter((item) => item?.id).map((item) => ({ id: asText(item.id), name: asText(item.name), type: asText(item.type) }));
+  return {
+    actions: asArray(data.actions).map(asText).filter(Boolean),
+    defaultPrompts: asObject(data.default_prompts),
+    prompts: named(data.prompts).sort((a, b) => a.name.localeCompare(b.name)),
+    guidelines: named(data.guidelines).sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+
+// Ready-made request bodies, by name (custom, doc, blog, …).
+export async function fetchPlaygroundExamples() {
+  const { success: _success, ...examples } = await apiPlayground("&action=example");
+  return Object.fromEntries(Object.entries(examples).filter(([, body]) => body && typeof body === "object"));
+}
+
+// The latest 50 tests, newest first.
+export async function fetchPlaygroundTests() {
+  const data = await apiPlayground("&action=list");
+  return asArray(data.tests).filter((test) => test?.id).map(mapPlaygroundTest);
+}
+
+// One test with its generated result.
+export async function fetchPlaygroundTest(id) {
+  return mapPlaygroundTest(await apiPlayground(`&action=status&id=${encodeURIComponent(id)}`));
+}
+
+// Starts a test. `custom` answers at once (status completed); the other actions come back queued.
+export async function runPlaygroundTest(body, { signal } = {}) {
+  return mapPlaygroundTest(await apiPlayground("", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal }));
+}
+
+// Runs a saved test again.
+export async function rerunPlaygroundTest(id) {
+  return mapPlaygroundTest(await apiPlayground(`&action=run&id=${encodeURIComponent(id)}`, { method: "POST" }));
 }
 
 // Why each job was rejected: the reason in its latest "Rejected: …" activity entry, as { [jobId]: reason }.
@@ -1527,7 +1608,8 @@ export async function saveUserSkills(userId, skills) {
   return fetchUserSkills(userId);
 }
 
-// The ids of every scored job linked to any of these skills, for the Jobs page's "My skills" filter.
+// The ids of every scored job linked to any of these skills (outr_skills <-> outr_upwork_jobs), for the Jobs page's
+// "My skills" filter.
 export async function fetchSkillJobIds(skillIds = []) {
   const ids = [...new Set(asArray(skillIds).filter(Boolean))];
   const lists = await Promise.all(ids.map((id) => fetchEveryPage({ action: "fetch_related", module: SKILLS_MODULE, id, related_module: JOBS_MODULE, filters: { ai_processed: 1 }, fields: ["id"] })));
@@ -2587,30 +2669,6 @@ export async function mcpSmartGateway(payload, { timeout = 60_000, signal } = {}
   }
 }
 
-// The API Playground only offers credentials ticked "API Playground" in the CRM (outr_credentials.is_payload = 1).
-const PLAYGROUND_FILTER = { is_payload: 1 };
-
-// The APIs with a "Test <API>" button. Each one's ticked credentials are picked by the gateway, by name,
-// so a credential added or ticked in the CRM later (e.g. one named "Claude ...") shows up on its own.
-export const PLAYGROUND_APIS = [
-  { key: "claude", label: "Claude", match: "claude" },
-  { key: "chatgpt", label: "ChatGPT", match: "chatgpt" },
-  { key: "upwork", label: "Upwork", match: "upwork" },
-];
-
-// { records: every ticked credential (the dropdown), groups: [{ key, label, credentials }] (the Test buttons),
-//   options: the CRM's own API type and status choices (the create form) }.
-export async function fetchPlaygroundCredentials() {
-  const [all, ...groups] = await Promise.all([
-    fetchCredentials({ perPage: 100, filters: PLAYGROUND_FILTER }),
-    ...PLAYGROUND_APIS.map(async (target) => ({
-      ...target,
-      credentials: (await fetchCredentials({ perPage: 100, filters: { ...PLAYGROUND_FILTER, name: { like: `%${target.match}%` } } })).records,
-    })),
-  ]);
-  return { ...all, groups };
-}
-
 export async function fetchCredentials({ page = 1, perPage = 100, filters = {} } = {}) {
   const data = await mcpSmartGateway({
     action: "fetch",
@@ -2683,54 +2741,10 @@ export async function deleteCredential(id) {
   });
 }
 
-/*
- * One step of the CRM MCP agent (the same endpoint the CRM's own mcp_ui page uses).
- * Body: { message, user } to start, then { job_id, user } while the reply has `has_more`.
- * Reply: { success, message, job_id, status, has_more, tool_count, actions: [{ step, action, module, id, status, detail }] }.
- * The agent does not need a key. `agentKey` is only sent when a real agent key is given; never pass an API
- * credential's token here (the agent ignores it, and it would only expose the secret).
- * CORS: the endpoint allows only the Content-Type and X-Agent-Key headers.
- */
-export async function runMcpAgentStep(body, { agentKey, signal } = {}) {
-  const headers = { "Content-Type": "application/json" };
-  if (agentKey) headers["X-Agent-Key"] = agentKey;
-
-  const send = (url) => fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
-  const primaryUrl = getMcpAgentUrl();
-  let response;
-  try {
-    response = await send(primaryUrl);
-  } catch (err) {
-    if (err.name === "AbortError") throw err;
-    // Local dev proxy unavailable: try the CRM directly.
-    if (primaryUrl === MCP_AGENT_URL) throw createAppError("NETWORK_ERROR", "Unable to reach the agent server. Please check your connection.");
-    try {
-      response = await send(MCP_AGENT_URL);
-    } catch (directErr) {
-      if (directErr.name === "AbortError") throw directErr;
-      throw createAppError("NETWORK_ERROR", "Unable to reach the agent server. Please check your connection.");
-    }
-  }
-
-  const raw = await response.text();
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    throw createAppError("PARSE_ERROR", `The agent server did not answer with JSON (HTTP ${response.status}): ${raw.trim().slice(0, 150) || "empty response"}`, { status: response.status });
-  }
-  if (!response.ok || data?.success === false) {
-    throw createAppError("AGENT_ERROR", data?.message || data?.error || `The agent server answered HTTP ${response.status}.`, { status: response.status, data, jobId: data?.job_id });
-  }
-  return data;
-}
-
 export const api = {
   getCredentials: fetchCredentials,
-  getPlaygroundCredentials: fetchPlaygroundCredentials,
   createCredential,
   deleteCredential,
-  runMcpAgentStep,
   getJobs: (params) => fetchJobs(params),
   getJobsPage: (params) => fetchJobsPage(params),
   getJobStats: (params) => fetchJobStats(params),
@@ -2755,6 +2769,12 @@ export const api = {
   getAutoFeed: (id) => fetchAutoFeed(id),
   getAutoFeedStatus: (id) => fetchAutoFeedStatus(id),
   saveAutoFeed: (spec) => saveAutoFeed(spec),
+  getPlaygroundOptions: () => fetchPlaygroundOptions(),
+  getPlaygroundExamples: () => fetchPlaygroundExamples(),
+  getPlaygroundTests: () => fetchPlaygroundTests(),
+  getPlaygroundTest: (id) => fetchPlaygroundTest(id),
+  runPlaygroundTest: (body, options) => runPlaygroundTest(body, options),
+  rerunPlaygroundTest: (id) => rerunPlaygroundTest(id),
   getSkillCounts: (params) => fetchSkillCounts(params),
   getGroupOptions: (module) => fetchGroupOptions(module),
   getJobGroupCounts: (params) => fetchJobGroupCounts(params),

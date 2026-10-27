@@ -83,7 +83,9 @@ export default function FeedSection({ definition, onSettings }) {
   ], [fields])
 
   const [search, setSearch] = useState('')
-  const [filters, setFilters] = useState(emptyFilters)
+  const [pickedFilters, setFilters] = useState(emptyFilters)
+  // Every current dropdown field has a list, also when the feed's fields arrive or change after the first render.
+  const filters = useMemo(() => Object.fromEntries(Object.keys(emptyFilters).map((key) => [key, asArray(pickedFilters[key])])), [emptyFilters, pickedFilters])
   const [dateFilter, setDateFilter] = useState(EMPTY_DATE_RANGE)
   const [sort, setSort] = useState('newest')
   const [filterDialog, setFilterDialog] = useState(false)
@@ -107,7 +109,7 @@ export default function FeedSection({ definition, onSettings }) {
   const filterCount = countFilters(filters)
   const hasFilters = Boolean(search || filterCount || dateFilter.preset !== 'all')
   const clearAll = () => { setSearch(''); setFilters(emptyFilters); setDateFilter(EMPTY_DATE_RANGE) }
-  const removeFilter = (key, value) => setFilters((current) => ({ ...current, [key]: current[key].filter((entry) => entry !== value) }))
+  const removeFilter = (key, value) => setFilters((current) => ({ ...current, [key]: asArray(current[key]).filter((entry) => entry !== value) }))
   const activeChips = Object.keys(filterFields).flatMap((key) => (filters[key] || []).map((value) => [key, value, labelOf(key, value)]))
   const listSection = filterSections.find((entry) => entry.key === listKey)
   const noun = title.toLowerCase()

@@ -202,11 +202,11 @@ function UserAccess({ summary, roles, permissions, isSelf }) {
 }
 
 // The user's skills (CRM: Users <-> Skills): the admin adds, removes or creates them (a skill typed in that the Skills
-// module does not have is created), then saves. A user left with no skills picks theirs at their next login. The
-// user's Jobs page shows the jobs for these skills.
+// module does not have is created), then saves. The user's Jobs page shows
+// the jobs for these skills (My skills).
 function UserSkills({ userId, name, isSelf }) {
   const queryClient = useQueryClient()
-  const { user: me, skillsSaved } = useAuth()
+  const { user: me } = useAuth()
   const skillsQuery = useQuery({ queryKey: ['user-skills', userId], queryFn: () => api.getUserSkills(userId) })
   const saved = asArray(skillsQuery.data)
   const [draft, setDraft] = useState(null)
@@ -226,7 +226,6 @@ function UserSkills({ userId, name, isSelf }) {
       // The admin's own skills: their Jobs page follows at once.
       if (isSelf) {
         queryClient.setQueryData(['my-skills', me?.email], next)
-        if (next.length) skillsSaved()
       }
     } catch (saveError) {
       setError(saveError)

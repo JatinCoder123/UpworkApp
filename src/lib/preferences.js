@@ -79,6 +79,17 @@ export function saveReactionFilter(filter) {
   try { localStorage.setItem(JOB_REACTION_FILTER_KEY, JSON.stringify(filter)) } catch { /* storage unavailable */ }
 }
 
+const MY_SKILLS_FILTER_KEY = 'pitchflow-my-skills-filter'
+
+// The Jobs page's "My skills" checkbox: on (the default) shows only the jobs for the user's skills.
+export function loadMySkillsFilter() {
+  try { return localStorage.getItem(MY_SKILLS_FILTER_KEY) !== 'off' } catch { return true }
+}
+
+export function saveMySkillsFilter(on) {
+  try { localStorage.setItem(MY_SKILLS_FILTER_KEY, on ? 'on' : 'off') } catch { /* storage unavailable */ }
+}
+
 const JOB_SORT_KEY = 'pitchflow-job-sort'
 const JOB_EXTRA_FILTERS_KEY = 'pitchflow-job-extra-filters'
 
