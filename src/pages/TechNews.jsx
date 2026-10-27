@@ -337,10 +337,12 @@ export default function TechNews() {
         <section className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
           <div className="space-y-4 rounded-[calc(2rem-.375rem)] bg-[var(--surface)] px-4 py-4 sm:px-6">
             {/* Top Row: Source Types (Left) + Search & Filter (Right) */}
-            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            {/* On a tablet the search group wraps under the title and tabs instead of squeezing the tabs away; from lg
+                up everything fits on one row (the tabs scroll). */}
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:flex-wrap md:items-center lg:flex-nowrap">
               <h1 className="shrink-0 text-2xl font-semibold tracking-[-.04em]">AI News</h1>
               {/* Source Type Tabs in rounded-full pill container (multi-select, "All" inside filter) */}
-              <HScroll className="rounded-full bg-[var(--paper)] p-1" innerClassName="gap-1" fade="var(--paper)" label="source types">
+              <HScroll className="max-w-[40rem] rounded-full bg-[var(--paper)] p-1" innerClassName="gap-1" fade="var(--paper)" label="source types">
                 {SOURCE_TYPE_TABS.map((item) => {
                   const isSelected = selectedSourceTypes.includes(item)
                   const count = sourceTypeCounts[item] ?? 0
@@ -378,7 +380,7 @@ export default function TechNews() {
               </HScroll>
 
               {/* Layout Toggle + Search Bar + Filter Button (Matching Opportunity Desk) */}
-              <div className="flex items-center gap-2.5 shrink-0">
+              <div className="flex items-center gap-2.5 shrink-0 md:ml-auto">
                 <LayoutToggle
                   layout={layout}
                   onChange={(next) => {

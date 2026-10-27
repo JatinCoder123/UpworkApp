@@ -55,8 +55,11 @@ const SECTIONS = [
   },
 ]
 
-export default function PromptManagerDialog({ onClose }) {
-  const [tab, setTab] = useState('prompts')
+export default function PromptManagerDialog({ onClose, tab: tabProp, onTab, openId, onOpen }) {
+  // The tab and the open item come from the caller when it keeps them (Shell: in the URL); otherwise they live here.
+  const [ownTab, setOwnTab] = useState('prompts')
+  const tab = SECTIONS.some((entry) => entry.id === tabProp) ? tabProp : ownTab
+  const setTab = (id) => { setOwnTab(id); onTab?.(id) }
   const section = SECTIONS.find((entry) => entry.id === tab)
   const tabClass = (active) => `inline-flex items-center gap-2 rounded-full px-4 py-2 transition-colors ${active ? 'bg-[var(--ink)] text-white dark:bg-(--lime) dark:text-[#26320b]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`
   return <Modal onClose={onClose} full contained>
@@ -66,16 +69,18 @@ export default function PromptManagerDialog({ onClose }) {
       <nav aria-label="Prompt management sections" className="mt-4 flex w-fit flex-wrap gap-1 rounded-full bg-[var(--paper)] p-1 text-xs font-semibold ring-1 ring-[var(--line)]/70">
         {SECTIONS.map(({ id, label: text, icon: Icon }) => <button key={id} type="button" aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)} className={tabClass(tab === id)}><Icon size={14} weight="bold" />{text}</button>)}
       </nav>
-      <ManagerSection key={tab} section={section} />
+      <ManagerSection key={tab} section={section} openId={onOpen ? openId : undefined} onOpen={onOpen} />
     </div>
   </Modal>
 }
 
 // One tab: search and chips over the list; the open item beside it (on a phone, instead of it).
-function ManagerSection({ section }) {
+function ManagerSection({ section, openId: openProp, onOpen }) {
   const [search, setSearch] = useState('')
   const [chip, setChip] = useState('')
-  const [openId, setOpenId] = useState(null)
+  const [ownOpen, setOwnOpen] = useState(null)
+  const openId = onOpen ? openProp || null : ownOpen
+  const setOpenId = (id) => { setOwnOpen(id); onOpen?.(id) }
   const list = useQuery({ queryKey: section.listKey, queryFn: section.list, staleTime: 60_000 })
   const items = asArray(list.data)
   const chips = section.chips ? section.chips(items) : []

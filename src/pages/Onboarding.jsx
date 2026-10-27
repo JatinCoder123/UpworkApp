@@ -138,19 +138,19 @@ const HOW_IT_WORKS = [
     icon: Broadcast,
     title: 'Collects',
     text: 'New Upwork jobs and tech news, around the clock.',
-    example: <><span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#c8e875] opacity-70" /><span className="relative size-1.5 rounded-full bg-[#c8e875]" /></span>12 new jobs this hour</>,
+    example: <><span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#c8e875] opacity-70" /><span className="relative size-1.5 rounded-full bg-[#c8e875]" /></span>New jobs every hour</>,
   },
   {
     icon: Sparkle,
     title: 'AI does the groundwork',
     text: 'Scores every job, writes cover letters and drafts site content.',
-    example: <><Target size={11} weight="bold" />72% match · cover letter ready</>,
+    example: <><Target size={11} weight="bold" />Match score · cover letter drafted</>,
   },
   {
     icon: UsersThree,
     title: 'Your team acts',
     text: 'Apply, publish and share in Microsoft Teams, from one place.',
-    example: <><MicrosoftTeamsLogo size={11} weight="fill" />Shared with Jatin</>,
+    example: <><MicrosoftTeamsLogo size={11} weight="fill" />Shared in Teams</>,
   },
 ]
 

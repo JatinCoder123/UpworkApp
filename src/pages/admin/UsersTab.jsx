@@ -42,7 +42,7 @@ export default function UsersTab({ catalog, filter, onFilterChange }) {
   const selected = users.find((user) => user.id === selectedId) || visible[0] || null
   const chip = (active) => `inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold ring-1 transition-colors ${active ? 'bg-[var(--ink)] text-white ring-[var(--ink)] dark:bg-(--lime) dark:text-[#26320b] dark:ring-[var(--lime)]' : 'bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--text)]'}`
 
-  return <div className="grid items-start gap-4 lg:grid-cols-[21rem_minmax(0,1fr)]">
+  return <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[21rem_minmax(0,1fr)]">
     <Panel>
       <label className="flex items-center gap-2 rounded-full bg-[var(--paper)] px-4 py-2.5 ring-1 ring-[var(--line)] focus-within:ring-[var(--lime-dark)]">
         <MagnifyingGlass size={14} className="text-[var(--muted)]" />
@@ -237,14 +237,14 @@ function UserSkills({ userId, name, isSelf }) {
   return <div className="mt-5">
     <div className="flex items-center justify-between gap-3">
       <h3 className="text-sm font-semibold text-[var(--text)]">Skills</h3>
-      <span className="text-[11px] font-semibold text-[var(--muted)]">{skillsQuery.isLoading ? '…' : saved.length ? `${saved.length} skill${saved.length === 1 ? '' : 's'}` : 'None yet: picked at their next login'}</span>
+      <span className="text-[11px] font-semibold text-[var(--muted)]">{skillsQuery.isLoading ? '…' : saved.length ? `${saved.length} skill${saved.length === 1 ? '' : 's'}` : 'None yet'}</span>
     </div>
     <div className="mt-3 rounded-2xl bg-[var(--paper)] p-4 ring-1 ring-[var(--line)]/70">
       {skillsQuery.isLoading
         ? <span className={`${skeleton} h-10`} />
         : skillsQuery.isError
           ? <ErrorNote error={skillsQuery.error} onRetry={() => skillsQuery.refetch()} />
-          : <SkillsPicker skills={skills} onChange={(next) => { setDraft(next); setError(null) }} allowNew label={`${name}'s skills`} noneLabel="(none)" noneHint="No skills: they pick theirs at their next login" />}
+          : <SkillsPicker skills={skills} onChange={(next) => { setDraft(next); setError(null) }} allowNew label={`${name}'s skills`} noneLabel="(none)" noneHint="No skills yet: add some here, or they pick theirs on the Jobs page (My skills)" />}
       {error && <div className="mt-3"><ErrorNote error={error} onDismiss={() => setError(null)} /></div>}
       {changed && <div className="mt-3 flex items-center justify-end gap-2">
         <button type="button" onClick={() => setDraft(null)} disabled={saving} className="rounded-full px-4 py-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--ink)]">Cancel</button>

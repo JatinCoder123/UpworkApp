@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Article, Brain, Briefcase, Browsers, CaretDown, ChartLineUp, Check, Clock, Cloud, Code, DotsThreeOutline, EnvelopeSimple, Globe, List, MagnifyingGlass, Megaphone, Newspaper, PlugsConnected, Plus, Robot, ShareNetwork, ShieldCheck, SignOut, SlidersHorizontal, User, UserCircle, VideoCamera, WarningCircle, X } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import gsap from 'gsap'
@@ -65,7 +65,16 @@ export default function Shell({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [feedsOpen, setFeedsOpen] = useState(false)
   const [newFeedOpen, setNewFeedOpen] = useState(false)
-  const [promptsOpen, setPromptsOpen] = useState(false)
+  // Prompt management lives in the URL (?prompts=<tab>&prompt=<id>), like a job preview, so a link opens it anywhere
+  // and Back closes it.
+  const [params, setParams] = useSearchParams()
+  const promptsTab = params.get('prompts')
+  const setPrompts = (tab, id = null, replace = false) => setParams((current) => {
+    const next = new URLSearchParams(current)
+    if (tab) next.set('prompts', tab); else next.delete('prompts')
+    if (tab && id) next.set('prompt', id); else next.delete('prompt')
+    return next
+  }, { replace })
   // The open nav dropdown (a group's label), or null.
   const [navMenu, setNavMenu] = useState(null)
   const { user, logout: endAuthSession } = useAuth()
@@ -213,7 +222,7 @@ export default function Shell({ children }) {
             </span>
           </div>
           <ThemeToggle />
-          {canAccess(user, '/appscript') && <button type="button" onClick={() => setPromptsOpen(true)} aria-label="Prompt management" title="Prompt management" className="grid size-9 place-items-center rounded-full bg-[var(--ink)]/5 text-[var(--text)] ring-1 ring-black/5 transition-colors hover:bg-(--lime)/35 hover:text-[var(--accent-strong)]"><Robot size={17} weight="light" /></button>}
+          {canAccess(user, '/appscript') && <button type="button" onClick={() => setPrompts('prompts')} aria-label="Prompt management" title="Prompt management" className="grid size-9 place-items-center rounded-full bg-[var(--ink)]/5 text-[var(--text)] ring-1 ring-black/5 transition-colors hover:bg-(--lime)/35 hover:text-[var(--accent-strong)]"><Robot size={17} weight="light" /></button>}
           <DocNotificationBell />
           <div ref={menuRef} className="relative hidden xl:block">
             <button aria-expanded={profileOpen} onClick={() => setProfileOpen((open) => !open)} className={`${iconButton} size-9`} aria-label="Open profile menu"><User size={17} weight="light" /></button>
@@ -279,7 +288,9 @@ export default function Shell({ children }) {
     <div className="relative z-10">{children}</div>
     {/* Feedback button on every signed-in page. */}
     <FeedbackWidget />
-    {promptsOpen && <ErrorBoundary name="prompt-management" fallback={DialogError} fallbackProps={{ onClose: () => setPromptsOpen(false) }}><PromptManagerDialog onClose={() => setPromptsOpen(false)} /></ErrorBoundary>}
+    {promptsTab && <ErrorBoundary name="prompt-management" fallback={DialogError} fallbackProps={{ onClose: () => setPrompts(null, null, true) }}>
+      <PromptManagerDialog tab={promptsTab} onTab={(tab) => setPrompts(tab, null, true)} openId={params.get('prompt')} onOpen={(id) => setPrompts(promptsTab, id, Boolean(params.get('prompt')))} onClose={() => setPrompts(null, null, true)} />
+    </ErrorBoundary>}
     {newFeedOpen && <NewFeedDialog onClose={() => setNewFeedOpen(false)} onSaved={(id) => { setNewFeedOpen(false); if (id) navigate(`/feeds/${id}`) }} />}
   </div>
 }

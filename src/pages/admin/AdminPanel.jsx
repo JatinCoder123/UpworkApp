@@ -38,8 +38,8 @@ export default function AdminPanel() {
           <h1 className="mt-2 text-3xl font-semibold tracking-[-.045em] text-[var(--text)] sm:text-4xl">Access &amp; permissions</h1>
           <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">Decide who can open each module. Changes reach people within about a minute.</p>
         </div>
-        <nav aria-label="Admin sections" className="flex gap-1 rounded-full bg-[var(--surface)] p-1 ring-1 ring-[var(--line)]/70">
-          {TABS.map(([id, label, Icon]) => <button key={id} type="button" aria-current={tab === id ? 'page' : undefined} onClick={() => openTab(id)} className={tabClass(tab === id)}><Icon size={14} weight="bold" />{label}</button>)}
+        <nav aria-label="Admin sections" className="flex max-w-full gap-1 overflow-x-auto rounded-full bg-[var(--surface)] p-1 ring-1 ring-[var(--line)]/70 [scrollbar-width:none]">
+          {TABS.map(([id, label, Icon]) => <button key={id} type="button" aria-current={tab === id ? 'page' : undefined} onClick={() => openTab(id)} className={`${tabClass(tab === id)} shrink-0 whitespace-nowrap`}><Icon size={14} weight="bold" />{label}</button>)}
         </nav>
       </header>
 

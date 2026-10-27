@@ -15,7 +15,7 @@ export default function RolesTab({ catalog }) {
   const selected = roles.find((role) => role.id === selectedId) || roles[0] || null
   const usersWith = (role) => users.filter((user) => user.role === role.name).length
 
-  return <div className="grid items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+  return <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
     <Panel>
       <SectionTitle>Roles</SectionTitle>
       <ul className="mt-3 space-y-1">

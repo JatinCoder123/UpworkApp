@@ -112,7 +112,7 @@ export default function FeedSection({ definition, onSettings }) {
   const removeFilter = (key, value) => setFilters((current) => ({ ...current, [key]: asArray(current[key]).filter((entry) => entry !== value) }))
   const activeChips = Object.keys(filterFields).flatMap((key) => (filters[key] || []).map((value) => [key, value, labelOf(key, value)]))
   const listSection = filterSections.find((entry) => entry.key === listKey)
-  const noun = title.toLowerCase()
+  const noun = title
 
   return <Shell>
     <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">

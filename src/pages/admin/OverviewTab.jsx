@@ -37,7 +37,7 @@ export default function OverviewTab({ catalog, onOpenUsers }) {
       })}
     </div>
 
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <Panel>
         <SectionTitle aside={<span className="text-[10px] text-[var(--muted)]">Role defaults; extras are per user</span>}>Who gets what</SectionTitle>
         {loading
