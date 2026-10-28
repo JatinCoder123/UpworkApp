@@ -38,8 +38,10 @@ export function StageChip({ icon: Icon, name, stage }) {
  * and Generate (Regenerate once it has a status). Generate opens the suggestion box, prefilled with the last
  * suggestion; Start saves it (`generate`, a useGenerateOutput mutation) and the output shows its steps while it is made.
  * `published`: a ready output is published on the sites, so their login is offered too.
+ * `publish` (from usePublishOutput), instead: once it is ready the user is asked whether to publish it on
+ * WordPress, and the sites' login is offered when they say yes.
  */
-export function OutputRow({ output, type, icon: Icon, name, short, example, panelOpen, onPanel, generate, published = false }) {
+export function OutputRow({ output, type, icon: Icon, name, short, example, panelOpen, onPanel, generate, published = false, publish }) {
   const stage = stageOf(output)
   const running = isRunning(stage)
   // The suggestion being written; null while the box is closed.
@@ -75,6 +77,7 @@ export function OutputRow({ output, type, icon: Icon, name, short, example, pane
     {running && <GenerateProgress stage={stage} name={short.toLowerCase()} />}
     {stage !== 'idle' && output?.suggestion && draft === null && <p className="mt-2 flex gap-1.5 text-xs leading-5 text-[var(--muted)]"><Quotes size={12} weight="fill" className="mt-0.5 shrink-0" /><span className="min-w-0 break-words">{output.suggestion}</span></p>}
     {stage === 'failed' && draft === null && <p className="mt-2 text-xs font-semibold text-[var(--danger)]">It could not be made this time. Regenerate it, maybe with another suggestion.</p>}
+    {publish && stage === 'completed' && draft === null && <PublishChoice output={output} publish={publish} />}
 
     {draft !== null && <form onSubmit={start} className="mt-3">
       <label className="block">
@@ -87,6 +90,24 @@ export function OutputRow({ output, type, icon: Icon, name, short, example, pane
       </div>
     </form>}
     {generate.isError && <p role="alert" className="mt-2 text-xs font-semibold text-[var(--danger)]">{generate.error?.message || 'It could not be started. Please try again.'}</p>}
+  </div>
+}
+
+/**
+ * Under a ready output: "Do you want to publish it on WordPress?". The answer is saved on the item (`publish`, from
+ * usePublishOutput) and the box stays as the user leaves it; ticked, the sites' login is shown, with "Posted" once it is up.
+ */
+function PublishChoice({ output, publish }) {
+  return <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--paper)] px-3 py-2 ring-1 ring-[var(--line)]/70">
+    <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-[var(--ink)]">
+      <input type="checkbox" checked={publish.on} disabled={publish.isPending} onChange={(event) => publish.set(event.target.checked)} className="size-3.5 accent-[var(--lime-dark)]" />
+      Do you want to publish it on WordPress?
+    </label>
+    {publish.on && <span className="flex animate-[domain-chip-in_.35s_ease-out] items-center gap-2">
+      {output.posted && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#137333] dark:text-[#81c995]"><CheckCircle size={12} weight="fill" />Posted</span>}
+      <LoginUrlPill />
+    </span>}
+    {publish.isError && <p role="alert" className="w-full text-xs font-semibold text-[var(--danger)]">Your answer could not be saved. Please try again.</p>}
   </div>
 }
 

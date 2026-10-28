@@ -19,7 +19,7 @@ import { api } from '../services/api'
 import { EMPTY_DATE_RANGE } from '../lib/dateRange'
 import { countFilters, useFeedIndex } from '../lib/feedView'
 import { useGatewayFeed, useOpenItem } from '../lib/gatewayFeed'
-import { stageOf, useGenerateOutput, useGenerationWatch } from '../lib/generation'
+import { stageOf, useGenerateOutput, useGenerationWatch, usePublishOutput } from '../lib/generation'
 import { skillStyle } from '../lib/jobSignals'
 import { timeAgo, useNow } from '../lib/time'
 
@@ -31,6 +31,8 @@ import { timeAgo, useNow } from '../lib/time'
  * sorts are finished on the page (see useGatewayFeed). Labels and choices come from the module's dropdown lists.
  * Generate (script, blog, video): the user adds a suggestion and starts it; the CRM gets the suggestion, the generate
  * box and "queued", and the page follows the status the generator sets until the document is ready (or failed).
+ * Once the script is ready, the user is asked whether to publish it on WordPress (post_script); ticked, the sites'
+ * login URL is shown with it.
  */
 
 // Google apps: icon and colour (google_app keys). The card's tile shows the first app.
@@ -68,9 +70,9 @@ const OUTPUTS = [
   ['blog', Article, 'Blog post', 'Blog', 'e.g. Write for small agencies and say it works with a free Gmail account'],
   ['video', VideoCamera, 'Video', 'Video', 'e.g. Keep it under 60 seconds and end on a question'],
 ]
-// The outputs' CRM prefixes, and the ones published on the sites (the video is not).
+// The outputs' CRM prefixes, and the ones that can be published on WordPress (only the script).
 const OUTPUT_TYPES = OUTPUTS.map(([type]) => type)
-const PUBLISHED = ['script', 'blog']
+const PUBLISHED = ['script']
 // Trend chips in the filters: green rising, grey stable, red declining.
 const TREND_TONE = {
   rising: 'bg-[#e9f6dc] text-[#3f7d1c] dark:bg-[#1f3315] dark:text-[#a8d86e]',
@@ -381,10 +383,12 @@ function IdeaDrawer({ item, items, labelOf, now, indexMeta, indexMark, onSelect,
     panel={({ panelType, onPanel }) => <ErrorBoundary name="appscript-instructions" resetKey={panelType} fallback={SectionError} fallbackProps={{ title: 'The prompt and guidelines could not load' }}><InstructionsPanel type={panelType} onType={onPanel} onClose={() => onPanel(null)} /></ErrorBoundary>} />
 }
 
-// One output in the details (the shared row), generating through the idea's CRM fields.
+// One output in the details (the shared row), generating through the idea's CRM fields; the script also asks whether
+// to publish it on WordPress.
 function AppScriptOutput({ item, type, name, ...row }) {
   const generate = useGenerateOutput({ feed: 'appscript', item, type, title: `${name} · ${item.name}`, path: '/appscript', save: (suggestion) => api.generateAppScriptOutput(item.id, type, suggestion) })
-  return <OutputRow {...row} output={item.generation[type]} type={type} name={name} generate={generate} published={PUBLISHED.includes(type)} />
+  const publish = usePublishOutput({ feed: 'appscript', item, type, save: (on) => api.setAppScriptPost(item.id, type, on) })
+  return <OutputRow {...row} output={item.generation[type]} type={type} name={name} generate={generate} publish={PUBLISHED.includes(type) ? publish : undefined} />
 }
 
 // The prompt and guidelines of one output, beside the details (on a phone, in their place): the output picker, then

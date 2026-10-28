@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { initDocSocket, subscribeDocStatus } from '../services/docSocket'
 import { fillOutputNotificationLinks, outputTypeOf, recordDocNotification, removeNotification } from '../services/docNotifications'
@@ -9,7 +9,8 @@ import { asObject } from './safe'
  * Outputs generated from a feed item (AppScript's script / blog / video, a "+ New feed" feed's doc / blog / video /
  * image). Each output has the same CRM fields: generate_<type>, <type>_suggestion, <type>_status (set by the generator),
  * <type>_view_url, <type>_download_url and <type>_doc_id; an item's `generation` is { [type]: { requested, status,
- * suggestion, viewUrl, downloadUrl, docId } }.
+ * suggestion, viewUrl, downloadUrl, docId, post, posted } }. `post` and `posted` (post_<type>, <type>_is_posted) are
+ * only on the outputs that can go up on WordPress (AppScript's script).
  */
 
 // Where an output stands. The generator sets the status; a ticked box with no status yet is waiting to start.
@@ -47,6 +48,29 @@ export function useGenerateOutput({ feed, item, type, title, path, save }) {
     },
     onSettled: () => queryClient.invalidateQueries({ predicate: isFeed }),
   })
+}
+
+/**
+ * The "publish it on WordPress?" box of one output. The CRM's post_<type> is a trigger: the backend posts the output,
+ * sets <type>_is_posted and puts post_<type> back to 0. So the CRM only gives the box its first state (ticked if asked
+ * for or already posted); after that it stays as the user leaves it. Each answer is saved (`save(on)`) and the box goes
+ * back only if the save fails. Returns { on, set, isPending, isError }.
+ */
+export function usePublishOutput({ feed, item, type, save }) {
+  const queryClient = useQueryClient()
+  const isFeed = (query) => String(query.queryKey[0]).startsWith(`${feed}-`)
+  // The user's own answer, for the item it was given on (the row stays while the drawer moves to another item).
+  const [answer, setAnswer] = useState(null)
+  const output = item.generation[type]
+  const on = answer?.id === item.id ? answer.on : Boolean(output?.post || output?.posted)
+  // Settled: read again, for "Posted" once it is up.
+  const mutation = useMutation({ mutationFn: save, onSettled: () => queryClient.invalidateQueries({ predicate: isFeed }) })
+  const set = (next) => {
+    const previous = { id: item.id, on }
+    setAnswer({ id: item.id, on: next })
+    mutation.mutate(next, { onError: () => setAnswer(previous) })
+  }
+  return { on, set, isPending: mutation.isPending, isError: mutation.isError }
 }
 
 /**

@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowClockwise, ArrowCounterClockwise, Briefcase, Check, Clock, Copy, CurrencyDollar, FilePdf, FileText, FloppyDisk, Hourglass, Lightbulb, MagicWand, PencilSimple, SealCheck, Sparkle, Star, Target, User, Users, WarningCircle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, Briefcase, Check, Clock, Copy, CurrencyDollar, FilePdf, FileText, FloppyDisk, Hourglass, Lightbulb, PencilSimple, Quotes, SealCheck, Sparkle, Star, Target, User, Users, WarningCircle } from '@phosphor-icons/react'
 import ExpandableText from './ExpandableText'
+import { GenerateProgress } from './GenerateOutput'
 import { api } from '../services/api'
+import { initDocSocket, subscribeDocStatus } from '../services/docSocket'
 import { downloadCoverLetterPdf } from '../lib/coverLetterPdf'
+import { isRunning, stageOf } from '../lib/generation'
 import { asObject, asText } from '../lib/safe'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -99,7 +102,8 @@ export function useCopied() {
   return [copied, copy]
 }
 
-const AI_SUGGESTIONS = [
+// Quick picks for a regenerate suggestion: one click adds it to the box.
+const SUGGESTION_PICKS = [
   'Make it shorter and punchier',
   'Use a more confident tone',
   'Open with the client’s main problem',
@@ -107,29 +111,36 @@ const AI_SUGGESTIONS = [
   'End with a clear call to action',
   'Add one smart question for the client',
 ]
+// A status event can come just before the CRM is saved; then the job is read once more this much later.
+const RECHECK_MS = 3000
 
 // Activity entries a cover letter change records; JobActivity shows them as "<user> generated the cover letter" etc.
 export const COVER_LETTER_ACTIVITY = {
   generated: 'Cover letter generated',
   written: 'Cover letter written',
   edited: 'Cover letter edited',
-  ai: 'Cover letter edited with AI',
-  undone: 'Cover letter AI change undone',
+  regenerated: 'Cover letter regenerated',
 }
 
+/**
+ * The job's cover letter. Without one: fetch it or write your own. With one: read it, copy it, download it, edit it,
+ * or Regenerate it with a suggestion (CRM jobs): the suggestion, generate_cover_letter and "queued" are saved on the
+ * job, the CRM generator writes the new letter, and the steps show here until it is ready (or failed).
+ */
 export function CoverLetter({ job, onLetter }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [copied, copy] = useCopied()
   const [draft, setDraft] = useState(null)
-  const [instruction, setInstruction] = useState('')
-  const [suggestion, setSuggestion] = useState(null)
-  // The letter before the last accepted AI change, for Undo.
-  const [previous, setPrevious] = useState(null)
-  const aiRequest = useRef(null)
+  // The regenerate suggestion being written; null while its box is closed.
+  const [request, setRequest] = useState(null)
   const editing = draft != null
   const current = editing ? draft : asText(job.coverLetter)
-  // Every change (generated, typed, AI, undo) is saved to the CRM job and logged in its activity.
+  // Only CRM jobs can regenerate (a live job has no record): where it stands, as an AppScript output.
+  const generation = job.coverLetterGeneration
+  const stage = stageOf(generation)
+  const running = isRunning(stage)
+  // Every change made here (fetched, typed) is saved to the CRM job and logged in its activity.
   // The letter sits in the editor while it saves, so a failed save keeps it there with the error and Save to retry.
   const save = useMutation({
     mutationFn: ({ letter, activity }) => api.saveCoverLetter(job, letter, { userEmail: user?.email, activity }),
@@ -137,41 +148,85 @@ export function CoverLetter({ job, onLetter }) {
   })
   const commit = (letter, activity) => { const value = asText(letter).trim(); if (!value) return; setDraft(value); save.mutate({ letter: value, activity }) }
   const fetchLetter = useMutation({ mutationFn: () => api.getCoverLetter(job), onSuccess: (letter) => commit(letter, COVER_LETTER_ACTIVITY.generated) })
-  // POST /api/ai/cover-letter with the letter on screen; a newer request or leaving the job cancels the old one.
-  const aiEdit = useMutation({
-    mutationFn: (prompt) => {
-      aiRequest.current?.abort()
-      aiRequest.current = new AbortController()
-      return api.editCoverLetter(current, prompt, { signal: aiRequest.current.signal })
+  // Regenerate: shown as queued straight away, put back if it cannot be saved.
+  const regenerate = useMutation({
+    mutationFn: (suggestion) => api.regenerateCoverLetter(job, suggestion, { userEmail: user?.email, activity: COVER_LETTER_ACTIVITY.regenerated }),
+    onMutate: async (suggestion) => {
+      // A read already on its way would bring back the old status.
+      await queryClient.cancelQueries({ queryKey: ['job', job.id] })
+      queryClient.setQueryData(['job', job.id], (data) => (data ? { ...data, coverLetterGeneration: { requested: true, status: 'queued', suggestion } } : data))
+      return { before: generation }
     },
-    onSuccess: (result, prompt) => setSuggestion({ letter: result.coverLetter, summary: result.summary, prompt }),
+    onError: (_, __, context) => queryClient.setQueryData(['job', job.id], (data) => (data ? { ...data, coverLetterGeneration: context?.before } : data)),
+    // The new entry in the job's activity. The letter is not read again here: the WebSocket says when it changes.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['job-activity', job.id] }),
   })
-  useEffect(() => () => aiRequest.current?.abort(), [job.id])
+  // While the generator writes the new letter, the page does not ask the CRM on a timer: it listens to the backend's
+  // WebSocket (the doc-status events AppScript follows). An event that names this job reads the job once; so does the
+  // socket reconnecting, for an event missed while it was down.
+  useEffect(() => {
+    if (!running) return undefined
+    let stopped = false
+    const timers = new Set()
+    const read = async (event) => {
+      await queryClient.invalidateQueries({ queryKey: ['job', job.id] })
+      if (stopped) return
+      // The event can come just before the CRM is saved: if the job does not show that status yet, one more read later.
+      const status = queryClient.getQueryData(['job', job.id])?.coverLetterGeneration?.status
+      if (event?.status && status !== event.status) {
+        const timer = window.setTimeout(() => { timers.delete(timer); read() }, RECHECK_MS)
+        timers.add(timer)
+      }
+    }
+    const names = (event) => [event.contentId, event.noteId, ...Object.values(asObject(event.raw))].map((value) => String(value ?? '')).includes(job.id)
+    const unsubscribe = subscribeDocStatus((event) => { if (names(event)) read(event) })
+    const socket = initDocSocket()
+    const catchUp = () => read()
+    socket.on('connect', catchUp)
+    return () => {
+      stopped = true
+      unsubscribe()
+      socket.off('connect', catchUp)
+      timers.forEach(window.clearTimeout)
+    }
+  }, [running, job.id, queryClient])
+  const startRegenerate = (event) => {
+    event.preventDefault()
+    const text = request.trim()
+    if (!text) return
+    setRequest(null)
+    // If it cannot be saved, the box opens again with what was written.
+    regenerate.mutate(text, { onError: () => setRequest(text) })
+  }
   const pdf = useMutation({ mutationFn: () => downloadCoverLetterPdf(current, job.title) })
-  const runAi = (prompt) => { const value = prompt.trim(); if (value && current.trim() && !aiEdit.isPending) aiEdit.mutate(value) }
-  const accept = () => { setPrevious(current); commit(suggestion.letter, COVER_LETTER_ACTIVITY.ai); setSuggestion(null); setInstruction('') }
-  const undo = () => { commit(previous, COVER_LETTER_ACTIVITY.undone); setPrevious(null) }
   const pill = 'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[var(--line)] transition-colors disabled:pointer-events-none disabled:opacity-45'
+  // Edit and Regenerate: once there is a letter, while nothing else is changing it.
+  const changeable = Boolean(job.coverLetter) && !editing && !running && !save.isPending && request === null
 
   const action = <div className="flex flex-wrap justify-end gap-2">
     {current && <button type="button" onClick={() => copy('letter', current)} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>{copied === 'letter' ? <Check size={13} weight="bold" /> : <Copy size={13} />}{copied === 'letter' ? 'Copied' : 'Copy'}</button>}
     {current.trim() && <button type="button" disabled={pdf.isPending} onClick={() => pdf.mutate()} title={pdf.isError ? pdf.error?.message : 'Download as PDF'} className={`${pill} ${pdf.isError ? 'text-[var(--bad)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{pdf.isPending ? <span className="size-3 animate-spin rounded-full border-2 border-current/30 border-t-current" /> : <FilePdf size={13} />}{pdf.isPending ? 'Generating…' : pdf.isError ? 'Retry PDF' : 'PDF'}</button>}
-    {previous != null && !save.isPending && <button type="button" onClick={undo} title="Go back to the letter before the last AI change" className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}><ArrowCounterClockwise size={13} />Undo AI change</button>}
-    {job.coverLetter && !editing && <button type="button" onClick={() => setDraft(asText(job.coverLetter))} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}><PencilSimple size={13} />Edit</button>}
+    {changeable && <button type="button" onClick={() => setDraft(asText(job.coverLetter))} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}><PencilSimple size={13} />Edit</button>}
+    {changeable && generation && <button type="button" onClick={() => { regenerate.reset(); setRequest('') }} title="Regenerate the cover letter with your suggestion" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs font-semibold text-white transition-transform hover:-translate-y-0.5"><ArrowClockwise size={13} weight="bold" />Regenerate</button>}
   </div>
+  const subtitle = save.isPending ? 'Saving to CRM…'
+    : editing ? 'Editing · changes are not saved yet'
+      : running ? 'Regenerating with your suggestion…'
+        : !job.coverLetter ? 'Not written yet'
+          : stage === 'completed' ? 'Regenerated with your suggestion · saved in CRM' : 'Tailored for this job · saved in CRM'
 
-  return <Panel icon={FileText} title="Cover letter" subtitle={save.isPending ? 'Saving to CRM…' : editing ? 'Editing · changes are not saved yet' : job.coverLetter ? 'Tailored for this job · saved in CRM' : 'Not written yet'} action={action}>
+  return <Panel icon={FileText} title="Cover letter" subtitle={subtitle} action={action}>
     {editing
       ? <div className="space-y-3">
         <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={12} aria-label="Cover letter" className="w-full resize-y rounded-2xl bg-[var(--paper)] p-5 text-sm leading-7 outline-none ring-1 ring-[var(--line)] focus:ring-[var(--lime-dark)]" />
         {save.isError && <p role="alert" className="flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{save.error?.message}</p>}
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <button type="button" onClick={() => { setDraft(null); setSuggestion(null); setPrevious(null); save.reset() }} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>Cancel</button>
+          <button type="button" onClick={() => { setDraft(null); save.reset() }} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>Cancel</button>
           <button type="button" disabled={!draft.trim() || save.isPending || draft === job.coverLetter} onClick={() => commit(draft, job.coverLetter ? COVER_LETTER_ACTIVITY.edited : COVER_LETTER_ACTIVITY.written)} className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--ink)] px-4 text-xs font-semibold text-white transition-opacity disabled:opacity-50">{save.isPending ? <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <FloppyDisk size={14} />}{save.isPending ? 'Saving…' : 'Save letter'}</button>
         </div>
       </div>
       : job.coverLetter
-        ? <div className="rounded-2xl bg-[var(--paper)] p-5"><ExpandableText collapsedHeight="9rem" fade="var(--paper)"><p className="whitespace-pre-wrap break-words text-sm leading-7">{job.coverLetter}</p></ExpandableText></div>
+        ? <div aria-busy={running} className={`rounded-2xl bg-[var(--paper)] p-5 transition-opacity duration-300 ${running ? 'opacity-60' : ''}`}><ExpandableText collapsedHeight="9rem" fade="var(--paper)"><p className="whitespace-pre-wrap break-words text-sm leading-7">{job.coverLetter}</p></ExpandableText></div>
         : <div className="flex flex-col items-start gap-4 rounded-2xl border border-dashed border-[var(--line)] p-5 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">{fetchLetter.isPending ? 'Writing a cover letter…' : 'Get a tailored cover letter'}</p>
@@ -187,25 +242,24 @@ export function CoverLetter({ job, onLetter }) {
           </div>
         </div>}
 
-    {current.trim() && <div className="mt-4 rounded-2xl bg-[var(--lime)]/[.12] p-4 ring-1 ring-[var(--lime-dark)]/25">
-      <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-strong)]"><Sparkle size={14} weight="fill" />Edit with AI</p>
-      <div className="mt-3 flex flex-wrap gap-1.5">{AI_SUGGESTIONS.map((item) => <button key={item} type="button" disabled={aiEdit.isPending} onClick={() => { setInstruction(item); runAi(item) }} className="rounded-full bg-[var(--surface)] px-3 py-1.5 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)] transition-colors hover:text-[var(--ink)] hover:ring-[var(--lime-dark)] disabled:opacity-50">{item}</button>)}</div>
-      <form onSubmit={(event) => { event.preventDefault(); runAi(instruction) }} className="mt-3 flex items-center gap-2 rounded-full bg-[var(--surface)] py-1 pl-4 pr-1 ring-1 ring-[var(--line)] focus-within:ring-[var(--lime-dark)]">
-        <MagicWand size={14} className="shrink-0 text-[var(--muted)]" />
-        <input value={instruction} disabled={aiEdit.isPending} onChange={(event) => setInstruction(event.target.value)} placeholder="Tell AI what to change, e.g. mention our Shopify work" aria-label="AI edit instruction" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
-        <button type="submit" disabled={!instruction.trim() || aiEdit.isPending} className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--ink)] px-3.5 text-[11px] font-semibold text-white disabled:opacity-45">{aiEdit.isPending ? <span className="size-3 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <Sparkle size={12} weight="fill" />}{aiEdit.isPending ? 'Rewriting…' : 'Edit with AI'}</button>
-      </form>
-      {aiEdit.isError && aiEdit.error?.code !== 'ABORTED' && <p role="alert" className="mt-2 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{aiEdit.error?.message}</p>}
-      {suggestion && <div className="mt-4 rounded-2xl bg-[var(--surface)] p-4 ring-1 ring-[var(--line)]">
-        <p className="text-[11px] font-semibold text-[var(--muted)]">AI suggestion · “{suggestion.prompt}”</p>
-        {suggestion.summary && <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-[var(--lime)]/[.14] px-3 py-2 text-xs leading-5 text-[var(--ink)]"><Sparkle size={13} weight="fill" className="mt-0.5 shrink-0 text-[var(--accent-strong)]" />{suggestion.summary}</p>}
-        <ExpandableText className="mt-2" collapsedHeight="9rem"><p className="whitespace-pre-wrap break-words text-sm leading-7">{suggestion.letter}</p></ExpandableText>
-        <div className="mt-3 flex flex-wrap justify-end gap-2">
-          <button type="button" onClick={() => setSuggestion(null)} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}><X size={13} />Discard</button>
-          <button type="button" onClick={accept} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--lime)] px-4 text-xs font-bold text-[#26320b] ring-1 ring-[var(--lime-dark)]/40"><Check size={13} weight="bold" />Use suggestion</button>
-        </div>
-      </div>}
+    {/* Regenerate: what should change (typed, or quick picks added), then the generator writes a new letter. */}
+    {request !== null && <form onSubmit={startRegenerate} className="mt-4 rounded-2xl bg-[var(--lime)]/[.12] p-4 ring-1 ring-[var(--lime-dark)]/25">
+      <label className="block">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-strong)]"><Sparkle size={14} weight="fill" />What should change in the cover letter?</span>
+        <textarea autoFocus rows={3} maxLength={2000} value={request} onChange={(event) => setRequest(event.target.value)} placeholder="e.g. Make it shorter and mention our Shopify work" className="mt-2 w-full resize-y rounded-xl bg-[var(--surface)] px-3 py-2 text-sm leading-6 outline-none ring-1 ring-[var(--line)] placeholder:text-[var(--muted)] focus:ring-[var(--lime-dark)]" />
+      </label>
+      <div className="mt-2 flex flex-wrap gap-1.5">{SUGGESTION_PICKS.map((item) => <button key={item} type="button" onClick={() => setRequest((text) => (text.trim() ? `${text.trim()}\n${item}` : item))} className="rounded-full bg-[var(--surface)] px-3 py-1.5 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)] transition-colors hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]">{item}</button>)}</div>
+      <div className="mt-3 flex items-center justify-end gap-2">
+        <button type="button" onClick={() => setRequest(null)} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>Cancel</button>
+        <button type="submit" disabled={!request.trim()} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--ink)] px-4 text-xs font-semibold text-white transition-opacity disabled:opacity-45"><ArrowClockwise size={13} weight="bold" />Regenerate cover letter</button>
+      </div>
+    </form>}
+    {running && <div className="mt-4 rounded-2xl bg-[var(--paper)] p-4">
+      <GenerateProgress stage={stage} name="cover letter" />
+      {generation.suggestion && <p className="mt-2 flex gap-1.5 text-xs leading-5 text-[var(--muted)]"><Quotes size={12} weight="fill" className="mt-0.5 shrink-0" /><span className="min-w-0 whitespace-pre-wrap break-words">{generation.suggestion}</span></p>}
     </div>}
+    {stage === 'failed' && request === null && <p role="alert" className="mt-3 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />The cover letter could not be regenerated this time. Regenerate it again, maybe with another suggestion.</p>}
+    {regenerate.isError && <p role="alert" className="mt-3 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{regenerate.error?.message || 'It could not be started. Please try again.'}</p>}
   </Panel>
 }
 

@@ -321,6 +321,13 @@ export function mapGatewayJob(input) {
     description: jobBrief(record.description) || "No description provided.",
     pitch: decodeHtml(record.pitch || ""),
     coverLetter: decodeCoverLetter(record.cover_letter),
+    // Regenerating the letter with the user's suggestion (the CRM generator), read like an AppScript output:
+    // generate_cover_letter, cover_letter_status (queued / processing / completed / failed) and cover_letter_suggestion.
+    coverLetterGeneration: {
+      requested: flag(record.generate_cover_letter),
+      status: asText(record.cover_letter_status).trim().toLowerCase(),
+      suggestion: decodeHtml(asText(record.cover_letter_suggestion)).trim(),
+    },
     clientStats,
     // The signed-in user's like/save state, when the job was fetched with engagement.
     engagement: mapEngagement(record.engagement),
@@ -1051,6 +1058,19 @@ export async function saveCoverLetter(job, letter, { userEmail, activity } = {})
   return letter;
 }
 
+// Asks the CRM generator for a new cover letter, in one save: the user's suggestion, generate_cover_letter ticked and
+// cover_letter_status "queued". The generator sets processing and, at the end, completed (with the new cover_letter) or
+// failed. Then records `activity`, as saveCoverLetter does. Live Upwork jobs have no CRM record, so they cannot.
+export async function regenerateCoverLetter(job, suggestion, { userEmail, activity } = {}) {
+  if (!job?.id || job.status === "Live") throw createAppError("REGENERATE_INVALID", "This cover letter cannot be regenerated.");
+  await smartGateway({ action: "update", module: JOBS_MODULE, id: job.id, data: { cover_letter_suggestion: asText(suggestion).trim(), generate_cover_letter: 1, cover_letter_status: "queued" } });
+  // A letter kept from an edit in this session would hide the new one.
+  const changes = { ...(localChanges.get(job.id) || {}) };
+  delete changes.coverLetter;
+  localChanges.set(job.id, changes);
+  if (activity && userEmail) await logJobActivity({ jobId: job.id, userEmail, description: activity }).catch((error) => console.warn("Could not record cover letter activity", error));
+}
+
 // ----------------------------------------------------
 // AI endpoints (Claude on the auth backend; they need the login session cookie)
 // ----------------------------------------------------
@@ -1084,14 +1104,6 @@ export async function askAi(text, prompt = "", { signal } = {}) {
   const answer = asText(data.answer).trim();
   if (!answer) throw createAppError("AI_EMPTY", "The AI did not return an answer. Please try again.");
   return answer;
-}
-
-// Rewrites a cover letter from the user's instructions. The server keeps no history, so send the latest letter each time.
-export async function editCoverLetterWithAi(letter, prompt, { signal } = {}) {
-  const data = await postAi("/api/ai/cover-letter", { coverLetter: letter, prompt }, signal);
-  const coverLetter = asText(data.coverLetter).trim();
-  if (!coverLetter) throw createAppError("COVER_LETTER_EMPTY", "The AI did not return a cover letter. Please try again.");
-  return { coverLetter, summary: asText(data.summary).trim() };
 }
 
 // Asks for a new strategy; the current one is sent along so the endpoint can offer a different angle.
@@ -2234,6 +2246,9 @@ export const APPSCRIPT_MODULE = import.meta.env?.VITE_APPSCRIPT_MODULE || "outr_
 // user's notes for the generator), <type>_status (queued / processing / completed / failed, set by the generator) and,
 // once made, the document's <type>_view_url and <type>_download_url.
 export const APPSCRIPT_OUTPUTS = ["script", "blog", "video"];
+// The outputs that can go up on WordPress, each with two more fields: post_<type> (the user's "publish it on WordPress"
+// box, a trigger: the backend posts it and puts it back to 0) and <type>_is_posted (set once it is up).
+export const APPSCRIPT_POSTED = ["script"];
 // The same fields serve any module that generates (a feed made with "+ New feed" too); `types` are its outputs.
 const generationOf = (record, types = APPSCRIPT_OUTPUTS) => Object.fromEntries(types.map((type) => [type, {
   requested: flag(record[`generate_${type}`]),
@@ -2242,6 +2257,8 @@ const generationOf = (record, types = APPSCRIPT_OUTPUTS) => Object.fromEntries(t
   viewUrl: linkOf(record[`${type}_view_url`]),
   downloadUrl: linkOf(record[`${type}_download_url`]),
   docId: asText(record[`${type}_doc_id`]).trim(),
+  post: flag(record[`post_${type}`]),
+  posted: flag(record[`${type}_is_posted`]),
 }]));
 
 function mapAppScript(record) {
@@ -2283,6 +2300,12 @@ function mapAppScript(record) {
 export async function setAppScriptFields(id, data) {
   if (!id || !data) return;
   await smartGateway({ action: "update", module: APPSCRIPT_MODULE, id, data });
+}
+
+// Saves the user's answer to "publish it on WordPress?" for an idea's script (post_<type>, 1 / 0).
+export async function setAppScriptPost(id, type, on) {
+  if (!APPSCRIPT_POSTED.includes(type)) throw createAppError("POST_INVALID", "This cannot be published on WordPress.");
+  await setAppScriptFields(id, { [`post_${type}`]: on ? 1 : 0 });
 }
 
 // Starts making one output of an idea, in one save: the user's suggestion, the generate_<type> box ticked and the
@@ -2410,13 +2433,14 @@ export async function saveSchedulerPrompt(id, field, value) {
 
 // Where the outputs of a few ideas stand, read while they are being made: { [id]: generation } (as in mapAppScript).
 export async function fetchAppScriptGeneration(ids = []) {
-  return fetchModuleGeneration(APPSCRIPT_MODULE, APPSCRIPT_OUTPUTS, ids);
+  return fetchModuleGeneration(APPSCRIPT_MODULE, APPSCRIPT_OUTPUTS, ids, APPSCRIPT_POSTED);
 }
 
-// The same read for any module that generates: { [id]: generation } for its outputs `types`.
-export async function fetchModuleGeneration(module, types, ids = []) {
+// The same read for any module that generates: { [id]: generation } for its outputs `types`; `posted` are the outputs
+// with the WordPress fields (post_<type>, <type>_is_posted).
+export async function fetchModuleGeneration(module, types, ids = [], posted = []) {
   if (!ids.length) return {};
-  const fields = ["id", ...types.flatMap((type) => [`generate_${type}`, `${type}_status`, `${type}_suggestion`, `${type}_view_url`, `${type}_download_url`, `${type}_doc_id`])];
+  const fields = ["id", ...types.flatMap((type) => [`generate_${type}`, `${type}_status`, `${type}_suggestion`, `${type}_view_url`, `${type}_download_url`, `${type}_doc_id`]), ...posted.flatMap((type) => [`post_${type}`, `${type}_is_posted`])];
   const data = await smartGateway({ action: "fetch", module, filters: { id: { in: ids } }, fields, page: 1, per_page: 50 });
   return Object.fromEntries(asArray(data.records).filter((record) => record?.id).map((record) => [record.id, generationOf(record, types)]));
 }
@@ -2790,7 +2814,7 @@ export const api = {
   getJob: (id, userEmail) => fetchJobById(id, userEmail),
   getCoverLetter: (job) => fetchCoverLetter(job),
   saveCoverLetter,
-  editCoverLetter: editCoverLetterWithAi,
+  regenerateCoverLetter,
   askAi,
   getStrategy: (job) => fetchStrategy(job),  getTeamMembers: () => fetchTeamMembers(),
   getLiveJobs: (params) => fetchLiveUpworkJobs(params),
@@ -2811,6 +2835,7 @@ export const api = {
   setWordpressStatus: (id, status) => setWordpressStatus(id, status),
   setLlmFields: (id, data) => setLlmFields(id, data),
   setAppScriptFields: (id, data) => setAppScriptFields(id, data),
+  setAppScriptPost: (id, type, on) => setAppScriptPost(id, type, on),
   generateAppScriptOutput: (id, type, suggestion) => generateAppScriptOutput(id, type, suggestion),
   getAppScriptGeneration: (ids) => fetchAppScriptGeneration(ids),
   getGenerationInstructions: (promptName, guidelinesName) => fetchGenerationInstructions(promptName, guidelinesName),
@@ -2853,7 +2878,8 @@ export const api = {
     const reasonText = asText(reason).trim().slice(0, 150);
     if (description === "Rejected" && reasonText) description = `Rejected: ${reasonText}`;
     if (description) await logJobActivity({ jobId: id, userEmail, description }).catch((error) => console.warn("Could not record job activity", error));
-    const changes = { status, reason, coverLetter, activity: [`Status changed from ${current.status} to ${status}`, ...current.activity] };
+    // Without a letter given, none is kept: an empty one would hide the CRM's letter whenever the job is read again.
+    const changes = { status, reason, ...(coverLetter != null ? { coverLetter } : {}), activity: [`Status changed from ${current.status} to ${status}`, ...current.activity] };
     localChanges.set(id, changes);
     return { ...current, ...changes };
   },
