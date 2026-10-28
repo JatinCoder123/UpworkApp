@@ -1322,13 +1322,18 @@ async function fetchReactionRecords(module, filters) {
   return [first, ...rest].flatMap((page) => asArray(page?.records)).filter((record) => record && record.deleted !== "1" && record.content_id);
 }
 
-// { liked: [jobId], saved: [jobId] } for the signed-in user, newest first.
+// { liked: [jobId], saved: [jobId] } for the signed-in user, newest first. A like or save outlives a job deleted from
+// the CRM, so only the jobs still there are kept (the counts and the Saved / Liked lists show real jobs only). If that
+// cannot be checked, every id is kept.
 export async function fetchJobReactions(user) {
   const userId = await reactionUserId(user);
   const [liked, saved] = await Promise.all(Object.values(REACTION_MODULES).map((module) =>
     fetchReactionRecords(module, { user_id: userId, content_module: JOBS_MODULE })
       .then((records) => [...new Set(records.sort((a, b) => Date.parse(parseEnteredAt(b)) - Date.parse(parseEnteredAt(a))).map((record) => record.content_id))])));
-  return { liked, saved };
+  const ids = [...new Set([...liked, ...saved])];
+  const existing = ids.length ? await fetchEveryPage({ action: "fetch", module: JOBS_MODULE, filters: { id: { in: ids } }, fields: ["id"] }).then((records) => new Set(records.map((record) => record.id))).catch(() => null) : null;
+  if (!existing) return { liked, saved };
+  return { liked: liked.filter((id) => existing.has(id)), saved: saved.filter((id) => existing.has(id)) };
 }
 
 // Adds or removes the user's like/save on a job. Adding skips a record that already exists;
