@@ -178,8 +178,10 @@ const present = (value) => value !== undefined && value !== null && String(value
 // A client stat that is not a real number ("N/A", "") becomes null instead of NaN on screen.
 const numberOrNull = (value) => (present(value) && Number.isFinite(Number(value)) ? Number(value) : null);
 
-// The client field is "Country; 31 hires, ★5 (16 reviews), payment verified; 22 proposals".
-// Structured client_* fields (or a JSON client value) win when the backend provides them.
+// The client field is "Country; 31 hires, ★5 (16 reviews), payment verified; 22 proposals" (older jobs) or
+// "Kyiv, Ukraine – payment verified, 3 hires / 8 jobs posted, 4.99 rating (243 reviews)" (newer jobs: the place,
+// "City, Country" or just "Country", before the dash). Structured client_* fields (or a JSON client value) win when
+// the backend provides them.
 function parseClient(record) {
   const text = decodeHtml(record.client || "");
   let structured = {};
@@ -188,9 +190,10 @@ function parseClient(record) {
   }
   const pick = (...keys) => keys.map((key) => record[`client_${key}`] ?? structured[key]).find(present);
   const segments = text.split(";").map((part) => part.trim()).filter(Boolean);
-  const country = pick("country", "location") || (!/\d|hires?|proposals?|verified/i.test(segments[0] || "") ? segments[0] : "") || "";
+  const place = !text.includes(";") && /\s[–—-]\s/.test(text) ? text.split(/\s[–—-]\s/)[0].split(",").map((part) => part.trim()).filter(Boolean) : [];
+  const country = pick("country", "location") || place.at(-1) || (!/\d|hires?|proposals?|verified/i.test(segments[0] || "") ? segments[0] : "") || "";
   const number = (pattern) => text.match(pattern)?.[1]?.replace(/,/g, "");
-  const rating = pick("rating") ?? number(/★\s*([\d.]+)/);
+  const rating = pick("rating") ?? number(/★\s*([\d.]+)/) ?? number(/([\d.]+)\s*rating/i);
   const reviews = pick("reviews", "review_count") ?? number(/\(([\d,]+)\s*reviews?\)/i);
   const hires = pick("hires", "total_hires") ?? number(/([\d,]+)\s*hires?/i);
   const proposals = pick("proposals") ?? number(/([\d,]+)\s*proposals?/i);
@@ -199,14 +202,14 @@ function parseClient(record) {
   const totalSpent = pick("total_spent", "spent") || text.match(/\$[\d.,]+[KkMm]?\+?(?=\s*(?:total\s*)?spent)/)?.[0] || "";
   return {
     country,
-    city: pick("city") || "",
+    city: pick("city") || place.slice(0, -1).join(", "),
     timezone: pick("timezone", "tz") || "",
     rating: numberOrNull(rating),
     reviews: numberOrNull(reviews),
     hires: numberOrNull(hires),
     activeHires: numberOrNull(pick("active_hires", "active")),
     proposals: numberOrNull(proposals),
-    jobsPosted: numberOrNull(pick("jobs_posted")),
+    jobsPosted: numberOrNull(pick("jobs_posted") ?? number(/([\d,]+)\s*jobs?\s+posted/i)),
     hireRate: pick("hire_rate") || "",
     openJobs: numberOrNull(pick("open_jobs")),
     totalSpent,
@@ -231,6 +234,23 @@ function parseBudget(value) {
   const workload = parts.find((part) => /hrs\/week|hours|not sure/i.test(part)) || "";
   const duration = parts.find((part) => part !== workload && DURATIONS.test(part)) || "";
   return { amount, level, workload: /not sure/i.test(workload) ? "" : workload, duration };
+}
+
+// Newer jobs keep their budget in the module's own fields: budget_type (fixed / hourly), fixed_amount, hourly_min,
+// hourly_max and budget_currency. Shown as the live Upwork jobs show it: "$50", "$14–$30/hr" ("$10/hr" when both are
+// the same). Null for an older job without them, whose budget text is read instead.
+function crmBudget(record) {
+  const kind = asText(record.budget_type).trim().toLowerCase();
+  if (kind !== "fixed" && kind !== "hourly") return null;
+  const currency = asText(record.budget_currency).trim().toUpperCase();
+  const price = (value) => {
+    if (!currency || currency === "USD") return money(value);
+    const amount = Number(value);
+    return Number.isFinite(amount) && amount > 0 ? `${currency} ${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "";
+  };
+  if (kind === "fixed") return { amount: price(record.fixed_amount) || "Budget not specified", type: "Fixed price" };
+  const range = [...new Set([price(record.hourly_min), price(record.hourly_max)].filter(Boolean))];
+  return { amount: range.length ? `${range.join("–")}/hr` : "Budget not specified", type: "Hourly" };
 }
 
 function humanize(value) {
@@ -292,6 +312,7 @@ export function mapGatewayJob(input) {
   const owner = descriptionValue(record.description, "Lead");
   const url = record.upwork_url || descriptionValue(record.description, "Upwork link");
   const budget = parseBudget(record.budget);
+  const crm = crmBudget(record);
   return {
     id: record.id,
     jobId: record.job_id || record.name,
@@ -304,8 +325,8 @@ export function mapGatewayJob(input) {
     // When the job entered the feed (its CRM record was created), shown in its Activity.
     added: record.date_entered_uni_format || record.date_entered || "",
     addedAt: present(record.date_entered) ? parseEnteredAt(record) : "",
-    budget: budget.amount,
-    type: /hour|\/hr/i.test(budget.amount) ? "Hourly" : "Fixed price",
+    budget: crm?.amount || budget.amount,
+    type: crm?.type || (/hour|\/hr/i.test(budget.amount) ? "Hourly" : "Fixed price"),
     level: budget.level || "Not specified",
     duration: budget.duration || "Duration not set",
     workload: budget.workload,
