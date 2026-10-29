@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, ArrowSquareOut, Article, BookOpenText, Briefcase, CalendarBlank, ChartBar, ChatCircle, CheckCircle, ClipboardText, Code, Coins, CurrencyDollar, EnvelopeSimple, FileText, Flag, Folder, Gauge, Globe, GoogleDriveLogo, Lightbulb, ListChecks, Minus, Plugs, PresentationChart, PuzzlePiece, Sparkle, Stack, Table, Tag, Target, Timer, Tray, TrendDown, TrendUp, Users, VideoCamera, X } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, ArrowSquareOut, BookOpenText, Briefcase, CalendarBlank, ChartBar, ChatCircle, CheckCircle, ClipboardText, Code, Coins, CurrencyDollar, EnvelopeSimple, FileText, Flag, Folder, Gauge, Globe, GoogleDriveLogo, Lightbulb, ListChecks, Minus, Plugs, PresentationChart, PuzzlePiece, Sparkle, Stack, Table, Tag, Target, Timer, Tray, TrendDown, TrendUp, Users, VideoCamera, X } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import LogoLoader from '../components/LogoLoader'
 import DateTimeRangeFilter from '../components/DateTimeRangeFilter'
@@ -29,7 +29,7 @@ import { timeAgo, useNow } from '../lib/time'
  * search, sort, date, the strips and the universal filter. The smart gateway does the filtering, search, sorting and
  * counts; the fields holding several values per idea (Google apps, integrations, target users, tags) and the rank
  * sorts are finished on the page (see useGatewayFeed). Labels and choices come from the module's dropdown lists.
- * Generate (script, blog, video): the user adds a suggestion and starts it; the CRM gets the suggestion, the generate
+ * Generate (script, video): the user adds a suggestion and starts it; the CRM gets the suggestion, the generate
  * box and "queued", and the page follows the status the generator sets until the document is ready (or failed).
  * Once the script is ready, the user is asked whether to publish it on WordPress (post_script); ticked, the sites'
  * login URL is shown with it.
@@ -67,7 +67,6 @@ const EARNING_ICONS = { addon: PuzzlePiece, freelance_gig: Briefcase, template_s
 // What can be made from an idea: type (the CRM fields' prefix), icon, name, short name and an example suggestion.
 const OUTPUTS = [
   ['script', Code, 'Apps Script code', 'Script', 'e.g. Also log every sent invoice with a timestamp in a "Sent log" sheet'],
-  ['blog', Article, 'Blog post', 'Blog', 'e.g. Write for small agencies and say it works with a free Gmail account'],
   ['video', VideoCamera, 'Video', 'Video', 'e.g. Keep it under 60 seconds and end on a question'],
 ]
 // The outputs' CRM prefixes, and the ones that can be published on WordPress (only the script).
@@ -315,7 +314,7 @@ function ChipList({ icon: Icon, title, values, field, labelOf }) {
 }
 
 // One idea: how it works, the problem, features, apps, integrations, users, the competition and our edge, plus Generate
-// (script, blog, video) with each one's status. `onPanel(type)` opens an output's Prompt & guidelines (null closes).
+// (script, video) with each one's status. `onPanel(type)` opens an output's Prompt & guidelines (null closes).
 function IdeaDetails({ item, labelOf, now, panelType, onPanel }) {
   const facts = [
     [Folder, 'Category', labelOf('category', item.category)],

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUUpLeft, BookmarkSimple, Briefcase, CheckCircle, Clock, Eye, Fire, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Star, Target } from '@phosphor-icons/react'
+import { ArrowUUpLeft, BookmarkSimple, Briefcase, CheckCircle, Clock, Fire, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Star, Target } from '@phosphor-icons/react'
 import { StatusPill } from './ui'
 import { Chips, Price } from './JobApplySection'
 import ShareJobDialog from './ShareJobDialog'
+import UpworkLogo from './UpworkLogo'
 import { scoreJob } from '../lib/scoring'
 import { timeAgo } from '../lib/time'
 import { previewClick, skillStyle } from '../lib/jobSignals'
@@ -51,7 +52,7 @@ export function JobCardActions({ job, liked, onLike, likeCount, saved, onSave, f
         <Star size={15} weight={favorite ? 'fill' : 'regular'} className={favorite ? 'text-[#f59e0b] dark:text-[#fde047]' : ''} />
       </ReactionButton>}
     <ReactionButton active={false} onClick={() => setSharing(true)} label="Share in Teams"><MicrosoftTeamsLogo size={15} weight="fill" className="text-[#4b53bc]" /></ReactionButton>
-    {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="View job on Upwork" title="View job on Upwork" className="grid size-7 place-items-center rounded-full text-[var(--muted)] transition-all duration-300 hover:bg-[var(--raised)] hover:text-[var(--ink)] active:scale-90"><Eye size={15} weight="bold" /></a>}
+    {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="View job on Upwork" title="View job on Upwork" className="grid size-8 place-items-center rounded-full transition-all duration-300 hover:bg-[var(--raised)] active:scale-90"><UpworkLogo size={20} /></a>}
     {sharing && <ShareJobDialog job={job} mode="teams" onClose={() => setSharing(false)} />}
   </div>
 }

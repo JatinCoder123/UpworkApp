@@ -66,11 +66,14 @@ function pad(value) {
   return String(value).padStart(2, '0')
 }
 
-function formatGatewayDate(date) {
+// `utc`: the time in UTC, which is how the gateway compares the jobs' dates (checked against their records); without
+// it, the browser's own time.
+function formatGatewayDate(date, utc = false) {
+  if (utc) return date.toISOString().slice(0, 19).replace('T', ' ')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
 }
 
-export function toGatewayDateFilter(filter, dateField = 'date_entered') {
+export function toGatewayDateFilter(filter, dateField = 'date_entered', { utc = false } = {}) {
   if (!filter || filter.preset === 'all') return null
   const now = new Date()
   let { start, end } = resolveDateRange(filter, now)
@@ -88,7 +91,7 @@ export function toGatewayDateFilter(filter, dateField = 'date_entered') {
   if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
   return {
     date_field: dateField,
-    date_from: formatGatewayDate(start),
-    date_to: formatGatewayDate(end),
+    date_from: formatGatewayDate(start, utc),
+    date_to: formatGatewayDate(end, utc),
   }
 }

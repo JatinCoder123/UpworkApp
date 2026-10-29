@@ -6,7 +6,7 @@ import { patchFeedItem } from './gatewayFeed'
 import { asObject } from './safe'
 
 /*
- * Outputs generated from a feed item (AppScript's script / blog / video, a "+ New feed" feed's doc / blog / video /
+ * Outputs generated from a feed item (AppScript's script / video, a "+ New feed" feed's doc / blog / video /
  * image). Each output has the same CRM fields: generate_<type>, <type>_suggestion, <type>_status (set by the generator),
  * <type>_view_url, <type>_download_url and <type>_doc_id; an item's `generation` is { [type]: { requested, status,
  * suggestion, viewUrl, downloadUrl, docId, post, posted } }. `post` and `posted` (post_<type>, <type>_is_posted) are

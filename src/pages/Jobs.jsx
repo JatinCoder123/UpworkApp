@@ -87,7 +87,7 @@ export default function Jobs() {
   const reactions = useCrmReactions(user);
   const jobStatus = useJobStatus();
   const [dateFilter, setDateFilter] = useState(() => loadDateFilter("jobs"));
-  const gatewayDateFilter = useMemo(() => toGatewayDateFilter(dateFilter), [dateFilter]);
+  const gatewayDateFilter = useMemo(() => toGatewayDateFilter(dateFilter, "date_entered", { utc: true }), [dateFilter]);
   const [scope, setScope] = useState(loadJobScope);
   const [tab, setTab] = useState(() => (loadJobStatus() === "Seen" ? "New" : loadJobStatus()));
   // Independent of the status tab, so e.g. Rejected + Saved + Liked narrow the list together.
@@ -416,6 +416,20 @@ export default function Jobs() {
   const hasFilters = skills.length > 0 || groupChosen || dateFilter.preset !== "all" || searchInput || countExtraFilters(extraFilters) > 0 || savedOnly || likedOnly;
   const searching = isFetching && !isFetchingNextPage && searchInput.trim() === search;
   const clearAllFilters = () => { setSkills([]); setSkillGroup(EMPTY_SKILL_GROUP); setSearchInput(""); setDateFilter(EMPTY_DATE_RANGE); setExtraFilters(EMPTY_EXTRA_FILTERS); setReactionFilter(EMPTY_REACTION_FILTER); };
+  // The "new jobs" alert: the list shows the jobs it counted (added since `since`, every status, newest first). The
+  // filters that could hide one are cleared, and My skills / My preferences are off for this visit only (not saved),
+  // so no job is hidden and no older preference job is added on top.
+  const showNewJobs = (since) => {
+    const minute = (time) => { const date = new Date(time); return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); };
+    clearAllFilters();
+    setDateFilter({ preset: "custom", from: minute(since), to: minute(Date.now()) });
+    setTab("All");
+    saveJobStatus("All");
+    changeSort("newest");
+    setMySkillsChecked(false);
+    setPreferenceToggle(false);
+    window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  };
 
   return (
     <Shell>
@@ -670,7 +684,7 @@ export default function Jobs() {
         </div>
 
         {/* Feeder and applications alerts as the page opens; an extra, so a failure there hides them and nothing else. */}
-        <ErrorBoundary name="job-alerts" fallback={NoAlerts}><JobAlerts userEmail={user?.email} allJobs={showAllJobs} sort={sort} onShowNewest={() => changeSort("newest")} /></ErrorBoundary>
+        <ErrorBoundary name="job-alerts" fallback={NoAlerts}><JobAlerts userEmail={user?.email} allJobs={showAllJobs} onShowNew={showNewJobs} /></ErrorBoundary>
         {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={jobStatus.markApplied} applyError={jobStatus.errorId === preview.id ? `Could not mark this job as applied: ${jobStatus.error?.message || "please try again."}` : ""} />}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}

@@ -1,6 +1,7 @@
-import { ArrowSquareOut, ArrowUUpLeft, BookmarkSimple, Check, Eye, Heart, LinkSimple, MicrosoftTeamsLogo, PaperPlaneTilt, Star, UsersThree, WarningCircle, X } from '@phosphor-icons/react'
+import { ArrowSquareOut, ArrowUUpLeft, BookmarkSimple, Check, Heart, LinkSimple, MicrosoftTeamsLogo, PaperPlaneTilt, Star, UsersThree, WarningCircle, X } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { useCopied } from './JobDetailParts'
+import UpworkLogo from './UpworkLogo'
 import { REJECT_REASONS } from '../lib/jobStatus'
 import { jobShareLink } from '../lib/jobSignals'
 
@@ -10,7 +11,9 @@ export function Price({ job, className = '' }) {
   if (!/\d/.test(text)) return <p className={`text-lg font-semibold tracking-[-.02em] text-[var(--muted)] ${className}`}>{job.budget || 'Budget not specified'}</p>
   const match = text.match(/^(.*?)\s*\/\s*(?:hr|hour)$/i)
   const hourly = Boolean(match) || job.type === 'Hourly'
-  return <p className={`min-w-0 truncate text-[1.65rem] font-bold leading-none tracking-[-.04em] ${className}`} title={job.budget}>{match ? match[1] : text}{hourly && <span className="ml-0.5 text-sm font-medium tracking-normal text-[var(--muted)]">/hr</span>}</p>
+  // A long budget ("USD 15.00 - USD 35.00/hr") goes on to a second line instead of being cut, so it reads the same in
+  // the narrow price column of a wide screen as in the full-width one of a phone.
+  return <p className={`min-w-0 break-words text-[1.65rem] font-bold leading-[1.1] tracking-[-.04em] ${className}`} title={job.budget}>{match ? match[1] : text}{hourly && <span className="ml-0.5 text-sm font-medium tracking-normal text-[var(--muted)]">/hr</span>}</p>
 }
 
 const jobChips = (job) => [job.type, job.level !== 'Not specified' && job.level, job.duration !== 'Duration not set' && job.duration].filter(Boolean)
@@ -110,7 +113,7 @@ export default function JobApplySection({ job, statusLabel, dismissed, rejectRea
       <button type="button" onClick={() => copy('link', jobShareLink(job))} aria-label="Copy job link" title={copied === 'link' ? 'Copied' : 'Copy link'} className={squareButton(false)}>{copied === 'link' ? <Check size={16} weight="bold" className="text-[var(--accent-strong)]" /> : <LinkSimple size={16} />}</button>
       <button type="button" onClick={() => onShare('teams')} aria-label="Share in Teams" title="Share in Teams" className={squareButton(false)}><MicrosoftTeamsLogo size={17} weight="fill" className="text-[#4b53bc]" /></button>
       <button type="button" onClick={() => onShare('notify')} aria-label="Notify team" title="Notify team" className={squareButton(false)}><UsersThree size={16} weight="bold" /></button>
-      {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="View job on Upwork" title="View job on Upwork" className={squareButton(false)}><Eye size={17} weight="bold" /></a>}
+      {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="View job on Upwork" title="View job on Upwork" className={squareButton(false)}><UpworkLogo size={24} /></a>}
     </div>
   </div>
 }

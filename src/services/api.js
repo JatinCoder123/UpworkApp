@@ -647,6 +647,8 @@ function lastHours(hours) {
 export async function fetchJobAlerts({ userEmail, allJobs = false, applications = true } = {}) {
   const userId = await findGatewayUserIdByEmail(userEmail);
   const byUser = allJobs ? {} : { user_id: userId };
+  // Where the feeder's 4 hours start, so the alert can show those jobs in the list.
+  const since = new Date(Date.now() - 4 * 3_600_000).toISOString();
   const [counts, newestJob, entries, lastApplied] = await Promise.all([
     smartGateway({ action: "get_stats", date_range: "", ...lastHours(4), queries: [
       { key: "added", module: JOBS_MODULE },
@@ -662,6 +664,7 @@ export async function fetchJobAlerts({ userEmail, allJobs = false, applications 
   const newest = asArray(newestJob.records).find((record) => record && record.deleted !== "1" && present(record.date_entered));
   const last = asArray(lastApplied.records).find((record) => record && record.deleted !== "1" && present(record.date_entered));
   return {
+    since,
     added: Number(counts.stats?.added?.count) || 0,
     ready: Number(counts.stats?.ready?.count) || 0,
     lastAddedAt: newest ? parseEnteredAt(newest) : "",
@@ -2271,7 +2274,7 @@ export const APPSCRIPT_MODULE = import.meta.env?.VITE_APPSCRIPT_MODULE || "outr_
 // What an idea can be turned into. Each has its own CRM fields: generate_<type> (the trigger), <type>_suggestion (the
 // user's notes for the generator), <type>_status (queued / processing / completed / failed, set by the generator) and,
 // once made, the document's <type>_view_url and <type>_download_url.
-export const APPSCRIPT_OUTPUTS = ["script", "blog", "video"];
+export const APPSCRIPT_OUTPUTS = ["script", "video"];
 // The outputs that can go up on WordPress, each with two more fields: post_<type> (the user's "publish it on WordPress"
 // box, a trigger: the backend posts it and puts it back to 0) and <type>_is_posted (set once it is up).
 export const APPSCRIPT_POSTED = ["script"];
@@ -2315,7 +2318,7 @@ function mapAppScript(record) {
     status: asText(record.status) || "new",
     priority: asText(record.priority),
     notes: text(record.notes),
-    // The script, blog and video made from the idea: { script: { requested, status, suggestion, viewUrl, downloadUrl }, ... }.
+    // The script and video made from the idea: { script: { requested, status, suggestion, viewUrl, downloadUrl }, ... }.
     generation: generationOf(record),
     publishedAt: parseCrmDate(record.posted_date) || parseEnteredAt(record),
     addedAt: parseEnteredAt(record),
@@ -2358,7 +2361,7 @@ const PROMPT_FIELDS = ["role_prompt", "overwrite_prompt", "output_format"];
 // The texts of a prompt record that can be edited: the three parts and, on older prompts, the task in description.
 const PROMPT_TEXT_FIELDS = ["description", ...PROMPT_FIELDS];
 
-// A generator's prompt and guidelines, by record name (e.g. "appscript_blog" and "appscript_blog_guidelines", or
+// A generator's prompt and guidelines, by record name (e.g. "appscript_script" and "appscript_script_guidelines", or
 // "notes_blog" and "notes_blog_guidelines" for Site Content): { prompt: { id, role_prompt, overwrite_prompt,
 // output_format } | null, guidelines: { id, text } | null }.
 export async function fetchGenerationInstructions(promptName, guidelinesName) {

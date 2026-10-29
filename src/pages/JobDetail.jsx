@@ -142,7 +142,7 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
             {clientStats.country && <p className="mt-3 flex items-center gap-1.5 text-sm text-[var(--muted)]"><MapPin size={15} weight="bold" />{clientStats.country}{clientStats.rating != null && <><span aria-hidden="true">·</span><Star size={14} weight="fill" className="text-[#e6a817]" />{Number(clientStats.rating).toFixed(1)}</>}{clientStats.paymentVerified && <><span aria-hidden="true">·</span><SealCheck size={14} weight="fill" className="text-[var(--ok)]" />Payment verified</>}</p>}
             {job.summary && <ExpandableText className="mt-5 max-w-3xl" collapsedHeight="3.6rem"><p className="text-[15px] leading-7">{job.summary}</p></ExpandableText>}
             <div className="mt-6 grid gap-3 grid-cols-2 sm:grid-cols-4">
-              <FactTile icon={CurrencyDollar} label="Budget" value={job.budget} note={job.type} />
+              <FactTile icon={CurrencyDollar} label="Budget" value={job.budget} note={job.type} wrap />
               <FactTile icon={ChartBar} label="Experience" value={job.level} />
               <FactTile icon={CalendarBlank} label="Duration" value={job.duration} />
               <FactTile icon={Hourglass} label="Workload" value={job.workload || 'Not specified'} />

@@ -107,7 +107,7 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
             <h1 className="job-detail-title mt-5">{job.title}</h1>
             <p className="mt-3 flex flex-wrap items-center gap-1.5 text-sm text-[var(--muted)]"><MapPin size={15} weight="bold" />{clientStats.country || 'Location not shared'}{clientStats.paymentVerified && <><span aria-hidden="true">·</span><SealCheck size={14} weight="fill" className="text-[var(--ok)]" />Payment verified</>}{tags[1] && <><span aria-hidden="true">·</span>{tags[1]}</>}</p>
             <div className="mt-6 grid gap-3 grid-cols-2 sm:grid-cols-4">
-              <FactTile icon={CurrencyDollar} label="Budget" value={job.budget} note={job.type} />
+              <FactTile icon={CurrencyDollar} label="Budget" value={job.budget} note={job.type} wrap />
               <FactTile icon={ChartBar} label="Experience" value={job.level} />
               <FactTile icon={CalendarBlank} label="Duration" value={job.duration} />
               <FactTile icon={Hourglass} label="Workload" value={job.workload || 'Not specified'} />
