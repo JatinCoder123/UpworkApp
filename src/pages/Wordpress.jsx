@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, ArrowSquareOut, CalendarBlank, ClockCounterClockwise, CurrencyDollar, DownloadSimple, Eye, Folder, Gauge, Globe, Layout, Lightbulb, Minus, Newspaper, PaintBrush, Plug, PuzzlePiece, ShoppingCart, SquaresFour, Stack, Star, Tag, Tray, TrendDown, TrendUp, User } from '@phosphor-icons/react'
+import { ArrowRight, ArrowSquareOut, ClockCounterClockwise, CurrencyDollar, DownloadSimple, Eye, Folder, Gauge, Globe, Layout, Lightbulb, Minus, Newspaper, PaintBrush, Plug, PuzzlePiece, ShoppingCart, SquaresFour, Stack, Star, Tag, Tray, TrendDown, TrendUp, User } from '@phosphor-icons/react'
 import Shell from '../components/Shell'
 import LogoLoader from '../components/LogoLoader'
 import DateTimeRangeFilter from '../components/DateTimeRangeFilter'
@@ -169,10 +169,10 @@ export default function Wordpress() {
           : items.length
             ? <div className="mt-6 grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
               <ErrorBoundary name="wordpress-index" fallbackProps={INDEX_ERROR} resetKey={items}><FeedIndex items={items} activeId={activeId} onJump={jumpTo}
-                meta={(item) => { const [TypeIcon] = TYPES[item.itemType] || [Tag]; return <><TypeIcon size={10} />{labelOf('item_type', item.itemType)} · {timeAgo(item.publishedAt, now)}</> }}
+                meta={(item) => { const [TypeIcon] = TYPES[item.itemType] || [Tag]; return <><TypeIcon size={10} />{labelOf('item_type', item.itemType)}</> }}
                 mark={(item) => item.demandScore != null && <span title={`Demand score ${item.demandScore}`} className="mt-0.5 shrink-0 self-start rounded-md bg-[var(--paper)] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{item.demandScore}</span>} /></ErrorBoundary>
               <div className="min-w-0">
-                <section className={`grid content-start gap-4 transition-opacity min-[1400px]:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="wordpress-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><FeedCard item={item} labelOf={labelOf} now={now} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
+                <section className={`grid content-start gap-4 transition-opacity min-[1400px]:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="wordpress-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><FeedCard item={item} labelOf={labelOf} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
                 <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} />
               </div>
             </div>
@@ -230,7 +230,7 @@ function Tags({ tags, labelOf }) {
   return <div className="flex flex-wrap gap-1.5">{tags.map((tag) => <span key={tag} style={skillStyle(tag)} className="skill-chip rounded-full px-2.5 py-1 text-xs font-semibold">{labelOf('tags', tag)}</span>)}</div>
 }
 
-function FeedCard({ item, labelOf, now, onOpen }) {
+function FeedCard({ item, labelOf, onOpen }) {
   return <article id={`feed-${item.id}`} data-feed-card={item.id} className={`flex scroll-mt-[calc(var(--shell-h)+1rem)] flex-col gap-3.5 rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(30,40,25,.1)]`}>
     <header className="flex items-start gap-3">
       <TypeTile type={item.itemType} />
@@ -248,7 +248,6 @@ function FeedCard({ item, labelOf, now, onOpen }) {
     <footer className="mt-auto flex items-center justify-between gap-3 border-t border-[var(--line)] pt-3">
       <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted)]">
         <span className="inline-flex items-center gap-1"><Globe size={12} />{labelOf('source', item.source)}</span>
-        <span className="inline-flex items-center gap-1" title="Published"><CalendarBlank size={12} />{timeAgo(item.publishedAt, now)}</span>
         {item.lastUpdated && <span className="inline-flex items-center gap-1"><ClockCounterClockwise size={12} />Updated {shortDate(item.lastUpdated)}</span>}
       </p>
       <div className="flex shrink-0 items-center gap-1.5">
@@ -268,7 +267,6 @@ function FeedDialog({ item, labelOf, now, onClose }) {
     [Globe, 'Source', labelOf('source', item.source)],
     [User, 'Author', item.author],
     [ClockCounterClockwise, 'Last updated', formatDate(item.lastUpdated)],
-    [CalendarBlank, 'Published', item.publishedAt && `${formatDate(item.publishedAt)} · ${timeAgo(item.publishedAt, now)}`],
     [Tray, 'Added to the feed', item.addedAt && `${formatDate(item.addedAt)} · ${timeAgo(item.addedAt, now)}`],
   ].filter(([, , value]) => value)
 

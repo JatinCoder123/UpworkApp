@@ -182,8 +182,15 @@ const numberOrNull = (value) => (present(value) && Number.isFinite(Number(value)
 // "Kyiv, Ukraine – payment verified, 3 hires / 8 jobs posted, 4.99 rating (243 reviews)" (newer jobs: the place,
 // "City, Country" or just "Country", before the dash). Structured client_* fields (or a JSON client value) win when
 // the backend provides them.
+// Newer jobs carry the client in separate fields (client_country, client_city, client_rating, client_reviews,
+// client_hires, client_jobs_posted, client_payment_verified, client_is_new, client_total_spent, and the job's
+// applicants). Those are used as they are, with nothing read from the client text, so an empty client_rating means no
+// reviews yet rather than the text's "0 rating". Older jobs have only the client text, read as below.
+const CLIENT_FIELDS = ["country", "city", "rating", "reviews", "hires", "jobs_posted", "payment_verified", "is_new", "total_spent"];
+
 function parseClient(record) {
-  const text = decodeHtml(record.client || "");
+  const separate = CLIENT_FIELDS.some((key) => present(record[`client_${key}`]));
+  const text = separate ? "" : decodeHtml(record.client || "");
   let structured = {};
   if (/^\s*\{/.test(text)) {
     try { structured = JSON.parse(text); } catch { structured = {}; }
@@ -196,7 +203,7 @@ function parseClient(record) {
   const rating = pick("rating") ?? number(/★\s*([\d.]+)/) ?? number(/([\d.]+)\s*rating/i);
   const reviews = pick("reviews", "review_count") ?? number(/\(([\d,]+)\s*reviews?\)/i);
   const hires = pick("hires", "total_hires") ?? number(/([\d,]+)\s*hires?/i);
-  const proposals = pick("proposals") ?? number(/([\d,]+)\s*proposals?/i);
+  const proposals = pick("proposals") ?? (present(record.applicants) ? record.applicants : undefined) ?? number(/([\d,]+)\s*proposals?/i);
   const paymentVerified = present(pick("payment_verified")) ? flag(pick("payment_verified")) : /payment\s+verified/i.test(text) && !/payment\s+(?:not|un)\s*verified/i.test(text);
   const phoneVerifiedValue = pick("phone_verified");
   const totalSpent = pick("total_spent", "spent") || text.match(/\$[\d.,]+[KkMm]?\+?(?=\s*(?:total\s*)?spent)/)?.[0] || "";
@@ -217,6 +224,8 @@ function parseClient(record) {
     totalHours: pick("total_hours", "hours") || "",
     paymentVerified,
     phoneVerified: present(phoneVerifiedValue) ? flag(phoneVerifiedValue) : null,
+    // A client new to Upwork (client_is_new, or "new client" in an older job's text).
+    isNew: present(pick("is_new")) ? flag(pick("is_new")) : /\bnew client\b/i.test(text),
     // Kept for the fit-score helper, which reads these three.
     location: country || "Location not shared",
     spent: totalSpent || "—",
@@ -256,6 +265,13 @@ function crmBudget(record) {
 function humanize(value) {
   const text = String(value || "").replace(/_/g, " ").trim();
   return text ? text[0].toUpperCase() + text.slice(1) : "";
+}
+
+// A job field written as an Upwork code ("EXPERT", "MORE_THAN_6_MONTHS") as people read it ("Expert", "More than 6
+// months"); any other text as it is.
+function readableCode(value) {
+  const text = asText(value).trim();
+  return /^[A-Z0-9_]+$/.test(text) && /[A-Z]/.test(text) ? LIVE_LEVELS[text] || humanize(text.toLowerCase()) : text;
 }
 
 // Some cover letters are stored base64-encoded. Decode them when the payload is clearly base64 text.
@@ -327,9 +343,11 @@ export function mapGatewayJob(input) {
     addedAt: present(record.date_entered) ? parseEnteredAt(record) : "",
     budget: crm?.amount || budget.amount,
     type: crm?.type || (/hour|\/hr/i.test(budget.amount) ? "Hourly" : "Fixed price"),
-    level: budget.level || "Not specified",
-    duration: budget.duration || "Duration not set",
-    workload: budget.workload,
+    // Newer jobs have their own experience_level, project_duration and workload fields; older ones keep them in the
+    // budget text.
+    level: readableCode(record.experience_level) || budget.level || "Not specified",
+    duration: readableCode(record.project_duration) || budget.duration || "Duration not set",
+    workload: readableCode(record.workload) || budget.workload,
     status: changes.status || asText(record.status).trim() || descriptionValue(record.description, "Status") || "New",    match: Number(record.match_score) || 0,
     fitLabel: decodeHtml(record.fit || ""),
     matchReason: decodeHtml(record.match_reason || ""),
@@ -2290,6 +2308,37 @@ const generationOf = (record, types = APPSCRIPT_OUTPUTS) => Object.fromEntries(t
   posted: flag(record[`${type}_is_posted`]),
 }]));
 
+const POINT_MARK = /^(?:[-•*]|\d+[.)])\s+/;
+// Each line of a text, without its point marker ("1. ", "- ", "• ").
+const textLines = (value) => value.split("\n").map((line) => line.trim().replace(POINT_MARK, "")).filter(Boolean);
+// A text written as points, one per line ("1. …", "- …" or "• …"), without the markers; [] when it is not.
+function textPoints(value) {
+  const lines = value.split("\n").map((line) => line.trim()).filter(Boolean);
+  return lines.length > 1 && lines.every((line) => POINT_MARK.test(line)) ? textLines(value) : [];
+}
+
+// Demand proof, one proof per line: "Upwork: Build AI Lead Qualification Workflow, …, fixed $30, posted 2026-10-29
+// (https://www.upwork.com/jobs/~…)" -> { source: "Upwork", text: "Build AI Lead …, posted 2026-10-29", url }. An older
+// idea's single line, with no source or link, is one proof with only its text.
+function demandProofs(value) {
+  return value.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+    const url = line.match(/\((https?:\/\/[^\s)]+)\)\s*$/)?.[1] || line.match(/https?:\/\/\S+/)?.[0] || "";
+    const rest = line.replace(/\s*\((https?:\/\/[^\s)]+)\)\s*$/, "").replace(url, "").trim();
+    const source = rest.match(/^([^:]{2,40}):\s/)?.[1] || "";
+    return { source, text: source ? rest.slice(source.length + 1).trim() : rest, url };
+  });
+}
+
+// Price range as options: "$300-$800 per gig, or $39-$79 one-time template" -> [{ amount: "$300–$800", note: "per gig" },
+// { amount: "$39–$79", note: "one-time template" }]. Newer ideas join options with ", or", "; " or "plus"; an older
+// idea's "$50–$150" is one option. A part with no amount ("plus monthly content retainer") is a note alone.
+function priceOptions(value) {
+  return value.split(/\s*;\s*|,\s*or\s+|,?\s+plus\s+/i).map((part) => part.trim()).filter(Boolean).map((part) => {
+    const match = part.match(/^(\$\s?[\d,.]+[kK]?(?:\s*[-–]\s*\$?\s?[\d,.]+[kK]?)?(?:\s*\/\s*[a-z]+)?)\s*(.*)$/);
+    return match ? { amount: match[1].replace(/\s*[-–]\s*/, "–").replace(/\s*\/\s*/, "/"), note: match[2] } : { amount: "", note: part };
+  });
+}
+
 function mapAppScript(record) {
   const text = (value) => decodeHtml(asText(value)).trim();
   return {
@@ -2297,17 +2346,21 @@ function mapAppScript(record) {
     name: text(record.name),
     pitch: text(record.short_pitch),
     description: text(record.description),
+    // How it works as steps, when it is written as points ("1. …" lines); otherwise [] and the text is shown as written.
+    steps: textPoints(text(record.description)),
     problem: text(record.problem_solved),
-    features: text(record.key_features).split(/\s*,\s*/).filter(Boolean),
+    // Key features: one per line ("- …", newer ideas) or separated by commas (older ones).
+    features: text(record.key_features).includes("\n") ? textLines(text(record.key_features)) : text(record.key_features).split(/\s*,\s*/).filter(Boolean),
     apps: splitMultiEnum(record.google_app),
     category: asText(record.category),
     demandScore: numberOrNull(record.demand_score),
-    demandProof: text(record.demand_proof),
+    demandProofs: demandProofs(text(record.demand_proof)),
     trend: asText(record.trend),
     difficulty: asText(record.difficulty),
     buildTime: text(record.build_time),
     earningModel: asText(record.earning_model),
     priceRange: text(record.price_range),
+    prices: priceOptions(text(record.price_range)),
     tags: splitMultiEnum(record.tags),
     integrations: splitMultiEnum(record.integrations),
     targetUsers: splitMultiEnum(record.target_users),

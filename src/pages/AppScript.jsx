@@ -245,6 +245,26 @@ function Tile({ apps }) {
   return <span className={`grid size-11 shrink-0 place-items-center rounded-xl ${tone}`}><Icon size={21} weight="duotone" /></span>
 }
 
+// Price range as options ("$300–$800" per gig, "$39–$79" one-time template). In a tile (`full` off) the first option's
+// amount, with what it is for and how many more under it, so every tile keeps two short lines; in the facts, every
+// option on its own line.
+function PriceValue({ prices, text, full = false }) {
+  if (!prices.length) return null
+  const [first] = prices
+  const more = prices.length - 1
+  const note = (price) => (price.amount ? price.note : `+ ${price.note}`)
+  if (!full) {
+    const under = [first.amount && first.note, more > 0 && `+${more} more`].filter(Boolean).join(' · ')
+    return <span className="block min-w-0" title={text}>
+      <span className="block truncate">{first.amount || first.note}</span>
+      {under && <span className="mt-0.5 block truncate text-xs font-medium text-[var(--muted)]">{under}</span>}
+    </span>
+  }
+  return <span className="block">{prices.map((price) => <span key={`${price.amount}${price.note}`} className="block">
+    {price.amount}{price.amount && price.note && ' '}{price.note && <span className="font-medium text-[var(--muted)]">{note(price)}</span>}
+  </span>)}</span>
+}
+
 // Demand (score and bar), trend, build time and price, each with its icon.
 function Metrics({ item, labelOf }) {
   const [TrendIcon, trendTone] = TREND[item.trend] || TREND.stable
@@ -254,7 +274,7 @@ function Metrics({ item, labelOf }) {
     </Metric>
     <Metric icon={TrendIcon} tone={trendTone} caption="Trend" value={item.trend && <span className={trendTone}>{labelOf('trend', item.trend)}</span>} />
     <Metric icon={Timer} caption="Build time" value={item.buildTime} />
-    <Metric icon={CurrencyDollar} caption="Price" value={item.priceRange} wrap />
+    <Metric icon={CurrencyDollar} caption="Price" value={<PriceValue prices={item.prices} text={item.priceRange} />} wrap />
   </div>
 }
 
@@ -308,22 +328,50 @@ function TextBlock({ icon: Icon, title, children }) {
   return <section><p className={`${label} flex items-center gap-1.5`}><Icon size={13} weight="bold" />{title}</p><p className="mt-1.5 text-[var(--muted)]">{children}</p></section>
 }
 
+// How it works: numbered steps when the idea writes it as points ("1. …" lines); otherwise the text, its line breaks kept.
+function HowItWorks({ steps, text }) {
+  if (!text) return null
+  return <section>
+    <p className={`${label} flex items-center gap-1.5`}><Code size={13} weight="bold" />How it works</p>
+    {steps.length
+      ? <ol className="mt-2 space-y-2">{steps.map((step, index) => <li key={`${index}-${step}`} className="flex gap-2.5">
+        <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-[var(--paper)] font-mono text-[10px] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--line)]">{index + 1}</span>
+        <span className="min-w-0 text-[var(--muted)]">{step}</span>
+      </li>)}</ol>
+      : <p className="mt-1.5 whitespace-pre-line text-[var(--muted)]">{text}</p>}
+  </section>
+}
+
+// Demand proof: where the need was seen, one card per proof with its source and a link to it.
+function DemandProof({ proofs }) {
+  if (!proofs.length) return null
+  return <section>
+    <p className={`${label} flex items-center gap-1.5`}><TrendUp size={13} weight="bold" />Demand proof</p>
+    <ul className="mt-2 grid gap-2">{proofs.map((proof) => <li key={`${proof.source}${proof.text}`} className="flex items-start gap-3 rounded-xl bg-[var(--paper)] px-3.5 py-3 ring-1 ring-[var(--line)]/70">
+      <div className="min-w-0 flex-1">
+        {proof.source && <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[var(--accent-strong)]">{proof.source}</p>}
+        <p className="mt-0.5 break-words text-[13px] leading-5">{proof.text}</p>
+      </div>
+      {proof.url && <span className="shrink-0 text-[11px] font-bold"><a href={proof.url} target="_blank" rel="noreferrer" title={proof.url} className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)]">Open<ArrowSquareOut size={11} weight="bold" /></a></span>}
+    </li>)}</ul>
+  </section>
+}
+
 function ChipList({ icon: Icon, title, values, field, labelOf }) {
   if (!values.length) return null
   return <section><p className={`${label} flex items-center gap-1.5`}><Icon size={13} weight="bold" />{title}</p><div className="mt-2 flex flex-wrap gap-1.5">{values.map((value) => <span key={value} className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-xs font-semibold ring-1 ring-[var(--line)]/70">{labelOf(field, value)}</span>)}</div></section>
 }
 
-// One idea: how it works, the problem, features, apps, integrations, users, the competition and our edge, plus Generate
+// One idea: the problem, how it works, features, our edge, integrations and users on the left; the facts, demand proof
+// and similar tools on the right; plus Generate
 // (script, video) with each one's status. `onPanel(type)` opens an output's Prompt & guidelines (null closes).
 function IdeaDetails({ item, labelOf, now, panelType, onPanel }) {
   const facts = [
     [Folder, 'Category', labelOf('category', item.category)],
     [Gauge, 'Demand score', item.demandScore != null && `${item.demandScore} / 100`],
-    [ListChecks, 'Demand proof', item.demandProof],
     [Timer, 'Build time', item.buildTime],
-    [CurrencyDollar, 'Price range', item.priceRange],
+    [CurrencyDollar, 'Price range', item.prices.length > 0 && <PriceValue key="price" prices={item.prices} text={item.priceRange} full />],
     [Coins, 'Earning model', item.earningModel && labelOf('earning_model', item.earningModel)],
-    [Stack, 'Similar tools', item.similarTools],
     [Globe, 'Source', labelOf('source', item.source)],
     [CalendarBlank, 'Posted', formatDate(item.publishedAt)],
     [Tray, 'Added to the feed', item.addedAt && `${formatDate(item.addedAt)} · ${timeAgo(item.addedAt, now)}`],
@@ -343,7 +391,7 @@ function IdeaDetails({ item, labelOf, now, panelType, onPanel }) {
     <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
       <div className="space-y-4 text-sm leading-6">
         {item.problem && <Callout icon={Target} title="Problem it solves" text={item.problem} tone="amber" />}
-        <TextBlock icon={Code} title="How it works">{item.description}</TextBlock>
+        <HowItWorks steps={item.steps} text={item.description} />
         {item.features.length > 0 && <section><p className={`${label} flex items-center gap-1.5`}><ListChecks size={13} weight="bold" />Key features</p><ul className="mt-1.5 grid gap-1 sm:grid-cols-2">{item.features.map((feature) => <li key={feature} className="flex gap-2"><CheckCircle size={15} weight="fill" className="mt-1 shrink-0 text-[var(--lime-dark)]" /><span className="first-letter:uppercase">{feature}</span></li>)}</ul></section>}
         {item.edge && <Callout icon={Lightbulb} title="Our edge" text={item.edge} />}
         <ChipList icon={Plugs} title="Integrations" values={item.integrations} field="integrations" labelOf={labelOf} />
@@ -351,14 +399,17 @@ function IdeaDetails({ item, labelOf, now, panelType, onPanel }) {
         <Tags tags={item.tags} labelOf={labelOf} />
       </div>
 
-      <div className="space-y-4">
+      {/* Beside the long texts: the short facts, then the demand proof and the similar tools under them (as their own
+          sections, not squeezed into a fact row). */}
+      <div className="space-y-4 text-sm leading-6">
         <dl className="rounded-2xl bg-[var(--paper)] p-3.5 text-[13px] ring-1 ring-[var(--line)]/70">
           {facts.map(([Icon, title, value]) => <div key={title} className="flex items-start justify-between gap-3 border-t border-[var(--line)]/60 py-2 first:border-t-0 first:pt-0 last:pb-0">
             <dt className="flex shrink-0 items-center gap-2.5 text-[var(--muted)]"><FactIcon icon={Icon} title={title} />{title}</dt>
             <dd className="text-right font-semibold">{value}</dd>
           </div>)}
         </dl>
-
+        <DemandProof proofs={item.demandProofs} />
+        <TextBlock icon={Stack} title="Similar tools">{item.similarTools}</TextBlock>
       </div>
     </div>
 

@@ -82,10 +82,14 @@ export function AboutClient({ stats: clientStats, now }) {
     <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[var(--paper)] p-4">
       {rating != null
         ? <div className="flex items-center gap-3" aria-label={`Rating is ${rating.toFixed(1)} out of 5`}><span className="text-3xl font-semibold leading-none tracking-[-.04em]">{rating.toFixed(1)}</span><div><Stars rating={rating} /><p className="mt-1 text-[11px] text-[var(--muted)]">{stats.reviews != null ? `${rating.toFixed(2)} of ${count(stats.reviews, 'review')}` : 'Client rating'}</p></div></div>
-        : <p className="text-sm text-[var(--muted)]">No reviews yet</p>}
+        // A client new to Upwork has no rating yet, so the rating's place says so plainly.
+        : stats.isNew
+          ? <div className="flex items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--warn-bg)] text-[var(--warn)]"><Sparkle size={18} weight="fill" /></span><p className="text-base font-semibold leading-tight">New client</p></div>
+          : <p className="text-sm text-[var(--muted)]">No reviews yet</p>}
       <div className="flex flex-wrap gap-2">
         <Verified ok={stats.paymentVerified}>{stats.paymentVerified ? 'Payment verified' : 'Payment not verified'}</Verified>
         {stats.phoneVerified != null && <Verified ok={stats.phoneVerified}>{stats.phoneVerified ? 'Phone verified' : 'Phone not verified'}</Verified>}
+        {stats.isNew && rating != null && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-bg)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warn)]"><Sparkle size={13} weight="fill" />New client</span>}
       </div>
     </div>
     {items.length > 0 && <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{items.map(([icon, label, value, note]) => <FactTile key={label} icon={icon} label={label} value={value} note={note} />)}</div>}

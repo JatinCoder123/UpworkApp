@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUUpLeft, BookmarkSimple, Briefcase, CheckCircle, Clock, Fire, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Star, Target } from '@phosphor-icons/react'
+import { ArrowUUpLeft, BookmarkSimple, Briefcase, CheckCircle, Clock, Fire, Heart, Hourglass, MapPin, MicrosoftTeamsLogo, SealCheck, Sparkle, Star, Target } from '@phosphor-icons/react'
 import { StatusPill } from './ui'
 import { Chips, Price } from './JobApplySection'
 import ShareJobDialog from './ShareJobDialog'
@@ -112,6 +112,7 @@ export default function JobCard({ job, index, now, rejectReason = '', liked, sav
           <Fact icon={MapPin}>{client.country || 'Location not shared'}</Fact>
           {client.rating != null && <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--muted)]"><Star size={13} weight="fill" className="text-[#e6a817]" /><span className="font-semibold text-[var(--text)]">{Number(client.rating).toFixed(1)}</span>{client.reviews != null && `(${client.reviews})`}</span>}
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${client.paymentVerified ? 'bg-[var(--ok-bg)] text-[var(--ok)]' : 'bg-[var(--bad-bg)] text-[var(--bad)]'}`}><SealCheck size={11} weight="fill" />{client.paymentVerified ? 'Payment verified' : 'Payment unverified'}</span>
+          {client.isNew && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--warn)]"><Sparkle size={11} weight="fill" />New client</span>}
           <Fact icon={Briefcase}>{[client.hires != null && `${client.hires} hires`, client.proposals != null && `${client.proposals} proposals`].filter(Boolean).join(' · ')}</Fact>
           <Fact icon={Hourglass}>{job.workload}</Fact>
         </div>
