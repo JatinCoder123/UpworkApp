@@ -91,7 +91,7 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
     <ol className="mt-4 space-y-3 border-l border-[var(--line)] pl-4">{timeline.map(([text, value], index) => <li key={text} className="relative text-xs leading-5"><span className={`absolute -left-[1.3rem] top-1.5 size-2 rounded-full ring-2 ring-[var(--surface)] ${index === 0 ? 'bg-[var(--lime-dark)]' : 'bg-[var(--line)]'}`} />{text}<span className="block text-[11px] text-[var(--muted)]">{clock(value)} · {timeAgo(value, now)}</span></li>)}</ol>
   </div>
 
-  const content = <div ref={root} className={embedded ? 'space-y-5 p-4 sm:p-6' : 'mx-auto w-full max-w-[1320px] px-4 pb-20 pt-6 sm:px-6 md:pt-8'}>
+  const content = <div ref={root} className={embedded ? 'space-y-5 p-4 sm:p-6' : 'mx-auto w-full max-w-[1320px] px-4 pb-20 pt-4 sm:px-6 md:pt-6'}>
     {!embedded && <Link data-detail to="/live-jobs" className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--muted)] transition-colors hover:text-[var(--ink)]"><span className="grid size-8 place-items-center rounded-full bg-[var(--surface)] ring-1 ring-[var(--line)]"><ArrowLeft size={14} /></span>Live jobs</Link>}
 
     <div className={embedded ? 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] xl:gap-8'}>

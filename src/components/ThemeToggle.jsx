@@ -15,7 +15,7 @@ const initialTheme = () =>
     ? "dark"
     : "light");
 
-export default function ThemeToggle({ inverted = false }) {
+export default function ThemeToggle({ inverted = false, flat = false }) {
   const [theme, setTheme] = useState(initialTheme);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -48,7 +48,7 @@ export default function ThemeToggle({ inverted = false }) {
     <button
       onClick={toggle}
       aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-      className={`group relative grid size-9 place-items-center overflow-hidden rounded-full transition-all duration-700 ease-[cubic-bezier(.32,.72,0,1)] hover:rotate-12 active:scale-95 ${inverted ? "bg-white/10 text-white ring-1 ring-white/15" : "bg-[var(--ink)]/5 text-[var(--text)] ring-1 ring-black/5"}`}
+      className={`group relative grid size-9 place-items-center overflow-hidden rounded-full transition-all duration-700 ease-[cubic-bezier(.32,.72,0,1)] hover:rotate-12 active:scale-95 ${inverted ? "bg-white/10 text-white ring-1 ring-white/15" : flat ? "text-[var(--text)] hover:bg-[var(--paper)] hover:text-[var(--accent-strong)]" : "bg-[var(--ink)]/5 text-[var(--text)] ring-1 ring-black/5"}`}
     >
       <Sun
         size={16}

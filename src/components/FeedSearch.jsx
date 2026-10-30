@@ -25,7 +25,7 @@ export default function FeedSearch({ value, onChange, email, scope, placeholder,
     return () => window.removeEventListener('keydown', focusSearch)
   }, [])
 
-  return <form onSubmit={(event) => { event.preventDefault(); remember(); setFocused(false) }} className="job-search relative order-last flex w-full min-w-0 items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-1.5 md:order-none md:w-auto md:max-w-xl md:flex-1">
+  return <form onSubmit={(event) => { event.preventDefault(); remember(); setFocused(false) }} className="job-search relative order-last flex w-full min-w-0 items-center gap-2.5 rounded-full p-1 md:order-none md:w-auto md:max-w-xl md:flex-1">
     <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--lime)] text-[var(--on-lime)] shadow-[0_2px_8px_color-mix(in_srgb,var(--lime-dark)_35%,transparent)]"><MagnifyingGlass size={15} weight="bold" /></span>
     <input ref={inputRef} value={value} onChange={(event) => { onChange(event.target.value); setFocused(true) }} onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); remember() }} onKeyDown={(event) => event.key === 'Escape' && (value ? onChange('') : event.currentTarget.blur())} placeholder={placeholder} aria-label={ariaLabel} aria-expanded={focused && (history.length > 0 || suggested.length > 0)} aria-keyshortcuts="Control+K Meta+K" autoComplete="off" className="min-w-0 flex-1 bg-transparent py-1.5 text-sm outline-none placeholder:text-[var(--muted)]" />
     {value

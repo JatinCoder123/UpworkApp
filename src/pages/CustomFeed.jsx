@@ -42,7 +42,7 @@ export default function CustomFeed() {
   if (definition.error) {
     if (/not found/i.test(definition.error.message)) return <NotFound />
     return <Shell>
-      <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
+      <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-4 sm:px-6 md:pt-6">
         <p role="alert" className="rounded-2xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]">This feed could not be loaded: {definition.error.message} <button type="button" onClick={() => definition.refetch()} className="ml-2 underline">Try again</button></p>
       </main>
     </Shell>
@@ -61,7 +61,7 @@ export default function CustomFeed() {
     {editor}
   </>
   return <Shell>
-    <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 sm:px-6 md:pt-8"><FeedOverview feed={feed} build={build} status={status} onEdit={edit} /></main>
+    <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-4 sm:px-6 md:pt-6"><FeedOverview feed={feed} build={build} status={status} onEdit={edit} /></main>
     {editor}
   </Shell>
 }

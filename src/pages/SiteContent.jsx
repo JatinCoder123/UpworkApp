@@ -320,7 +320,7 @@ export default function SiteContent() {
 
   return (
     <Shell>
-      <main ref={root} className="mx-auto w-full max-w-[1560px] px-4 pb-28 pt-6 sm:px-6 md:pt-8">
+      <main ref={root} className="mx-auto w-full max-w-[1560px] px-4 pb-28 pt-4 sm:px-6 md:pt-6">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold tracking-[-.04em]">Site Content</h1>
           <dl

@@ -4,6 +4,8 @@ import gsap from 'gsap'
 import { X } from '@phosphor-icons/react'
 
 export const iconButton = 'grid size-10 shrink-0 place-items-center rounded-full bg-[var(--ink)]/5 text-[var(--ink)] transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] hover:scale-105 hover:bg-[var(--ink)] hover:text-white active:scale-95'
+// A button in the Shell top bar's tray: flat on the tray, with a soft fill on hover and while its menu is open.
+export const barButton = 'relative grid size-9 shrink-0 place-items-center rounded-full text-[var(--text)] transition-colors duration-300 hover:bg-[var(--paper)] hover:text-[var(--accent-strong)] aria-expanded:bg-[var(--paper)] aria-expanded:text-[var(--accent-strong)]'
 // Page-level sticky bar that docks under the Shell header. The solid band hides content scrolling beneath it.
 export const stickyBand = 'sticky top-[var(--shell-h)] z-20 -mx-4 bg-[var(--paper)] px-4 pb-3 pt-1 sm:-mx-6 sm:px-6 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-5 after:bg-gradient-to-b after:from-[var(--paper)] after:to-transparent'
 export const primaryButton = 'group inline-flex items-center justify-center gap-3 rounded-full bg-[var(--ink)] py-2 pl-5 pr-2 text-sm font-semibold text-white transition-all duration-500 ease-[cubic-bezier(.32,.72,0,1)] hover:-translate-y-0.5 active:scale-[.98] disabled:pointer-events-none disabled:opacity-50'

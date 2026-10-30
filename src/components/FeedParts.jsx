@@ -60,6 +60,10 @@ export function FilterStrip({ title, icon: Icon, options, value, countOf, onChan
   </div>
 }
 
+// Layout for the row of FilterStrips under a section's toolbar. Like metricRow it follows the panel, not the screen:
+// strips share a line while each gets 18rem, and the strips of a shorter line (or a feed with fewer) share its width.
+export const stripRow = 'flex flex-wrap gap-2 *:grow *:basis-72'
+
 // Colours of the details-list icons, by row title, the same in every section (light and dark).
 const FACT_TONES = {
   blue: 'bg-tone-blue-bg text-tone-blue',

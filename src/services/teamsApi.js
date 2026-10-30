@@ -2,10 +2,6 @@ import { MCP_CRM_BASE_URL, createAppError } from "./api";
 import { asText } from "../lib/safe";
 
 /*
- * NOT IN USE YET: the share dialog still opens Teams with the message ready (ShareJobDialog), because the CRM entry point
- * does not allow calls from the browser on the live site (no CORS headers, unlike smart_gateway). Once it does, import
- * sendTeamsMessage in ShareJobDialog and call it for each chosen person instead of opening the Teams chat link.
- *
  * Teams messages sent from the app (CRM entryPoint=send_teams_message): a POST with { email, message } posts the
  * message to that person in Teams, one person per call; "\n" in the message starts a new line. The entry point's key
  * goes in X-Api-Key (VITE_TEAMS_MESSAGE_KEY in .env). Errors come as { success: false, error } with 401 (wrong key),

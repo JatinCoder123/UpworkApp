@@ -128,7 +128,7 @@ export default function Seo() {
 
   return (
     <Shell>
-      <main className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
+      <main className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-4 sm:px-6 md:pt-6">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold tracking-[-.04em]">SEO</h1>
           <label className="flex items-center gap-2 rounded-full bg-[var(--surface)] p-1.5 pl-4 ring-1 ring-[var(--line)] shadow-[0_12px_36px_rgb(var(--shadow-rgb)/.08)] focus-within:ring-[var(--lime-dark)]">

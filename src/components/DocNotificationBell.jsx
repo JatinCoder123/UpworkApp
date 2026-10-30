@@ -14,7 +14,7 @@ import {
 } from '@phosphor-icons/react'
 import { OUTPUT_STATUS_TEXT, useDocNotifications } from '../services/docNotifications'
 import { downloadNoteDocument, getDocumentViewUrl } from '../services/api'
-import { iconButton } from './ui'
+import { barButton } from './ui'
 
 function formatTimeAgo(timestamp) {
   if (!timestamp) return ''
@@ -151,7 +151,7 @@ export default function DocNotificationBell() {
         onClick={() => setOpen((prev) => !prev)}
         aria-label="Document notifications"
         aria-expanded={open}
-        className={`${iconButton} relative size-9`}
+        className={barButton}
       >
         <Bell size={17} weight={unreadCount > 0 ? 'fill' : 'light'} />
 

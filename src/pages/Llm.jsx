@@ -10,7 +10,7 @@ import { ClearFilters, NothingMatches, SectionPanel, SectionTab, sectionLabel as
 import FeedSearch from '../components/FeedSearch'
 import FeedFilterDialog from '../components/FeedFilterDialog'
 import FilterListDialog from '../components/FilterListDialog'
-import { FactList, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow } from '../components/FeedParts'
+import { FactList, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow, stripRow } from '../components/FeedParts'
 import { DialogHeader, Modal, primaryButton } from '../components/ui'
 import ErrorBoundary, { CardError, DialogError } from '../components/ErrorBoundary'
 import { useAuth } from '../contexts/AuthContext'
@@ -161,10 +161,10 @@ export default function Llm() {
   const { open, openItem, closeItem } = useOpenItem('llm', openable, 'llm')
 
   return <Shell>
-    <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">
+    <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-4 sm:px-6 md:pt-6">
       <SectionPanel>
         {/* Row 1: title and search. */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[var(--line)]/70 px-4 py-4 sm:px-6">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[var(--line)]/70 px-4 py-3 sm:px-6">
           <h1 className="flex shrink-0 items-baseline gap-2 text-2xl font-semibold tracking-[-.04em]">LLM<span className="font-mono text-[13px] font-semibold tracking-normal text-[var(--muted)] tabular-nums">{loading || updating ? '…' : `${total} of ${grandTotal ?? total}`}</span></h1>
           <FeedSearch value={search} onChange={setSearch} email={user?.email} scope="llm" suggestions={searchSuggestions} placeholder="Search models, companies, courses, tags…" label="Search the LLM feed" />
         </div>
@@ -178,7 +178,7 @@ export default function Llm() {
               return <SectionTab key={option.value} active={group === option.value} onClick={() => setGroup(group === option.value ? 'all' : option.value)} count={countOf('group', option.value)}><Icon size={15} />{option.label}</SectionTab>
             })}
           </div>
-          <div className="ml-auto flex shrink-0 items-center gap-2 py-3">
+          <div className="ml-auto flex shrink-0 items-center gap-2 py-2.5">
             <SortMenu value={sort} options={SORTS} onChange={setSort} label="Sort the feed" />
             <DateTimeRangeFilter value={dateFilter} onApply={setDateFilter} label="Published" />
             <FilterButton count={filterCount} onClick={() => setFilterDialog(true)} title="Filter by priority, impact, type, company and more" />
@@ -188,7 +188,7 @@ export default function Llm() {
 
         {/* Row 3: the main filters on the page, a few choices at a time; the wheel opens each whole list and the
             universal filter has every option. Several choices can be picked at once. */}
-        {Object.keys(options).length > 0 && <ErrorBoundary name="llm-filters" fallbackProps={FILTERS_ERROR} resetKey={options}><div className="grid gap-2 border-t border-[var(--line)]/70 px-4 py-3 sm:px-6 xl:grid-cols-3">
+        {Object.keys(options).length > 0 && <ErrorBoundary name="llm-filters" fallbackProps={FILTERS_ERROR} resetKey={options}><div className={`${stripRow} border-t border-[var(--line)]/70 px-4 py-2.5 sm:px-6`}>
           {STRIPS.map(([key, icon]) => {
             const section = filterSections.find((entry) => entry.key === key)
             return <FilterStrip key={key} title={section.title} icon={icon} options={section.options} value={filters[key]} countOf={(value) => countOf(key, value)} onChange={(values) => setFilters((current) => ({ ...current, [key]: values }))} onOpenAll={() => setListKey(key)} />
@@ -196,7 +196,7 @@ export default function Llm() {
         </div></ErrorBoundary>}
 
         {/* Filters in use, each removable. */}
-        {(activeChips.length > 0 || dateFilter.preset !== 'all') && <div className="flex flex-wrap items-center gap-2 border-t border-[var(--line)]/70 px-4 py-3 sm:px-6">
+        {(activeChips.length > 0 || dateFilter.preset !== 'all') && <div className="flex flex-wrap items-center gap-2 border-t border-[var(--line)]/70 px-4 py-2.5 sm:px-6">
           {activeChips.map(([key, value, text]) => <FilterChip key={`${key}-${value}`} onClear={() => removeFilter(key, value)}>{text}</FilterChip>)}
           <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} />
           {hasFilters && <span className="ml-auto"><ClearFilters onClick={clearAll} /></span>}

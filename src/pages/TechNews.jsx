@@ -332,10 +332,10 @@ export default function TechNews() {
 
   return (
     <Shell>
-      <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
+      <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-24 pt-4 sm:px-6 md:pt-6">
         {/* Top Horizontal Navigation & Search/Filter Toolbar */}
         <section className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
-          <div className="space-y-4 rounded-[calc(2rem-.375rem)] bg-[var(--surface)] px-4 py-4 sm:px-6">
+          <div className="space-y-3 rounded-[calc(2rem-.375rem)] bg-[var(--surface)] px-4 py-3 sm:px-6">
             {/* Top Row: Source Types (Left) + Search & Filter (Right) */}
             {/* On a tablet the search group wraps under the title and tabs instead of squeezing the tabs away; from lg
                 up everything fits on one row (the tabs scroll). */}
@@ -585,7 +585,7 @@ export default function TechNews() {
         </section>
 
         {/* Main Content: Left Main Stories Grid + Right "Latest News" Sidebar */}
-        <section className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px] items-start">
+        <section className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px] items-start">
           {/* LEFT: Main Categorized News Feed */}
           <div className="space-y-6 min-w-0">
             <div className="flex items-center justify-between text-xs text-[var(--muted)]">

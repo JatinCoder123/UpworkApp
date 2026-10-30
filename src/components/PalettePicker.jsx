@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Palette } from '@phosphor-icons/react'
 import { PALETTES, PALETTE_KEY, storedPalette } from '../lib/palette'
+import { barButton } from './ui'
 
 export default function PalettePicker() {
   const [palette, setPalette] = useState(storedPalette)
@@ -29,7 +30,7 @@ export default function PalettePicker() {
     else apply()
   }
   return <div ref={ref} className="relative">
-    <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)} aria-label="Color theme" title="Color theme" className="relative grid size-9 place-items-center rounded-full bg-[var(--ink)]/5 text-[var(--text)] ring-1 ring-black/5 transition-colors hover:bg-(--lime-tint)/35 hover:text-[var(--accent-strong)]">
+    <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)} aria-label="Color theme" title="Color theme" className={barButton}>
       <Palette size={17} weight="light" />
       <span aria-hidden="true" className="absolute right-1 top-1 size-2 rounded-full bg-[var(--lime)] ring-2 ring-[var(--surface)]" />
     </button>

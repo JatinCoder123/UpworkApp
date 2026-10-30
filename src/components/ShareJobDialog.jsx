@@ -4,6 +4,7 @@ import { ArrowSquareOut, Check, CheckCircle, ClockCounterClockwise, Copy, Envelo
 import { DialogHeader, Modal } from './ui'
 import { useCopied } from './JobDetailParts'
 import { api } from '../services/api'
+import { sendTeamsMessage } from '../services/teamsApi'
 import { useAuth } from '../contexts/AuthContext'
 import { forgetRecipient, jobShareLink, loadRecentRecipients, rememberRecipients } from '../lib/jobSignals'
 import { asArray, asText } from '../lib/safe'
@@ -18,6 +19,9 @@ const defaultMessage = (job) => [
 
 const teamsShareUrl = (href, text) => `https://teams.microsoft.com/share?href=${encodeURIComponent(href)}&msgText=${encodeURIComponent(text)}&preview=true`
 const teamsChatUrl = (emails, topic, text) => `https://teams.microsoft.com/l/chat/0/0?users=${emails.map(encodeURIComponent).join(',')}${emails.length > 1 ? `&topicName=${encodeURIComponent(asText(topic).slice(0, 120))}` : ''}&message=${encodeURIComponent(text)}`
+
+const teamsButton = 'inline-flex items-center justify-center gap-2 rounded-full bg-brand-teams px-5 py-3 text-xs font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50'
+const doneButton = 'inline-flex items-center justify-center gap-2 rounded-full bg-[var(--ink)] px-5 py-3 text-xs font-bold text-white'
 
 const EMAIL = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/
 const sameEmail = (a, b) => asText(a).toLowerCase() === asText(b).toLowerCase()
@@ -114,6 +118,16 @@ function RecipientPicker({ members, loading, selected, exclude, nameOf, onAdd, o
   </div>
 }
 
+// How the last send went: who has the message, and who it failed for (and why), with the old Teams chat link as a way out.
+function SendStatus({ sent, failed, nameOf, onOpenInTeams }) {
+  if (!sent.length && !failed.length) return null
+  const names = (emails) => emails.map(nameOf).join(', ')
+  return <div className="mt-4 space-y-2">
+    {sent.length > 0 && <p role="status" className="flex items-start gap-1.5 text-xs font-semibold text-[var(--ok)]"><CheckCircle size={14} weight="fill" className="mt-0.5 shrink-0" /><span className="flex-1">Sent to {names(sent)} in Teams.</span></p>}
+    {failed.length > 0 && <p role="alert" className="flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" /><span className="flex-1">Could not send to {names(failed.map((item) => item.email))}. {[...new Set(failed.map((item) => item.error))].join(' ')}</span><button type="button" onClick={onOpenInTeams} className="shrink-0 underline underline-offset-4">Open in Teams instead</button></p>}
+  </div>
+}
+
 /** Shares a job; see ShareDialog. */
 export default function ShareJobDialog({ job, mode, onClose }) {
   return <ShareDialog
@@ -131,6 +145,8 @@ export default function ShareJobDialog({ job, mode, onClose }) {
 /**
  * Shares anything with a title and a link in Teams, with type-ahead recipients and a per-user Recent list.
  * mode: 'teams' shares in Teams (to chosen people, or any chat picked in Teams), 'notify' messages chosen teammates directly.
+ * Notify team sends the message to each chosen teammate on their own, straight away, through the CRM's Teams endpoint;
+ * Share in group opens Teams (one group chat with the chosen people, or any chat or channel picked there).
  * `link` is what Teams previews; `text` is the editable starting message; `subject` is used for email.
  */
 export function ShareDialog({ noun = 'job', eyebrow, title, link, text, subject, mode: initialMode = 'teams', onClose }) {
@@ -141,6 +157,10 @@ export function ShareDialog({ noun = 'job', eyebrow, title, link, text, subject,
   // Emails of the people to send to; shared by both tabs.
   const [selected, setSelected] = useState([])
   const [recent, setRecent] = useState(() => loadRecentRecipients(user?.email))
+  const [sending, setSending] = useState(false)
+  // Who has the message so far, and who the last send failed for ({ email, error }).
+  const [sent, setSent] = useState([])
+  const [failed, setFailed] = useState([])
   const [copied, copy] = useCopied()
   const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['team-members'], queryFn: api.getTeamMembers, staleTime: 10 * 60_000 })
   const members = useMemo(() => asArray(data), [data])
@@ -153,17 +173,37 @@ export function ShareDialog({ noun = 'job', eyebrow, title, link, text, subject,
   const add = (person) => setSelected((current) => (current.some((email) => sameEmail(email, person.email)) ? current : [...current, person.email]))
   const remove = (email) => setSelected((current) => current.filter((item) => !sameEmail(item, email)))
   // Called on send, so the people show under Recent next time.
-  const rememberSelected = () => setRecent(rememberRecipients(user?.email, selected.map((email) => ({ email, name: nameOf(email) }))))
+  const remember = (emails) => setRecent(rememberRecipients(user?.email, emails.map((email) => ({ email, name: nameOf(email) }))))
+  const rememberSelected = () => remember(selected)
   const forget = (email) => setRecent(forgetRecipient(user?.email, email))
   const tab = (value) => `flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${mode === value ? 'bg-[var(--ink)] text-white' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`
   const open = (url) => window.open(url, '_blank', 'noopener,noreferrer')
-  const sendChat = () => { rememberSelected(); open(teamsChatUrl(selected, title, message.trim())) }
+  // Share in group: one Teams chat with everyone chosen, opened in Teams for the user to send.
+  const openChat = () => { rememberSelected(); open(teamsChatUrl(selected, title, message.trim())) }
+  // Notify team: the message comes from the CRM rather than this user's own Teams, so it ends with their name.
+  const signed = (text) => (user?.name ? `${text}\n\nShared by ${user.name}` : text)
+  // Sends to each chosen person in Teams (the endpoint takes one person per call). The people it failed for stay
+  // selected, so sending again tries just them.
+  const sendTeams = async () => {
+    const emails = selected, text = signed(message.trim())
+    setSending(true)
+    const results = await Promise.allSettled(emails.map((email) => sendTeamsMessage({ email, message: text })))
+    const delivered = emails.filter((_, index) => results[index].status === 'fulfilled')
+    remember(delivered)
+    setSent((current) => [...current, ...delivered.filter((email) => !current.some((item) => sameEmail(item, email)))])
+    setFailed(emails.flatMap((email, index) => (results[index].status === 'rejected' ? [{ email, error: results[index].reason?.message || 'Something went wrong.' }] : [])))
+    setSelected((current) => current.filter((email) => !delivered.some((item) => sameEmail(item, email))))
+    setSending(false)
+  }
+  const openFailedInTeams = () => open(teamsChatUrl(failed.map((item) => item.email), title, message.trim()))
+  // Everyone chosen has the message; Done replaces the send buttons until someone else is added.
+  const finished = sent.length > 0 && !selected.length
 
   return <Modal onClose={onClose} wide>
-    <DialogHeader eyebrow={`Share ${noun}`} title={mode === 'teams' ? 'Share in Teams chat' : 'Notify your team'} onClose={onClose} />
+    <DialogHeader eyebrow={`Share ${noun}`} title={mode === 'teams' ? 'Share in a Teams group' : 'Notify your team'} onClose={onClose} />
     <div className="mt-6 flex gap-1 rounded-full bg-[var(--paper)] p-1">
-      <button type="button" aria-pressed={mode === 'teams'} onClick={() => setMode('teams')} className={tab('teams')}><MicrosoftTeamsLogo size={15} weight="fill" />Share in Teams</button>
       <button type="button" aria-pressed={mode === 'notify'} onClick={() => setMode('notify')} className={tab('notify')}><UsersThree size={15} weight="bold" />Notify team</button>
+      <button type="button" aria-pressed={mode === 'teams'} onClick={() => setMode('teams')} className={tab('teams')}><MicrosoftTeamsLogo size={15} weight="fill" />Share in group</button>
     </div>
 
     <div className="mt-5 rounded-2xl bg-[var(--paper)] p-4"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-[var(--muted)]">{eyebrow}</p><p className="mt-1 text-sm font-semibold">{title}</p></div>
@@ -180,7 +220,7 @@ export function ShareDialog({ noun = 'job', eyebrow, title, link, text, subject,
         <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{selected.length ? 'Opens a Teams chat with these people and the message ready to send.' : 'Leave this empty to pick any chat or channel in Teams instead.'}</p>
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)]">Cancel</button>
-          <button type="button" disabled={!message.trim()} onClick={() => (selected.length ? sendChat() : open(teamsShareUrl(link, message.trim())))} className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-teams px-5 py-3 text-xs font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50"><MicrosoftTeamsLogo size={16} weight="fill" />{selected.length ? `Send to ${selected.length === 1 ? nameOf(selected[0]) : `${selected.length} people`}` : 'Share in Teams'}<ArrowSquareOut size={14} /></button>
+          <button type="button" disabled={!message.trim()} onClick={() => (selected.length ? openChat() : open(teamsShareUrl(link, message.trim())))} className={teamsButton}><MicrosoftTeamsLogo size={16} weight="fill" />{selected.length ? `Send to ${selected.length === 1 ? nameOf(selected[0]) : `${selected.length} people`}` : 'Share in group'}<ArrowSquareOut size={14} /></button>
         </div>
       </>
       : <>
@@ -199,11 +239,15 @@ export function ShareDialog({ noun = 'job', eyebrow, title, link, text, subject,
                 </button>
               }) : <p className="p-4 text-center text-xs text-[var(--muted)]">{query ? 'No teammate matches that search.' : 'No teammates found.'}</p>}
         </div>
-        <p className="mt-3 text-xs leading-5 text-[var(--muted)]">Opens a Teams chat with the selected teammates and this message ready to send.</p>
+        {!finished && <p className="mt-3 text-xs leading-5 text-[var(--muted)]">Sends this message to each selected teammate in Teams, with your name at the end.</p>}
+        <SendStatus sent={sent} failed={failed} nameOf={nameOf} onOpenInTeams={openFailedInTeams} />
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" onClick={onClose} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)]">Cancel</button>
-          <button type="button" disabled={!selected.length || !message.trim()} onClick={() => { rememberSelected(); window.location.href = `mailto:${selected.join(',')}?subject=${encodeURIComponent(subject || title)}&body=${encodeURIComponent(message.trim())}` }} className="inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-xs font-bold ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)] disabled:opacity-50"><EnvelopeSimple size={15} />Email instead</button>
-          <button type="button" disabled={!selected.length || !message.trim()} onClick={sendChat} className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-teams px-5 py-3 text-xs font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50"><MicrosoftTeamsLogo size={16} weight="fill" />Notify in Teams<ArrowSquareOut size={14} /></button>
+          {finished ? <button type="button" onClick={onClose} className={doneButton}>Done</button>
+            : <>
+              <button type="button" onClick={onClose} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)]">Cancel</button>
+              <button type="button" disabled={!selected.length || !message.trim()} onClick={() => { rememberSelected(); window.location.href = `mailto:${selected.join(',')}?subject=${encodeURIComponent(subject || title)}&body=${encodeURIComponent(message.trim())}` }} className="inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-xs font-bold ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)] disabled:opacity-50"><EnvelopeSimple size={15} />Email instead</button>
+              <button type="button" disabled={sending || !selected.length || !message.trim()} onClick={sendTeams} className={teamsButton}><MicrosoftTeamsLogo size={16} weight="fill" />{sending ? 'Sending…' : 'Notify in Teams'}</button>
+            </>}
         </div>
       </>}
   </Modal>

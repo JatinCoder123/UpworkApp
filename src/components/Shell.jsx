@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { Article, Brain, Briefcase, Browsers, CaretLeft, CaretRight, CaretUpDown, ChatCircleText, Clock, Cloud, Code, DotsThreeOutline, EnvelopeSimple, Globe, List, MagnifyingGlass, Megaphone, Newspaper, PlugsConnected, Plus, Robot, ShareNetwork, ShieldCheck, SignOut, SlidersHorizontal, UserCircle, VideoCamera, WarningCircle, X } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import gsap from 'gsap'
-import { Mark, iconButton } from './ui'
+import { Mark, barButton, iconButton } from './ui'
 import ThemeToggle from './ThemeToggle'
 import PalettePicker from './PalettePicker'
 import DocNotificationBell from './DocNotificationBell'
@@ -333,17 +333,20 @@ export default function Shell({ children }) {
     {rail && tip && <span role="tooltip" className="pointer-events-none fixed left-[calc(var(--sidebar-w)+.25rem)] z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-[var(--ink)] px-3 py-1.5 text-[11px] font-bold text-white shadow-[0_10px_30px_rgb(var(--shadow-rgb)/.18)] ring-1 ring-white/10 xl:block" style={{ top: tip.top }}>{tip.label}</span>}
 
     <div className="relative z-10 transition-[padding] duration-500 ease-[cubic-bezier(.32,.72,0,1)] xl:pl-[var(--sidebar-w)]">
-      <header className="sticky top-0 z-30 flex h-[var(--shell-h)] items-center gap-3 border-b border-[var(--line)]/50 bg-[var(--paper)] px-3 md:px-6 xl:border-transparent">
+      {/* From xl the bar's bottom line runs on from the divider under the sidebar's logo (same height, --shell-h). */}
+      <header className="sticky top-0 z-30 flex h-[var(--shell-h)] items-center gap-3 border-b border-[var(--line)]/70 bg-[var(--paper)] px-3 md:px-6">
         <button type="button" onClick={() => setMobileOpen(true)} aria-label="Open navigation menu" aria-expanded={mobileOpen} className={`${iconButton} size-9 xl:hidden`}><List size={18} weight="bold" /></button>
         <Link to={homePath(user)} className="flex items-center gap-2.5 text-sm font-bold tracking-[-.02em] xl:hidden"><Mark /><span className="hidden sm:inline">Outright Feed Portal</span></Link>
         {crumb && <div className="hidden min-w-0 items-center gap-3 xl:flex">
           {crumb.tile || <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--surface)] text-[var(--accent-strong)] ring-1 ring-[var(--line)]/70 shadow-[0_6px_18px_rgb(var(--shadow-rgb)/.06)]"><crumb.icon size={18} weight="duotone" /></span>}
           <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">{crumb.section}</p><p className="truncate text-base font-bold leading-tight tracking-[-.02em]">{crumb.label}</p></div>
         </div>}
-        <div className="ml-auto flex items-center gap-2">
+        {/* The bar's tools in one tray: look (palette, light/dark), then prompts and notifications. */}
+        <div className="ml-auto flex shrink-0 items-center gap-0.5 rounded-full bg-[var(--surface)] p-1 ring-1 ring-[var(--line)]/70 shadow-[0_6px_18px_rgb(var(--shadow-rgb)/.06)]">
           <PalettePicker />
-          <ThemeToggle />
-          {canAccess(user, '/appscript') && <button type="button" onClick={() => setPrompts('prompts')} aria-label="Prompt management" title="Prompt management" className="grid size-9 place-items-center rounded-full bg-[var(--ink)]/5 text-[var(--text)] ring-1 ring-black/5 transition-colors hover:bg-(--lime-tint)/35 hover:text-[var(--accent-strong)]"><Robot size={17} weight="light" /></button>}
+          <ThemeToggle flat />
+          <span aria-hidden="true" className="mx-1 h-5 w-px bg-[var(--line)]" />
+          {canAccess(user, '/appscript') && <button type="button" onClick={() => setPrompts('prompts')} aria-label="Prompt management" title="Prompt management" className={barButton}><Robot size={17} weight="light" /></button>}
           <DocNotificationBell />
         </div>
       </header>

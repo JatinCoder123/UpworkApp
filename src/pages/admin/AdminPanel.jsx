@@ -31,7 +31,7 @@ export default function AdminPanel() {
   const tabClass = (active) => `inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${active ? 'bg-[var(--ink)] text-white dark:bg-(--lime) dark:text-[var(--on-lime)]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`
 
   return <Shell>
-    <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">
+    <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-4 sm:px-6 md:pt-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]"><ShieldCheck size={13} weight="fill" className="text-[var(--accent-strong)]" />Admin</p>

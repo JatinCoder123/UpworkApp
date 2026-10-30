@@ -11,7 +11,7 @@ import FeedFilterDialog from './FeedFilterDialog'
 import FilterListDialog from './FilterListDialog'
 import GenerationInstructions from './GenerationInstructions'
 import { ItemDrawer, OutputRow, StageChip } from './GenerateOutput'
-import { FactList, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow } from './FeedParts'
+import { FactList, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow, stripRow } from './FeedParts'
 import { primaryButton } from './ui'
 import ErrorBoundary, { CardError, DialogError, SectionError } from './ErrorBoundary'
 import { useAuth } from '../contexts/AuthContext'
@@ -115,10 +115,10 @@ export default function FeedSection({ definition, onSettings }) {
   const noun = title
 
   return <Shell>
-    <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">
+    <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-4 sm:px-6 md:pt-6">
       <SectionPanel>
         {/* Row 1: title, search, then sort, date, the universal filter, refresh and (admins) the feed's settings. */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-4 sm:px-6">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
           <h1 className="flex shrink-0 items-baseline gap-2 text-2xl font-semibold tracking-[-.04em]">{title}<span className="font-mono text-[13px] font-semibold tracking-normal text-[var(--muted)] tabular-nums">{loading || updating ? '…' : `${total} of ${grandTotal ?? total}`}</span></h1>
           <FeedSearch value={search} onChange={setSearch} email={user?.email} scope={feed} placeholder={`Search ${noun}…`} label={`Search the ${noun}`} />
           <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -131,7 +131,7 @@ export default function FeedSection({ definition, onSettings }) {
         </div>
 
         {/* Row 2: the first dropdown fields as strips; the wheel opens each whole list. */}
-        {stripKeys.length > 0 && Object.keys(options).length > 0 && <ErrorBoundary name="feed-filters" fallbackProps={FILTERS_ERROR} resetKey={options}><div className="grid gap-2 border-t border-[var(--line)]/70 px-4 py-3 sm:px-6 xl:grid-cols-3">
+        {stripKeys.length > 0 && Object.keys(options).length > 0 && <ErrorBoundary name="feed-filters" fallbackProps={FILTERS_ERROR} resetKey={options}><div className={`${stripRow} border-t border-[var(--line)]/70 px-4 py-2.5 sm:px-6`}>
           {stripKeys.map((key) => {
             const section = filterSections.find((entry) => entry.key === key)
             return <FilterStrip key={key} title={section.title} icon={section.icon} options={section.options} value={filters[key]} countOf={(value) => countOf(key, value)} onChange={(values) => setFilters((current) => ({ ...current, [key]: values }))} onOpenAll={() => setListKey(key)} />
@@ -139,7 +139,7 @@ export default function FeedSection({ definition, onSettings }) {
         </div></ErrorBoundary>}
 
         {/* Filters in use, each removable. */}
-        {(activeChips.length > 0 || dateFilter.preset !== 'all') && <div className="flex flex-wrap items-center gap-2 border-t border-[var(--line)]/70 px-4 py-3 sm:px-6">
+        {(activeChips.length > 0 || dateFilter.preset !== 'all') && <div className="flex flex-wrap items-center gap-2 border-t border-[var(--line)]/70 px-4 py-2.5 sm:px-6">
           {activeChips.map(([key, value, text]) => <FilterChip key={`${key}-${value}`} onClear={() => removeFilter(key, value)}>{text}</FilterChip>)}
           <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} />
           {hasFilters && <span className="ml-auto"><ClearFilters onClick={clearAll} /></span>}

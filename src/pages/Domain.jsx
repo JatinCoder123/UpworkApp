@@ -488,7 +488,7 @@ export default function Domain() {
 
   return (
     <Shell>
-      <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-6 sm:px-6 md:pt-8">
+      <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-4 sm:px-6 md:pt-6">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold tracking-[-.04em]">Domain</h1>
           <div className="flex gap-2">

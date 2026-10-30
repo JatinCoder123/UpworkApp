@@ -99,7 +99,7 @@ export default function Video() {
   return (
     <Shell>
       <div className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[3px]"><div data-scroll-progress className="h-full origin-left scale-x-0 bg-[var(--lime-dark)]" /></div>
-      <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-28 pt-6 sm:px-6 md:pt-8">
+      <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-28 pt-4 sm:px-6 md:pt-6">
         <header className="relative">
           <h1 className="mb-5 text-2xl font-semibold tracking-[-.04em]">Video</h1>
           <dl data-hero-fade className="grid max-w-3xl grid-cols-2 gap-px overflow-hidden rounded-[1.6rem] bg-[var(--line)]/70 ring-1 ring-[var(--line)]/70 sm:grid-cols-4">

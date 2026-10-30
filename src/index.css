@@ -243,7 +243,8 @@
 
 /* Height of the sticky Shell header band; page-level sticky bars dock right below it. */
 :root { --shell-h: 4rem; }
-@media (min-width: 1280px) { :root { --shell-h: 5rem; } }
+/* From xl it matches the sidebar's logo row (top-2 + p-1 + h-14), so the bar's bottom line meets the divider under the logo. */
+@media (min-width: 1280px) { :root { --shell-h: calc(4.25rem + 1px); } }
 
 * { box-sizing: border-box; }
 /* DM Mono and Playfair are loaded up to weight 500: use the real face instead of a smeared fake bold. */

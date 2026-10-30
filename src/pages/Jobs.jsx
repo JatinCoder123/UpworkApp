@@ -433,13 +433,13 @@ export default function Jobs() {
 
   return (
     <Shell>
-      <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">
+      <main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-4 sm:px-6 md:pt-6">
         <section className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
           <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)]">
             {/* Row 1: title, search and the main actions. */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[var(--line)]/70 px-4 py-4 sm:px-6">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[var(--line)]/70 px-4 py-3 sm:px-6">
               <h1 className="flex shrink-0 items-baseline gap-2 text-2xl font-semibold tracking-[-.04em]">Jobs<span className="font-mono text-xs font-semibold tracking-normal text-[var(--muted)] tabular-nums">{isFetchingStats && scopeCounts[scope] == null ? "…" : scopeCounts[scope] ?? 0} total</span></h1>
-              <form onSubmit={(event) => { event.preventDefault(); commitSearch(); setSearchFocused(false); }} className="job-search relative order-last flex w-full min-w-0 items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-1.5 md:order-none md:w-auto md:max-w-xl md:flex-1">
+              <form onSubmit={(event) => { event.preventDefault(); commitSearch(); setSearchFocused(false); }} className="job-search relative order-last flex w-full min-w-0 items-center gap-2.5 rounded-full p-1 md:order-none md:w-auto md:max-w-xl md:flex-1">
                 <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--lime)] text-[var(--on-lime)] shadow-[0_2px_8px_color-mix(in_srgb,var(--lime-dark)_35%,transparent)]">
                   {searching ? <span className="size-4 animate-spin rounded-full border-2 border-[var(--on-lime)]/25 border-t-[var(--on-lime)]" aria-label="Searching" /> : <MagnifyingGlass size={15} weight="bold" />}
                 </span>
@@ -469,7 +469,7 @@ export default function Jobs() {
 
             {/* Row 2: scope, status tabs and the list controls. */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--line)]/70 px-4 sm:px-6">
-              <div className="my-3 flex shrink-0 items-center gap-1 rounded-full bg-[var(--paper)] p-1" aria-label="Job scope">
+              <div className="my-2.5 flex shrink-0 items-center gap-1 rounded-full bg-[var(--paper)] p-1" aria-label="Job scope">
                 {scopes.map((item) => <button key={item} type="button" aria-pressed={scope === item} onClick={() => { setScope(item); saveJobScope(item); }} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition-all duration-300 ${scope === item ? "bg-[var(--raised)] text-[var(--text)] shadow-sm ring-1 ring-[var(--line)]" : "text-[var(--muted)] hover:text-[var(--text)]"}`}>
                   {item}<span className="ml-1.5 font-mono text-[10px] tabular-nums text-[var(--muted)]">{isFetchingStats && scopeCounts[item] == null ? "…" : scopeCounts[item] ?? 0}</span>
                 </button>)}
@@ -493,7 +493,7 @@ export default function Jobs() {
                   </div>}
                 </div>
               </div>
-              <div className="ml-auto flex shrink-0 items-center gap-2 py-3">
+              <div className="ml-auto flex shrink-0 items-center gap-2 py-2.5">
                 <SortMenu value={sort} options={JOB_SORTS} onChange={changeSort} />
                 <DateTimeRangeFilter value={dateFilter} onApply={setDateFilter} label="Job posting time" />
                 <button type="button" onClick={() => setSkillDialog(true)} aria-label="Open job filters" title="Filters" className={`relative ${iconButton} ${filterCount ? "bg-[var(--lime)] !text-[var(--on-lime)] ring-2 ring-[var(--lime-dark)]/40" : ""}`}>
@@ -505,7 +505,7 @@ export default function Jobs() {
             </div>
 
             {/* Row 3: liked, saved and skills, with Clear and the skill settings at the end. */}
-            <div className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-6 lg:flex-nowrap">
+            <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 sm:px-6 lg:flex-nowrap">
               <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:flex-nowrap">
                 <button type="button" aria-pressed={likedOnly} onClick={() => toggleReactionFilter("liked")} title={reactionsApply ? "Show liked jobs" : "Not used on the Applied tab, which shows every applied job"} disabled={!reactionsApply} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-45 ${likedOnly ? "bg-like-bg text-like ring-like-line shadow-sm dark:ring-like-icon/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-like-line"}`}>
                   <Heart size={14} weight={likedOnly || reactions.liked.length > 0 ? "fill" : "regular"} className={likedOnly || reactions.liked.length > 0 ? "text-like-icon" : "text-like"} />Liked
@@ -580,7 +580,7 @@ export default function Jobs() {
             </div>
 
             {/* Filters set in the funnel or date picker, so it is clear why the list is narrower. */}
-            {(countExtraFilters(extraFilters) > 0 || dateFilter.preset !== "all") && <div className="flex flex-wrap items-center gap-2 border-t border-[var(--line)]/70 px-4 py-3 sm:px-6">
+            {(countExtraFilters(extraFilters) > 0 || dateFilter.preset !== "all") && <div className="flex flex-wrap items-center gap-2 border-t border-[var(--line)]/70 px-4 py-2.5 sm:px-6">
               {extraFilters.jobType !== "any" && <FilterChip onClear={() => setExtraFilters({ ...extraFilters, jobType: "any" })}>{extraFilters.jobType === "hourly" ? "Hourly jobs" : "Fixed-price jobs"}</FilterChip>}
               {extraFilters.location !== "any" && <FilterChip onClear={() => setExtraFilters({ ...extraFilters, location: "any" })}>{`${clientLocation(extraFilters.location).label} clients`}</FilterChip>}
               <ActiveDateFilterChip value={dateFilter} onClear={() => setDateFilter(EMPTY_DATE_RANGE)} />
@@ -588,7 +588,7 @@ export default function Jobs() {
           </div>
         </section>
 
-        <div className="mt-8">
+        <div className="mt-6">
           {isLoading || waitingForSkills ? <LogoLoader className="min-h-[38dvh]" label="Loading jobs" />
             : isError ? <section className="py-24 text-center">
               <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--danger)]/10"><Briefcase size={22} /></div>

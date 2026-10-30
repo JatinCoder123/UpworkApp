@@ -25,7 +25,7 @@ export default function ApiPlayground() {
   }, [openId])
 
   return <Shell>
-    <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">
+    <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-4 sm:px-6 md:pt-6">
       <SectionPanel>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-4 sm:px-6">
           <div className="min-w-0 flex-1">
