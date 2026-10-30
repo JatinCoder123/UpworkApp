@@ -82,13 +82,13 @@ export default function SearchConsole({ value, onChange, mode, onModeChange, tld
   }
 
   return <form onSubmit={submit} className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
-    <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-4 shadow-[0_24px_70px_rgba(30,32,25,.08)] sm:p-6">
+    <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-4 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.08)] sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="radiogroup" aria-label="Search by" className="flex gap-1 rounded-full bg-[var(--paper)] p-1 ring-1 ring-[var(--line)]/70">
           {MODES.map((item) => <button key={item.id} type="button" role="radio" aria-checked={mode === item.id} onClick={() => onModeChange(item.id)} className={`rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all duration-300 ${mode === item.id ? 'bg-[var(--ink)] text-white shadow-sm' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{item.label}</button>)}
         </div>
         <div className="flex flex-wrap items-center gap-1" aria-label="Extensions to search">
-          {TLD_OPTIONS.map((tld) => <button key={tld} type="button" aria-pressed={tlds.includes(tld)} onClick={() => toggleTld(tld)} className={`rounded-full px-3 py-1.5 font-mono text-[11px] font-medium ring-1 transition-all duration-300 ${tlds.includes(tld) ? 'bg-[var(--lime)] text-[#26320b] ring-[var(--lime-dark)]/40' : 'text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`}>.{tld}</button>)}
+          {TLD_OPTIONS.map((tld) => <button key={tld} type="button" aria-pressed={tlds.includes(tld)} onClick={() => toggleTld(tld)} className={`rounded-full px-3 py-1.5 font-mono text-[11px] font-medium ring-1 transition-all duration-300 ${tlds.includes(tld) ? 'bg-[var(--lime)] text-[var(--on-lime)] ring-[var(--lime-dark)]/40' : 'text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`}>.{tld}</button>)}
         </div>
       </div>
 

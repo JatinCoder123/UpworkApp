@@ -40,11 +40,11 @@ export default function FeedFilterDialog({ title = 'Filters', sections = [], val
 
   return <Modal onClose={onClose} wide>
     {/* Short dark header, like the Jobs skills panel. */}
-    <div className="relative -mx-5 -mt-5 mb-5 overflow-hidden rounded-t-[calc(2rem-.375rem)] bg-[#1f2a21] px-6 py-5 sm:-mx-8 sm:-mt-8 sm:px-8">
-      <span aria-hidden="true" className="pointer-events-none absolute -right-8 -top-12 size-28 rounded-full bg-[#c8df7a]" />
-      <span aria-hidden="true" className="pointer-events-none absolute right-24 top-9 size-7 rounded-full border-2 border-[#c8df7a]/80" />
-      <button type="button" onClick={onClose} aria-label="Close dialog" className="absolute right-4 top-4 z-10 grid size-8 place-items-center rounded-full bg-[#1f2a21] text-white ring-1 ring-white/25 transition-transform hover:scale-105"><X size={14} weight="bold" /></button>
-      <h2 className="relative flex max-w-[80%] items-center gap-2.5 text-xl font-semibold leading-tight tracking-[-.03em] text-white"><Funnel size={20} weight="duotone" className="text-[#c8df7a]" />{title} <span className="font-serif italic text-[#c8df7a]">your way.</span></h2>
+    <div className="relative -mx-5 -mt-5 mb-5 overflow-hidden rounded-t-[calc(2rem-.375rem)] bg-[var(--hero)] px-6 py-5 sm:-mx-8 sm:-mt-8 sm:px-8">
+      <span aria-hidden="true" className="pointer-events-none absolute -right-8 -top-12 size-28 rounded-full bg-[var(--hero-soft)]" />
+      <span aria-hidden="true" className="pointer-events-none absolute right-24 top-9 size-7 rounded-full border-2 border-[var(--hero-soft)]/80" />
+      <button type="button" onClick={onClose} aria-label="Close dialog" className="absolute right-4 top-4 z-10 grid size-8 place-items-center rounded-full bg-[var(--hero)] text-white ring-1 ring-white/25 transition-transform hover:scale-105"><X size={14} weight="bold" /></button>
+      <h2 className="relative flex max-w-[80%] items-center gap-2.5 text-xl font-semibold leading-tight tracking-[-.03em] text-white"><Funnel size={20} weight="duotone" className="text-[var(--hero-soft)]" />{title} <span className="font-serif italic text-[var(--hero-soft)]">your way.</span></h2>
     </div>
 
     <div className="grid gap-4 sm:grid-cols-[13.5rem_minmax(0,1fr)]">
@@ -57,7 +57,7 @@ export default function FeedFilterDialog({ title = 'Filters', sections = [], val
           return <button key={section.key} type="button" onClick={() => pick(section.key)} aria-current={active ? 'true' : undefined} className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-left transition-colors ${active ? 'bg-[var(--text)] text-[var(--paper)]' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>
             <Icon size={17} weight={active ? 'bold' : 'regular'} className="shrink-0" />
             <span className="min-w-0 flex-1 truncate text-sm font-semibold">{section.title}</span>
-            {count > 0 && <span className="grid min-w-5 place-items-center rounded-full bg-[var(--lime)] px-1.5 text-[11px] font-bold !text-[#26320b]">{count}</span>}
+            {count > 0 && <span className="grid min-w-5 place-items-center rounded-full bg-[var(--lime)] px-1.5 text-[11px] font-bold !text-[var(--on-lime)]">{count}</span>}
           </button>
         })}
       </nav>
@@ -76,7 +76,7 @@ export default function FeedFilterDialog({ title = 'Filters', sections = [], val
           {shown.map((option) => {
             const checked = draft[open.key].includes(option.value)
             const count = countOf(open.key, option.value)
-            return <button key={option.value} type="button" role="checkbox" aria-checked={checked} onClick={() => toggle(open.key, option.value)} className={`flex min-w-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-left ring-1 transition-colors ${checked ? 'bg-(--lime)/25 ring-[var(--lime-dark)]/45' : 'bg-[var(--surface)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/60'} ${noItems(open.key, option) ? 'opacity-50' : ''}`}>
+            return <button key={option.value} type="button" role="checkbox" aria-checked={checked} onClick={() => toggle(open.key, option.value)} className={`flex min-w-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-left ring-1 transition-colors ${checked ? 'bg-(--lime-tint)/25 ring-[var(--lime-dark)]/45' : 'bg-[var(--surface)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/60'} ${noItems(open.key, option) ? 'opacity-50' : ''}`}>
               <span className={`grid size-4 shrink-0 place-items-center rounded-[5px] ring-1 transition-colors ${checked ? 'bg-[var(--lime-dark)] text-white ring-[var(--lime-dark)]' : 'bg-[var(--surface)] ring-[var(--line)]'}`}>{checked && <Check size={10} weight="bold" />}</span>
               <Marker option={option} />
               <span className="min-w-0 flex-1 truncate text-sm font-semibold">{option.label}</span>

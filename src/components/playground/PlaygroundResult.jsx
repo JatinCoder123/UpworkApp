@@ -14,7 +14,7 @@ import { isRunning, usePlaygroundTest, useRerunTest } from '../../lib/playground
 /** Before any test is open: what happens here. */
 export function ResultPlaceholder() {
   return <section className={`${card} px-6 py-12 text-center`}>
-    <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-(--lime)/25 text-[#26320b] ring-1 ring-[var(--lime-dark)]/30 dark:text-[#c0df78]"><BracketsCurly size={24} weight="bold" /></span>
+    <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-(--lime-tint)/25 text-[var(--lime-ink)] ring-1 ring-[var(--lime-dark)]/30"><BracketsCurly size={24} weight="bold" /></span>
     <p className="mt-3 text-sm font-semibold text-[var(--ink)]">Your result shows here</p>
     <p className="mx-auto mt-1 max-w-xs text-xs leading-5 text-[var(--muted)]">Fill in the form and run it. A question is answered in seconds; documents and other files take a minute or two.</p>
   </section>

@@ -16,7 +16,7 @@ export function RefreshFilterButton({ onClick, loading, label }) {
 
 export function ActiveDateFilterChip({ value, onClear, className = '' }) {
   if (!value || value.preset === 'all') return null
-  return <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1.5 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25 ${className}`}>
+  return <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime-tint)]/35 px-3 py-1.5 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25 ${className}`}>
     <span>Time: {formatDateRange(value)}</span>
     <button type="button" onClick={onClear} aria-label="Remove date filter" className="grid size-4 place-items-center rounded-full transition-colors hover:bg-black/10"><X size={11} /></button>
   </span>

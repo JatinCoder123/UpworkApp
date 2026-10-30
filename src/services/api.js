@@ -1755,23 +1755,23 @@ function parsePriorityTier(priorityVal, score) {
   if (upper === "BLOCKBUSTER" || score >= 90) {
     return {
       label: "BLOCKBUSTER",
-      colorClass: "bg-rose-500/15 text-rose-800 dark:text-rose-200 ring-rose-500/30",
-      squareClass: "bg-rose-500",
+      colorClass: "bg-danger-solid/15 text-danger ring-danger-solid/30",
+      squareClass: "bg-danger-solid",
       tierKey: "blockbuster",
     };
   }
   if (upper === "HOT" || score >= 70) {
     return {
       label: "HOT",
-      colorClass: "bg-amber-500/15 text-amber-900 dark:text-amber-200 ring-amber-500/30",
-      squareClass: "bg-amber-500",
+      colorClass: "bg-warning-solid/15 text-warning ring-warning-solid/30",
+      squareClass: "bg-warning-solid",
       tierKey: "hot",
     };
   }
   return {
     label: "NORMAL",
-    colorClass: "bg-purple-500/15 text-purple-900 dark:text-purple-200 ring-purple-500/30",
-    squareClass: "bg-purple-500",
+    colorClass: "bg-tone-violet-solid/15 text-tone-violet ring-tone-violet-solid/30",
+    squareClass: "bg-tone-violet-solid",
     tierKey: "normal",
   };
 }
@@ -2534,6 +2534,17 @@ export async function fetchModuleGeneration(module, types, ids = [], posted = []
 
 export const SOCIAL_MODULE = import.meta.env?.VITE_SOCIAL_MODULE || "outr_socials";
 
+// A post's content outline as its steps. The CRM writes one step per line ("Slide 2: …", "0–3 s: …"), sometimes
+// split with "|"; a one-line outline lists its parts with " / " after a short lead ("Single post: hook / … / hashtags.").
+function parseSocialOutline(value) {
+  const lines = decodeHtml(asText(value)).replace(/\r\n/g, "\n").split(/\n|\s*\|\s*/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length !== 1 || !lines[0].includes(" / ")) return lines;
+  return lines[0].replace(/^[^:/]{1,24}:\s*/, "").split(/\s+\/\s+/)
+    .map((part) => part.trim().replace(/\.$/, ""))
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1));
+}
+
 function mapSocialPost(record) {
   const text = (value) => decodeHtml(asText(value)).trim();
   return {
@@ -2551,7 +2562,7 @@ function mapSocialPost(record) {
     trend: asText(record.trend),
     reachScore: numberOrNull(record.expected_reach_score),
     bestTime: text(record.best_time_to_post),
-    outline: text(record.content_outline).split(/\s*\|\s*/).filter(Boolean),
+    outline: parseSocialOutline(record.content_outline),
     callToAction: text(record.call_to_action),
     hashtags: splitMultiEnum(record.hashtags),
     mentions: text(record.mentions),

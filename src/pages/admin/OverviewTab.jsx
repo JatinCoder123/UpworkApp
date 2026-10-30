@@ -58,7 +58,7 @@ export default function OverviewTab({ catalog, onOpenUsers }) {
                     {roles.map((role) => {
                       const has = asArray(role.permissionIds).includes(permission.id)
                       return <td key={role.id} className="px-2 py-1.5 text-center last:rounded-r-lg">
-                        {has ? <span className="inline-grid size-5 place-items-center rounded-md bg-(--lime) text-[#26320b]" aria-label="Yes"><Check size={11} weight="bold" /></span> : <span className="text-[var(--line)]" aria-label="No">·</span>}
+                        {has ? <span className="inline-grid size-5 place-items-center rounded-md bg-(--lime) text-[var(--on-lime)]" aria-label="Yes"><Check size={11} weight="bold" /></span> : <span className="text-[var(--line)]" aria-label="No">·</span>}
                       </td>
                     })}
                   </tr>),

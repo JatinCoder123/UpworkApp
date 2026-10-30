@@ -149,8 +149,8 @@ function HotJobsCount({ user, row, allJobs }) {
   })
   if (isError) return null
   const count = asArray(data).length
-  return <span title="Jobs that match this preference: New or Seen, any age" className="inline-flex items-center gap-1 rounded-full bg-[#fff1e6] px-2.5 py-1 text-[11px] font-semibold text-[#c2410c] ring-1 ring-[#fed7aa] dark:bg-[#3b1d0e] dark:text-[#fdba74] dark:ring-[#7c2d12]">
-    {isFetching ? <CircleNotch size={11} className="animate-spin" /> : <Fire size={11} weight="fill" className="text-[#f97316]" />}
+  return <span title="Jobs that match this preference: New or Seen, any age" className="inline-flex items-center gap-1 rounded-full bg-tone-orange-bg px-2.5 py-1 text-[11px] font-semibold text-tone-orange ring-1 ring-tone-orange-line">
+    {isFetching ? <CircleNotch size={11} className="animate-spin" /> : <Fire size={11} weight="fill" className="text-tone-orange-solid" />}
     {data ? `${count}${count >= 100 ? '+' : ''} hot job${count === 1 ? '' : 's'}` : 'Counting hot jobs…'}
   </span>
 }

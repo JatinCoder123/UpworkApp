@@ -23,7 +23,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { asArray, asObject } from '../lib/safe'
 
 function MatchRing({ value }) {
-  const tone = value >= 75 ? 'var(--lime-dark)' : value >= 55 ? '#d9a53a' : 'var(--danger)'
+  const tone = value >= 75 ? 'var(--lime-dark)' : value >= 55 ? 'var(--score-mid)' : 'var(--danger)'
   return <div className="relative grid size-20 shrink-0 place-items-center">
     <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90"><circle cx="18" cy="18" r="15.9155" pathLength="100" fill="none" strokeWidth="3" className="stroke-black/[.07] dark:stroke-white/10" /><circle cx="18" cy="18" r="15.9155" pathLength="100" fill="none" strokeWidth="3" strokeLinecap="round" strokeDasharray={`${value} 100`} style={{ stroke: tone }} /></svg>
     <span className="text-center leading-none"><span className="block text-xl font-semibold tracking-[-.04em]">{value}%</span><span className="text-[9px] font-bold uppercase tracking-[.12em] text-[var(--muted)]">match</span></span>
@@ -122,24 +122,24 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
     <div className={embedded ? 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] xl:gap-8'}>
       <div className="min-w-0 space-y-5">
         <header data-detail className="relative overflow-hidden rounded-[1.8rem] bg-[var(--surface)] ring-1 ring-[var(--line)]/70">
-          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[var(--lime)]/25 to-transparent" />
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[var(--lime-tint)]/25 to-transparent" />
           <div className="relative p-5 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill status={job.status} />
               {reactions.isSaved(job.id, job) && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#e0f2fe] px-2.5 py-1 text-[11px] font-bold text-[#075985] ring-1 ring-[#bae6fd] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30">
-                  <BookmarkSimple size={12} weight="fill" className="text-[#0284c7] dark:text-[#7dd3fc]" /> Saved
+                <span className="inline-flex items-center gap-1 rounded-full bg-info-bg px-2.5 py-1 text-[11px] font-bold text-info ring-1 ring-info-line">
+                  <BookmarkSimple size={12} weight="fill" className="text-info-icon" /> Saved
                 </span>
               )}
               {reactions.isLiked(job.id, job) && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#ffe4e6] px-2.5 py-1 text-[11px] font-bold text-[#be123c] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/15 dark:text-[#fda4af] dark:ring-[#fda4af]/30">
-                  <Heart size={12} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" /> Liked
+                <span className="inline-flex items-center gap-1 rounded-full bg-like-bg px-2.5 py-1 text-[11px] font-bold text-like ring-1 ring-like-line">
+                  <Heart size={12} weight="fill" className="text-like-icon" /> Liked
                 </span>
               )}              {tags[0] && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]"><Tag size={12} weight="bold" />{tags[0]}</span>}
               <time dateTime={job.postedAt} title={job.posted} className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent-strong)]"><Clock size={13} weight="bold" />Posted {timeAgo(job.postedAt, now) || job.posted}</time>
             </div>
             <h1 className="job-detail-title mt-5">{job.title}</h1>
-            {clientStats.country && <p className="mt-3 flex items-center gap-1.5 text-sm text-[var(--muted)]"><MapPin size={15} weight="bold" />{clientStats.country}{clientStats.rating != null && <><span aria-hidden="true">·</span><Star size={14} weight="fill" className="text-[#e6a817]" />{Number(clientStats.rating).toFixed(1)}</>}{clientStats.paymentVerified && <><span aria-hidden="true">·</span><SealCheck size={14} weight="fill" className="text-[var(--ok)]" />Payment verified</>}</p>}
+            {clientStats.country && <p className="mt-3 flex items-center gap-1.5 text-sm text-[var(--muted)]"><MapPin size={15} weight="bold" />{clientStats.country}{clientStats.rating != null && <><span aria-hidden="true">·</span><Star size={14} weight="fill" className="text-star" />{Number(clientStats.rating).toFixed(1)}</>}{clientStats.paymentVerified && <><span aria-hidden="true">·</span><SealCheck size={14} weight="fill" className="text-[var(--ok)]" />Payment verified</>}</p>}
             {job.summary && <ExpandableText className="mt-5 max-w-3xl" collapsedHeight="3.6rem"><p className="text-[15px] leading-7">{job.summary}</p></ExpandableText>}
             <div className="mt-6 grid gap-3 grid-cols-2 sm:grid-cols-4">
               <FactTile icon={CurrencyDollar} label="Budget" value={job.budget} note={job.type} wrap />
@@ -164,7 +164,7 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
         </section>}
 
         <Panel icon={Briefcase} title="Job description" subtitle="As posted on Upwork">
-          <ExpandableText collapsedHeight="12rem"><p className="whitespace-pre-wrap break-words text-[15px] leading-[1.8] text-[#3f413b]"><LinkifiedDescription text={job.description} /></p></ExpandableText>
+          <ExpandableText collapsedHeight="12rem"><p className="whitespace-pre-wrap break-words text-[15px] leading-[1.8] text-[var(--body-text)]"><LinkifiedDescription text={job.description} /></p></ExpandableText>
         </Panel>
 
         {/* Skills live in the right sidebar; the drawer hides that sidebar below xl, so show them here instead. */}

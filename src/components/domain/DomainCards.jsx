@@ -32,7 +32,7 @@ export function ScoreRing({ score, size = 64, label = 'Brand score' }) {
 export function DomainActions({ item, onCopy, onFavorite, onMoz, onUseName, mozBusy }) {
   return <div className="flex flex-wrap items-center gap-2">
     <button type="button" onClick={() => onCopy(item)} className={softButton}><Copy size={13} weight="bold" />Copy</button>
-    <button type="button" onClick={() => onFavorite(item)} aria-pressed={Boolean(item.is_favorite)} className={`${softButton} ${item.is_favorite ? '!bg-[var(--lime)] !text-[#26320b] !ring-[var(--lime-dark)]/40' : ''}`}><Star size={13} weight={item.is_favorite ? 'fill' : 'bold'} />{item.is_favorite ? 'Favorited' : 'Favorite'}</button>
+    <button type="button" onClick={() => onFavorite(item)} aria-pressed={Boolean(item.is_favorite)} className={`${softButton} ${item.is_favorite ? '!bg-[var(--lime)] !text-[var(--on-lime)] !ring-[var(--lime-dark)]/40' : ''}`}><Star size={13} weight={item.is_favorite ? 'fill' : 'bold'} />{item.is_favorite ? 'Favorited' : 'Favorite'}</button>
     {onMoz && <button type="button" onClick={() => onMoz(item)} disabled={mozBusy} className={softButton}><ChartBar size={13} weight="bold" />{mozBusy ? 'Loading Moz…' : item.moz ? 'Refresh Moz' : 'Check Moz'}</button>}
     {onUseName && <button type="button" onClick={() => onUseName(item.domain)} className={softButton}><MagnifyingGlass size={13} weight="bold" />Check this name</button>}
     <a href={goDaddySearchUrl(item.domain)} target="_blank" rel="noopener noreferrer" className="upwork-apply-button inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-bold"><span className="relative z-10 inline-flex items-center gap-1.5">Register <ArrowSquareOut size={13} weight="bold" /></span></a>
@@ -83,7 +83,7 @@ function Checklist({ checks }) {
     <div className="grid gap-x-5 gap-y-2.5 sm:grid-cols-3">
       {groups.map(({ category: name, items, counts }) => {
         const Icon = CATEGORY_ICONS[name] || Sparkle
-        return <button key={name} type="button" onClick={() => { setCategory(category === name ? null : name); setOpen(true) }} className={`group rounded-xl px-2 py-1.5 text-left transition-colors ${category === name ? 'bg-[var(--lime)]/25' : 'hover:bg-[var(--paper)]'}`} aria-pressed={category === name}>
+        return <button key={name} type="button" onClick={() => { setCategory(category === name ? null : name); setOpen(true) }} className={`group rounded-xl px-2 py-1.5 text-left transition-colors ${category === name ? 'bg-[var(--lime-tint)]/25' : 'hover:bg-[var(--paper)]'}`} aria-pressed={category === name}>
           <span className="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-[.1em] text-[var(--muted)]"><span className="flex min-w-0 items-center gap-1.5"><Icon size={12} weight="bold" className="shrink-0" /><span className="truncate">{name}</span></span><span className="tabular-nums">{counts.pass}/{items.length}</span></span>
           <span className="mt-1.5 flex h-1.5 gap-px overflow-hidden rounded-full">
             {['pass', 'caution', 'fail', 'manual'].map((status) => counts[status] ? <span key={status} className={STATUS_META[status].bar} style={{ flexGrow: counts[status] }} /> : null)}
@@ -100,7 +100,7 @@ function Checklist({ checks }) {
           const count = status === 'all' ? checks.length : totals[status] || 0
           return <button key={status} type="button" disabled={!count} onClick={() => setFilter(status)} aria-pressed={filter === status} className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all disabled:opacity-35 ${filter === status ? 'bg-[var(--ink)] text-white' : status === 'all' ? 'bg-[var(--surface)] text-[var(--muted)]' : STATUS_META[status].chip}`}>{status === 'all' ? 'All' : STATUS_META[status].label} {count}</button>
         })}
-        {category && <button type="button" onClick={() => setCategory(null)} className="ml-auto rounded-full bg-[var(--lime)]/40 px-2.5 py-1 text-[10px] font-bold">{category} ×</button>}
+        {category && <button type="button" onClick={() => setCategory(null)} className="ml-auto rounded-full bg-[var(--lime-tint)]/40 px-2.5 py-1 text-[10px] font-bold">{category} ×</button>}
       </div>
       <ul className="mt-3 divide-y divide-[var(--line)]/70">
         {visible.map((check) => <li key={check.id} className="grid grid-cols-[4.2rem_minmax(0,1fr)] gap-3 py-2.5">
@@ -139,18 +139,18 @@ function GiftWrap() {
       <span className="gift-paper absolute inset-0" />
       <span className="gift-ribbon absolute inset-x-0 top-0 h-2" />
     </span>
-    <svg aria-hidden="true" viewBox="0 0 64 40" className="gift-bow pointer-events-none absolute -top-[23px] left-1/2 h-12 w-[4.75rem] -translate-x-1/2 drop-shadow-[0_3px_4px_rgba(120,84,10,.28)]">
+    <svg aria-hidden="true" viewBox="0 0 64 40" className="gift-bow pointer-events-none absolute -top-[23px] left-1/2 h-12 w-[4.75rem] -translate-x-1/2 drop-shadow-[0_3px_4px_color-mix(in_srgb,var(--gold-6)_40%,transparent)]">
       <defs>
-        <linearGradient id={gold} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f6dc82" /><stop offset=".55" stopColor="#dcae45" /><stop offset="1" stopColor="#b4841f" /></linearGradient>
-        <linearGradient id={tail} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#d4a43c" /><stop offset="1" stopColor="#a8791c" /></linearGradient>
+        <linearGradient id={gold} x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: "var(--gold-1)" }} /><stop offset=".55" style={{ stopColor: "var(--gold-2)" }} /><stop offset="1" style={{ stopColor: "var(--gold-3)" }} /></linearGradient>
+        <linearGradient id={tail} x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: "var(--gold-4)" }} /><stop offset="1" style={{ stopColor: "var(--gold-5)" }} /></linearGradient>
       </defs>
       <path d="M29 21 19 37l5-1.6 3 3.6L32 23Z" fill={`url(#${tail})`} />
       <path d="M35 21 45 37l-5-1.6-3 3.6L32 23Z" fill={`url(#${tail})`} />
       <path d="M32 20C23 5 5 4 7.5 15.5 9.6 25 23 24 32 20Z" fill={`url(#${gold})`} />
       <path d="M32 20C41 5 59 4 56.5 15.5 54.4 25 41 24 32 20Z" fill={`url(#${gold})`} />
-      <path d="M30 18.5C23 10 13 9 12.5 15M34 18.5C41 10 51 9 51.5 15" fill="none" stroke="#9c7016" strokeOpacity=".45" strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M14 11.5C16 9.6 19.5 9.4 22 10.6M50 11.5C48 9.6 44.5 9.4 42 10.6" fill="none" stroke="#fff6cf" strokeOpacity=".8" strokeWidth="1.3" strokeLinecap="round" />
-      <rect x="27" y="14.5" width="10" height="11" rx="3.2" fill={`url(#${gold})`} stroke="#a8791c" strokeOpacity=".5" />
+      <path d="M30 18.5C23 10 13 9 12.5 15M34 18.5C41 10 51 9 51.5 15" fill="none" style={{ stroke: "var(--gold-6)" }} strokeOpacity=".45" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M14 11.5C16 9.6 19.5 9.4 22 10.6M50 11.5C48 9.6 44.5 9.4 42 10.6" fill="none" style={{ stroke: "var(--gold-shine)" }} strokeOpacity=".8" strokeWidth="1.3" strokeLinecap="round" />
+      <rect x="27" y="14.5" width="10" height="11" rx="3.2" fill={`url(#${gold})`} style={{ stroke: "var(--gold-5)" }} strokeOpacity=".5" />
     </svg>
   </>
 }
@@ -165,7 +165,7 @@ export function SuggestionCard({ item, rank, onCopy, onFavorite, onMoz, onUseNam
   }, [rank])
   const complete = item.stage === 'complete' && Array.isArray(item.checks)
 
-  return <article ref={ref} className={`group relative grid grid-cols-[2rem_minmax(0,1fr)] gap-3 rounded-[1.75rem] bg-[var(--surface)] p-4 ring-1 transition-shadow duration-500 hover:shadow-[0_24px_60px_var(--new-shadow)] sm:grid-cols-[2.75rem_minmax(0,1fr)] sm:p-6 ${premium ? 'gift-card mt-6 ring-[#d9b44a]/70' : 'ring-[var(--line)]'}`}>
+  return <article ref={ref} className={`group relative grid grid-cols-[2rem_minmax(0,1fr)] gap-3 rounded-[1.75rem] bg-[var(--surface)] p-4 ring-1 transition-shadow duration-500 hover:shadow-[0_24px_60px_var(--new-shadow)] sm:grid-cols-[2.75rem_minmax(0,1fr)] sm:p-6 ${premium ? 'gift-card mt-6 ring-[var(--gold-2)]/70' : 'ring-[var(--line)]'}`}>
     {premium && <GiftWrap />}
     <span className="relative pt-1 font-mono text-sm text-[var(--muted)] sm:text-base">#{rank + 1}</span>
     <div className="relative min-w-0">
@@ -173,7 +173,7 @@ export function SuggestionCard({ item, rank, onCopy, onFavorite, onMoz, onUseNam
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ok-bg)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.1em] text-[var(--ok)]"><Check size={11} weight="bold" />Available</span>
-            {premium && <span className="inline-flex items-center gap-1 rounded-full bg-[#f6e8b8] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.1em] text-[#655419]"><Crown size={11} weight="fill" />Premium</span>}
+            {premium && <span className="inline-flex items-center gap-1 rounded-full bg-warning-bg px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.1em] text-warning"><Crown size={11} weight="fill" />Premium</span>}
             {item.stage === 'screening' && <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--lavender)]/45 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.1em] text-[var(--ink)]"><span className="domain-pulse-dot size-1.5 rounded-full bg-current" />Screening</span>}
             {item.stage === 'unscreened' && <span className="rounded-full bg-[var(--ink)]/[.06] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.1em] text-[var(--muted)]">Quick check only</span>}
             {complete && item.web_source_count > 0 && <span className="rounded-full bg-[var(--ink)]/[.06] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.1em] text-[var(--muted)]">{item.web_source_count} web sources</span>}
@@ -245,7 +245,7 @@ export function DirectResult({ direct, onCopy, onFavorite, onMoz, mozBusy }) {
   const godaddy = { provider: availability?.source === 'rdap' ? 'Public registry' : 'GoDaddy', configured: true, available: availability?.available ?? null, prices, price_type: 'live_domain_quote', source: availability?.source, error: availability?.fallbackReason ? `GoDaddy: ${availability.fallbackReason}` : availability?.error }
 
   return <section className="mt-8 overflow-hidden rounded-[2rem] bg-[var(--surface)] ring-1 ring-[var(--line)]">
-    <div className={`relative p-6 sm:p-9 ${available ? 'bg-[var(--lime)]/20' : 'bg-[var(--bad-bg)]/60'}`}>
+    <div className={`relative p-6 sm:p-9 ${available ? 'bg-[var(--lime-tint)]/20' : 'bg-[var(--bad-bg)]/60'}`}>
       <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">Exact match</p>

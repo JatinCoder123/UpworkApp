@@ -40,7 +40,7 @@ export default function UsersTab({ catalog, filter, onFilterChange }) {
     return users.filter((user) => matchesFilter(user, filter) && (!term || `${user.name} ${user.email}`.toLowerCase().includes(term)))
   }, [users, filter, search])
   const selected = users.find((user) => user.id === selectedId) || visible[0] || null
-  const chip = (active) => `inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold ring-1 transition-colors ${active ? 'bg-[var(--ink)] text-white ring-[var(--ink)] dark:bg-(--lime) dark:text-[#26320b] dark:ring-[var(--lime)]' : 'bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--text)]'}`
+  const chip = (active) => `inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold ring-1 transition-colors ${active ? 'bg-[var(--ink)] text-white ring-[var(--ink)] dark:bg-(--lime) dark:text-[var(--on-lime)] dark:ring-[var(--lime)]' : 'bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--text)]'}`
 
   return <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[21rem_minmax(0,1fr)]">
     <Panel>
@@ -62,7 +62,7 @@ export default function UsersTab({ catalog, filter, onFilterChange }) {
             ? visible.map((user) => {
               const active = selected?.id === user.id
               return <li key={user.id}>
-                <button type="button" aria-current={active} onClick={() => setSelectedId(user.id)} className={`flex w-full items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left transition-colors ${active ? 'bg-(--lime)/20 ring-1 ring-[var(--lime-dark)]/30' : 'hover:bg-[var(--paper)]'}`}>
+                <button type="button" aria-current={active} onClick={() => setSelectedId(user.id)} className={`flex w-full items-center gap-3 rounded-2xl px-2.5 py-2.5 text-left transition-colors ${active ? 'bg-(--lime-tint)/20 ring-1 ring-[var(--lime-dark)]/30' : 'hover:bg-[var(--paper)]'}`}>
                   <Avatar name={user.name} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5"><span className="truncate text-xs font-semibold text-[var(--text)]">{user.name}</span>{user.id === me?.crmUserId && <span className="shrink-0 text-[10px] font-semibold text-[var(--muted)]">(you)</span>}</span>
@@ -271,16 +271,16 @@ function PermissionRow({ permission, state, roleName, pending, disabled, onToggl
       disabled={locked || disabled}
       title={title}
       onClick={() => onToggle(permission, state)}
-      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ring-1 transition-colors ${checked ? 'bg-(--lime)/15 ring-[var(--lime-dark)]/25' : 'bg-[var(--surface)] ring-[var(--line)]'} ${locked ? 'cursor-default' : 'hover:ring-[var(--lime-dark)]/60'} disabled:cursor-default ${disabled && !locked ? 'opacity-60' : ''}`}
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ring-1 transition-colors ${checked ? 'bg-(--lime-tint)/15 ring-[var(--lime-dark)]/25' : 'bg-[var(--surface)] ring-[var(--line)]'} ${locked ? 'cursor-default' : 'hover:ring-[var(--lime-dark)]/60'} disabled:cursor-default ${disabled && !locked ? 'opacity-60' : ''}`}
     >
-      <span className={`grid size-5 shrink-0 place-items-center rounded-md ring-1 ${checked ? 'bg-(--lime) text-[#26320b] ring-[var(--lime-dark)]/40' : 'bg-[var(--paper)] ring-[var(--line)]'}`}>
+      <span className={`grid size-5 shrink-0 place-items-center rounded-md ring-1 ${checked ? 'bg-(--lime) text-[var(--on-lime)] ring-[var(--lime-dark)]/40' : 'bg-[var(--paper)] ring-[var(--line)]'}`}>
         {pending ? <span className="size-3 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--accent)]" /> : checked ? (locked ? <LockSimple size={11} weight="bold" /> : <Check size={12} weight="bold" />) : null}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-semibold text-[var(--text)]">{permission.name}</span>
         {permission.description && <span className="block truncate text-[10.5px] text-[var(--muted)]">{asText(permission.description)}</span>}
       </span>
-      {tag && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${state === 'extra' ? 'bg-[var(--ink)] text-white dark:bg-(--lime) dark:text-[#26320b]' : 'bg-[var(--frame)] text-[var(--muted)]'}`}>{tag}</span>}
+      {tag && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${state === 'extra' ? 'bg-[var(--ink)] text-white dark:bg-(--lime) dark:text-[var(--on-lime)]' : 'bg-[var(--frame)] text-[var(--muted)]'}`}>{tag}</span>}
       {!locked && !pending && <span className="shrink-0 text-[var(--muted)]">{state === 'extra' ? <Minus size={13} weight="bold" /> : <Plus size={13} weight="bold" />}</span>}
     </button>
   </li>

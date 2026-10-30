@@ -76,7 +76,7 @@ export default function Login() {
       </div>
 
       <section className="relative flex min-h-[100dvh] flex-col overflow-hidden px-5 py-6 sm:px-10 lg:px-14">
-        <div className="pointer-events-none absolute -left-36 top-1/3 size-[28rem] rounded-full bg-[var(--lime)]/10 blur-[110px]" />
+        <div className="pointer-events-none absolute -left-36 top-1/3 size-[28rem] rounded-full bg-[var(--lime-tint)]/10 blur-[110px]" />
         <div data-enter className="flex items-center gap-3">
           <Mark />
           <span className="text-sm font-bold tracking-[-.02em]">Outright Feed Portal</span>
@@ -92,7 +92,7 @@ export default function Login() {
           >
             AI-Powered
             <br />
-            <span className="font-serif italic text-[var(--lime)]">LiveFeeds</span>
+            <span className="font-serif italic text-[var(--hero-accent)]">LiveFeeds</span>
           </h1>
 
           <p data-enter className="mt-8 max-w-xl text-[15px] leading-7 text-white/55">
@@ -106,14 +106,14 @@ export default function Login() {
             {highlights.map(({ icon: Icon, label, isNew }, index) => (
               <li
                 key={label}
-                className="login-feature-card flex min-w-0 items-center gap-3.5 rounded-2xl bg-white/[.035] p-3 pr-4 ring-1 ring-inset ring-white/[.08] backdrop-blur-sm transition-colors duration-300 hover:bg-white/[.06] hover:ring-[var(--lime)]/25"
+                className="login-feature-card flex min-w-0 items-center gap-3.5 rounded-2xl bg-white/[.035] p-3 pr-4 ring-1 ring-inset ring-white/[.08] backdrop-blur-sm transition-colors duration-300 hover:bg-white/[.06] hover:ring-[var(--lime-tint)]/25"
                 style={{ "--feature-delay": `${0.45 + index * 0.12}s` }}
               >
-                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[var(--lime)]/[.07] text-[var(--lime)] ring-1 ring-inset ring-[var(--lime)]/30 shadow-[0_0_18px_rgba(200,232,117,.14)]">
+                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[var(--lime-tint)]/[.07] text-[var(--hero-accent)] ring-1 ring-inset ring-[var(--lime-tint)]/30 shadow-[0_0_18px_color-mix(in_srgb,var(--hero-accent)_14%,transparent)]">
                   <Icon size={19} />
                 </span>
                 <span className="min-w-0 flex-1 text-sm font-semibold leading-5 text-white/85">{label}</span>
-                {isNew && <span className="shrink-0 rounded-md bg-[var(--lime)] px-2 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-[#1d2810]">New</span>}
+                {isNew && <span className="shrink-0 rounded-md bg-[var(--lime)] px-2 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-[var(--on-lime)]">New</span>}
               </li>
             ))}
           </ul>
@@ -140,14 +140,14 @@ export default function Login() {
           data-enter
           className="relative w-full rounded-[2rem] bg-[var(--surface)] p-2 text-[var(--ink)] shadow-[0_40px_100px_rgba(0,0,0,.25)] sm:max-w-[29rem]"
         >
-          <div className="rounded-[calc(2rem-.5rem)] bg-white px-5 py-7 sm:px-8 sm:py-10">
+          <div className="rounded-[calc(2rem-.5rem)] bg-[var(--raised)] px-5 py-7 sm:px-8 sm:py-10">
             {/* <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]"></p> */}
             <h2 className="mt-3 text-3xl font-semibold tracking-[-.045em]">Welcome back</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
               Sign in with your approved Microsoft work account.
             </p>
             {error && (
-              <p role="alert" className="mt-5 rounded-xl bg-[#f5d6cf] px-4 py-3 text-xs font-semibold text-[var(--danger)]">
+              <p role="alert" className="mt-5 rounded-xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--danger)]">
                 {error}
               </p>
             )}
@@ -155,7 +155,7 @@ export default function Login() {
               type="button"
               onClick={login}
               disabled={status === "loading"}
-              className={`${primaryButton} mt-7 w-full bg-[var(--lime)] !text-[var(--ink)] disabled:cursor-wait disabled:opacity-60`}
+              className={`${primaryButton} mt-7 w-full bg-[var(--lime)] !text-[var(--on-lime)] disabled:cursor-wait disabled:opacity-60`}
             >
               <MicrosoftMark />
               <span>{status === "loading" ? "Checking session…" : "Continue with Microsoft"}</span>

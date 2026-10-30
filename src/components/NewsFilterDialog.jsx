@@ -13,9 +13,9 @@ import { DialogHeader, Modal, primaryButton } from './ui'
 import { loadCustomTechNewsCategories, saveCustomTechNewsCategories } from '../lib/preferences'
 
 const tierOptions = [
-  { id: 'BLOCKBUSTER', label: 'Blockbuster', note: 'Critical high-impact developments', dot: 'bg-rose-500' },
-  { id: 'HOT', label: 'Hot', note: 'Trending releases and significant moves', dot: 'bg-amber-500' },
-  { id: 'NORMAL', label: 'Normal', note: 'Standard industry reporting and updates', dot: 'bg-purple-500' },
+  { id: 'BLOCKBUSTER', label: 'Blockbuster', note: 'Critical high-impact developments', dot: 'bg-danger-solid' },
+  { id: 'HOT', label: 'Hot', note: 'Trending releases and significant moves', dot: 'bg-warning-solid' },
+  { id: 'NORMAL', label: 'Normal', note: 'Standard industry reporting and updates', dot: 'bg-tone-violet-solid' },
 ]
 
 const sourceOptions = [
@@ -176,7 +176,7 @@ export default function NewsFilterDialog({
               onClick={() => toggleCategory(cat)}
               className={`rounded-full px-3 py-2 text-[10px] font-semibold transition-all duration-300 ${
                 selectedCategories.includes(cat)
-                  ? 'bg-[var(--lime)] !text-[#26320b] ring-1 ring-[var(--lime-dark)]/30'
+                  ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-1 ring-[var(--lime-dark)]/30'
                   : 'bg-[var(--surface)] text-[var(--muted)] ring-1 ring-black/5 hover:text-[var(--ink)]'
               }`}
             >
@@ -206,7 +206,7 @@ export default function NewsFilterDialog({
                 type="button"
                 onClick={handleAddCategory}
                 aria-label="Save category"
-                className="grid size-5 place-items-center rounded-full bg-[var(--lime)] text-[#26320b] transition-colors hover:brightness-95"
+                className="grid size-5 place-items-center rounded-full bg-[var(--lime)] text-[var(--on-lime)] transition-colors hover:brightness-95"
               >
                 <Plus size={11} weight="bold" />
               </button>
@@ -244,7 +244,7 @@ export default function NewsFilterDialog({
               Score Tier
             </span>
             {selectedTiers.length > 0 && (
-              <span className="rounded-full bg-[var(--lime)]/30 px-2 py-0.5 text-[9px] font-bold text-[#34420f]">
+              <span className="rounded-full bg-[var(--lime-tint)]/30 px-2 py-0.5 text-[9px] font-bold text-[var(--lime-ink)]">
                 {selectedTiers.length} selected
               </span>
             )}
@@ -267,29 +267,29 @@ export default function NewsFilterDialog({
             onClick={() => setSelectedTiers([])}
             className={`flex items-center gap-3 rounded-2xl p-3 text-left ring-1 transition-all duration-300 ${
               selectedTiers.length === 0
-                ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/50 font-bold shadow-xs'
+                ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-[var(--lime-dark)]/50 font-bold shadow-xs'
                 : 'bg-[var(--paper)] text-[var(--ink)] ring-black/5 hover:ring-black/15'
             }`}
           >
             <span
               className={`grid size-9 shrink-0 place-items-center rounded-xl ${
-                selectedTiers.length === 0 ? 'bg-black/10' : 'bg-white'
+                selectedTiers.length === 0 ? 'bg-black/10' : 'bg-[var(--raised)]'
               }`}
             >
-              <span className="size-3 rounded-xs bg-zinc-400" />
+              <span className="size-3 rounded-xs bg-tone-slate-solid" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-xs font-bold">All Tiers</span>
               <span
                 className={`mt-0.5 block truncate text-[9px] ${
-                  selectedTiers.length === 0 ? 'text-[#536520]' : 'text-[var(--muted)]'
+                  selectedTiers.length === 0 ? 'text-[var(--accent-strong)]' : 'text-[var(--muted)]'
                 }`}
               >
                 Show stories across all evaluated score tiers
               </span>
             </span>
             {selectedTiers.length === 0 && (
-              <CheckCircle size={17} weight="fill" className="shrink-0 text-[#26320b]" />
+              <CheckCircle size={17} weight="fill" className="shrink-0 text-[var(--on-lime)]" />
             )}
           </button>
 
@@ -303,13 +303,13 @@ export default function NewsFilterDialog({
                 onClick={() => toggleTier(opt.id)}
                 className={`flex items-center gap-3 rounded-2xl p-3 text-left ring-1 transition-all duration-300 ${
                   isSelected
-                    ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/50 font-bold shadow-xs'
+                    ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-[var(--lime-dark)]/50 font-bold shadow-xs'
                     : 'bg-[var(--paper)] text-[var(--ink)] ring-black/5 hover:ring-black/15'
                 }`}
               >
                 <span
                   className={`grid size-9 shrink-0 place-items-center rounded-xl ${
-                    isSelected ? 'bg-black/10' : 'bg-white'
+                    isSelected ? 'bg-black/10' : 'bg-[var(--raised)]'
                   }`}
                 >
                   <span className={`size-3 rounded-xs ${opt.dot}`} />
@@ -318,14 +318,14 @@ export default function NewsFilterDialog({
                   <span className="block text-xs font-bold">{opt.label}</span>
                   <span
                     className={`mt-0.5 block truncate text-[9px] ${
-                      isSelected ? 'text-[#536520]' : 'text-[var(--muted)]'
+                      isSelected ? 'text-[var(--accent-strong)]' : 'text-[var(--muted)]'
                     }`}
                   >
                     {opt.note}
                   </span>
                 </span>
                 {isSelected && (
-                  <CheckCircle size={17} weight="fill" className="shrink-0 text-[#26320b]" />
+                  <CheckCircle size={17} weight="fill" className="shrink-0 text-[var(--on-lime)]" />
                 )}
               </button>
             )
@@ -341,7 +341,7 @@ export default function NewsFilterDialog({
               Source Type
             </span>
             {selectedSources.length > 0 && (
-              <span className="rounded-full bg-[var(--lime)]/30 px-2 py-0.5 text-[9px] font-bold text-[#34420f]">
+              <span className="rounded-full bg-[var(--lime-tint)]/30 px-2 py-0.5 text-[9px] font-bold text-[var(--lime-ink)]">
                 {selectedSources.length} selected
               </span>
             )}
@@ -364,13 +364,13 @@ export default function NewsFilterDialog({
             onClick={() => setSelectedSources([])}
             className={`flex items-center gap-3 rounded-2xl p-3 text-left ring-1 transition-all duration-300 ${
               selectedSources.length === 0
-                ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/50 font-bold shadow-xs'
+                ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-[var(--lime-dark)]/50 font-bold shadow-xs'
                 : 'bg-[var(--paper)] text-[var(--ink)] ring-black/5 hover:ring-black/15'
             }`}
           >
             <span
               className={`grid size-9 shrink-0 place-items-center rounded-xl ${
-                selectedSources.length === 0 ? 'bg-black/10' : 'bg-white'
+                selectedSources.length === 0 ? 'bg-black/10' : 'bg-[var(--raised)]'
               }`}
             >
               <Globe size={16} weight="bold" />
@@ -379,14 +379,14 @@ export default function NewsFilterDialog({
               <span className="block text-xs font-bold">All Sources</span>
               <span
                 className={`mt-0.5 block truncate text-[9px] ${
-                  selectedSources.length === 0 ? 'text-[#536520]' : 'text-[var(--muted)]'
+                  selectedSources.length === 0 ? 'text-[var(--accent-strong)]' : 'text-[var(--muted)]'
                 }`}
               >
                 Show stories regardless of provenance
               </span>
             </span>
             {selectedSources.length === 0 && (
-              <CheckCircle size={17} weight="fill" className="shrink-0 text-[#26320b]" />
+              <CheckCircle size={17} weight="fill" className="shrink-0 text-[var(--on-lime)]" />
             )}
           </button>
 
@@ -401,33 +401,33 @@ export default function NewsFilterDialog({
                 onClick={() => toggleSource(opt.id)}
                 className={`flex items-center gap-3 rounded-2xl p-3 text-left ring-1 transition-all duration-300 ${
                   isSelected
-                    ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/50 font-bold shadow-xs'
+                    ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-[var(--lime-dark)]/50 font-bold shadow-xs'
                     : 'bg-[var(--paper)] text-[var(--ink)] ring-black/5 hover:ring-black/15'
                 }`}
               >
                 <span
                   className={`grid size-9 shrink-0 place-items-center rounded-xl ${
-                    isSelected ? 'bg-black/10' : 'bg-white'
+                    isSelected ? 'bg-black/10' : 'bg-[var(--raised)]'
                   }`}
                 >
                   <Icon
                     size={16}
                     weight={opt.id === 'YouBlogging' ? 'fill' : 'bold'}
-                    className={opt.id === 'YouBlogging' ? 'text-red-500' : ''}
+                    className={opt.id === 'YouBlogging' ? 'text-danger-solid' : ''}
                   />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-bold">{opt.label}</span>
                   <span
                     className={`mt-0.5 block truncate text-[9px] ${
-                      isSelected ? 'text-[#536520]' : 'text-[var(--muted)]'
+                      isSelected ? 'text-[var(--accent-strong)]' : 'text-[var(--muted)]'
                     }`}
                   >
                     {opt.note}
                   </span>
                 </span>
                 {isSelected && (
-                  <CheckCircle size={17} weight="fill" className="shrink-0 text-[#26320b]" />
+                  <CheckCircle size={17} weight="fill" className="shrink-0 text-[var(--on-lime)]" />
                 )}
               </button>
             )

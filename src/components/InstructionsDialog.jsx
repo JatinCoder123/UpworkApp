@@ -32,7 +32,7 @@ export default function InstructionsDialog({ title, promptName, guidelinesName, 
   return <Modal onClose={onClose} full contained>
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex items-start gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[var(--lime)] text-[#26320b]"><BookOpenText size={20} weight="bold" /></span>
+        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[var(--lime)] text-[var(--on-lime)]"><BookOpenText size={20} weight="bold" /></span>
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">Prompt &amp; guidelines</p>
           <h2 className="mt-1 text-2xl font-semibold tracking-[-.04em]">{title}</h2>
@@ -48,8 +48,8 @@ export default function InstructionsDialog({ title, promptName, guidelinesName, 
             return <div key={key} className="contents">
               {index === 3 && <p className={`${label} hidden px-1 pt-2 lg:block`}>Guidelines</p>}
               {index === 0 && <p className={`${label} hidden px-1 lg:block`}>Prompt</p>}
-              <button type="button" onClick={() => setPart(key)} aria-current={active ? 'true' : undefined} className={`flex shrink-0 items-center gap-3 rounded-2xl px-3 py-2.5 text-left ring-1 transition-colors lg:py-3 ${active ? 'bg-(--lime)/30 ring-[var(--lime-dark)]/45' : 'bg-[var(--paper)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/50'}`}>
-                <span className={`grid size-8 shrink-0 place-items-center rounded-xl ${active ? 'bg-[var(--lime)] text-[#26320b]' : 'bg-[var(--surface)] text-[var(--muted)] ring-1 ring-[var(--line)]/70'}`}><Icon size={15} weight="bold" /></span>
+              <button type="button" onClick={() => setPart(key)} aria-current={active ? 'true' : undefined} className={`flex shrink-0 items-center gap-3 rounded-2xl px-3 py-2.5 text-left ring-1 transition-colors lg:py-3 ${active ? 'bg-(--lime-tint)/30 ring-[var(--lime-dark)]/45' : 'bg-[var(--paper)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/50'}`}>
+                <span className={`grid size-8 shrink-0 place-items-center rounded-xl ${active ? 'bg-[var(--lime)] text-[var(--on-lime)]' : 'bg-[var(--surface)] text-[var(--muted)] ring-1 ring-[var(--line)]/70'}`}><Icon size={15} weight="bold" /></span>
                 <span className="min-w-0">
                   <span className="flex items-center gap-1.5 whitespace-nowrap text-[13px] font-semibold text-[var(--ink)]">{text}{empty && <span className="rounded-full bg-[var(--surface)] px-1.5 py-px text-[10px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]">Empty</span>}</span>
                   <span className="hidden text-[11px] leading-4 text-[var(--muted)] lg:block">{about}</span>

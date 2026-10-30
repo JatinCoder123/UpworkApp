@@ -61,7 +61,7 @@ export default function PromptManagerDialog({ onClose, tab: tabProp, onTab, open
   const tab = SECTIONS.some((entry) => entry.id === tabProp) ? tabProp : ownTab
   const setTab = (id) => { setOwnTab(id); onTab?.(id) }
   const section = SECTIONS.find((entry) => entry.id === tab)
-  const tabClass = (active) => `inline-flex items-center gap-2 rounded-full px-4 py-2 transition-colors ${active ? 'bg-[var(--ink)] text-white dark:bg-(--lime) dark:text-[#26320b]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`
+  const tabClass = (active) => `inline-flex items-center gap-2 rounded-full px-4 py-2 transition-colors ${active ? 'bg-[var(--ink)] text-white dark:bg-(--lime) dark:text-[var(--on-lime)]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`
   return <Modal onClose={onClose} full contained>
     <div className="flex h-full min-h-0 flex-col">
       <DialogHeader eyebrow="Prompt management" title={section.label} onClose={onClose} />
@@ -88,7 +88,7 @@ function ManagerSection({ section, openId: openProp, onOpen }) {
   const shown = items.filter((item) => (!chip || section.chipOf(item) === chip) && (!term || section.search(item).toLowerCase().includes(term)))
   // Wide screens: the picked item, or the first one shown. Phones: the list until one is picked.
   const activeId = openId ?? shown[0]?.id ?? null
-  const chipClass = (active) => `rounded-full px-3 py-1.5 ring-1 transition-colors ${active ? 'bg-[var(--ink)] text-white ring-transparent dark:bg-(--lime) dark:text-[#26320b]' : 'bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`
+  const chipClass = (active) => `rounded-full px-3 py-1.5 ring-1 transition-colors ${active ? 'bg-[var(--ink)] text-white ring-transparent dark:bg-(--lime) dark:text-[var(--on-lime)]' : 'bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`
 
   return <div className="mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
     <div className={`min-h-0 flex-col ${openId ? 'hidden lg:flex' : 'flex'}`}>
@@ -107,8 +107,8 @@ function ManagerSection({ section, openId: openProp, onOpen }) {
             ? <li role="alert" className="py-8 text-center text-sm font-semibold text-[var(--danger)]">{list.error?.message || 'They could not be loaded.'} <span className="text-xs"><button type="button" onClick={() => list.refetch()} className="underline">Retry</button></span></li>
             : shown.length
               ? shown.map((item) => <li key={item.id}>
-                <button type="button" onClick={() => setOpenId(item.id)} aria-current={activeId === item.id} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ring-1 transition-colors ${activeId === item.id ? 'bg-(--lime)/25 ring-[var(--lime-dark)]/40' : 'bg-[var(--surface)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]'}`}>
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-(--lime)/30 text-[var(--accent-strong)]"><section.icon size={15} weight="bold" /></span>
+                <button type="button" onClick={() => setOpenId(item.id)} aria-current={activeId === item.id} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ring-1 transition-colors ${activeId === item.id ? 'bg-(--lime-tint)/25 ring-[var(--lime-dark)]/40' : 'bg-[var(--surface)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]'}`}>
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-(--lime-tint)/30 text-[var(--accent-strong)]"><section.icon size={15} weight="bold" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold">{item.name}</span>
                     <span className="block truncate text-[11px] text-[var(--muted)]">{section.meta(item)}</span>

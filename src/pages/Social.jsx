@@ -9,7 +9,7 @@ import { ClearFilters, NothingMatches, SectionPanel, sectionLabel as label } fro
 import FeedSearch from '../components/FeedSearch'
 import FeedFilterDialog from '../components/FeedFilterDialog'
 import FilterListDialog from '../components/FilterListDialog'
-import { FactIcon, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader } from '../components/FeedParts'
+import { FactList, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow } from '../components/FeedParts'
 import { DialogHeader, Modal, primaryButton } from '../components/ui'
 import ErrorBoundary, { CardError, DialogError } from '../components/ErrorBoundary'
 import { useAuth } from '../contexts/AuthContext'
@@ -44,9 +44,9 @@ const NO_PLATFORM = { icon: Megaphone, tile: 'bg-[var(--paper)] text-[var(--mute
 const FORMATS = { text_post: TextAa, carousel: Cards, image: Image, reel: FilmReel, short: DeviceMobile, thread: ListBullets, long_video: VideoCamera, story: CircleDashed, poll: ChartBarHorizontal, article: FileText, document_pdf: FilePdf }
 const GOALS = { reach: Megaphone, engagement: Heart, leads: Target, brand: Sparkle, traffic: ArrowSquareOut }
 const TREND = {
-  rising: [TrendUp, 'text-[#3f7d1c] dark:text-[#a8d86e]', 'bg-[#e9f6dc] text-[#3f7d1c] dark:bg-[#1f3315] dark:text-[#a8d86e]'],
+  rising: [TrendUp, 'text-rise', 'bg-rise-bg text-rise'],
   stable: [Minus, 'text-[var(--muted)]', 'bg-[var(--paper)] text-[var(--muted)]'],
-  declining: [TrendDown, 'text-[#9a3412] dark:text-[#fdba9a]', 'bg-[#fbe1d8] text-[#9a3412] dark:bg-[#4a2318] dark:text-[#fdba9a]'],
+  declining: [TrendDown, 'text-clay', 'bg-clay-bg text-clay'],
 }
 const SORTS = [{ id: 'reach', label: 'Highest expected reach' }, { id: 'newest', label: 'Newest first' }, { id: 'views', label: 'Most views' }]
 // Universal filter: key -> [CRM field, item field, matched on the page]. Hashtags and "repurpose for" hold several
@@ -188,7 +188,7 @@ function PlatformTile({ platform, large = false }) {
 
 function Hashtags({ tags, labelOf }) {
   if (!tags.length) return null
-  return <p className="flex flex-wrap gap-x-2 gap-y-0.5 text-[13px] font-semibold text-[#1d6fd6] dark:text-[#8ab4f8]">{tags.map((tag) => <span key={tag}>{labelOf('hashtags', tag)}</span>)}</p>
+  return <p className="flex flex-wrap gap-x-2 gap-y-0.5 text-[13px] font-semibold text-tone-blue">{tags.map((tag) => <span key={tag}>{labelOf('hashtags', tag)}</span>)}</p>
 }
 
 // "177 / 280" with a bar: green while short, amber near the platform's limit, red over it.
@@ -196,7 +196,7 @@ function CharacterMeter({ count, limit }) {
   if (count == null) return <span className="text-[var(--muted)]">-</span>
   if (!limit) return <span className="font-mono">{count}</span>
   const ratio = count / limit
-  const colour = ratio > 1 ? 'bg-[#e5484d]' : ratio > 0.85 ? 'bg-[#e0a526]' : 'bg-[var(--lime-dark)]'
+  const colour = ratio > 1 ? 'bg-danger-solid' : ratio > 0.85 ? 'bg-warning-solid' : 'bg-[var(--lime-dark)]'
   return <span className="block">
     <span className="font-mono">{count}<span className="text-[11px] text-[var(--muted)]"> / {limit.toLocaleString('en-US')}</span></span>
     <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-[var(--line)]"><span className={`block h-full rounded-full ${colour}`} style={{ width: `${Math.max(4, Math.min(100, ratio * 100))}%` }} /></span>
@@ -216,9 +216,9 @@ function PostPreview({ item, labelOf, clamp = false }) {
 // Results of a posted post.
 function Results({ item }) {
   const stats = [[Eye, 'Views', item.views], [Heart, 'Likes', item.likes], [ChatCircle, 'Comments', item.comments], [ShareFat, 'Shares', item.shares], [UsersThree, 'Leads', item.leads]]
-  return <div className="rounded-2xl bg-[#e9f6e4] p-3 ring-1 ring-[#c6e6b8] dark:bg-[#163323] dark:ring-[#2a5a3a]">
-    <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-[#137333] dark:text-[#81c995]"><PaperPlaneTilt size={13} weight="bold" />Results</p>
-    <div className="mt-2 grid grid-cols-5 gap-1.5">{stats.map(([Icon, caption, value]) => <div key={caption} className="min-w-0 text-center">
+  return <div className="rounded-2xl bg-success-bg p-3 ring-1 ring-success-line">
+    <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-success"><PaperPlaneTilt size={13} weight="bold" />Results</p>
+    <div className="mt-2 grid grid-cols-3 gap-x-1.5 gap-y-3 @md:grid-cols-5">{stats.map(([Icon, caption, value]) => <div key={caption} className="min-w-0 text-center">
       <p className="font-mono text-[15px] font-semibold tabular-nums">{value != null ? compact.format(value) : '-'}</p>
       <p className="flex items-center justify-center gap-1 text-[11px] text-[var(--muted)]"><Icon size={11} />{caption}</p>
     </div>)}</div>
@@ -231,19 +231,19 @@ function CopyPost({ item, labelOf, big = false }) {
   const copy = async () => {
     try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1600) } catch { /* clipboard blocked */ }
   }
-  if (big) return <span className="text-[13px] font-bold"><button type="button" onClick={copy} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--lime)] px-3.5 py-2 text-[#26320b] transition-transform hover:-translate-y-0.5">{copied ? <Check size={13} weight="bold" /> : <Copy size={13} weight="bold" />}{copied ? 'Copied' : 'Copy post'}</button></span>
-  return <button type="button" onClick={copy} aria-label="Copy post" title={copied ? 'Copied' : 'Copy post with hashtags'} className={`grid size-8 place-items-center rounded-full ring-1 transition-colors ${copied ? 'bg-[var(--lime)] text-[#26320b] ring-[var(--lime-dark)]/40' : 'bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}>{copied ? <Check size={14} weight="bold" /> : <Copy size={14} />}</button>
+  if (big) return <span className="text-[13px] font-bold"><button type="button" onClick={copy} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--lime)] px-3.5 py-2 text-[var(--on-lime)] transition-transform hover:-translate-y-0.5">{copied ? <Check size={13} weight="bold" /> : <Copy size={13} weight="bold" />}{copied ? 'Copied' : 'Copy post'}</button></span>
+  return <button type="button" onClick={copy} aria-label="Copy post" title={copied ? 'Copied' : 'Copy post with hashtags'} className={`grid size-8 place-items-center rounded-full ring-1 transition-colors ${copied ? 'bg-[var(--lime)] text-[var(--on-lime)] ring-[var(--lime-dark)]/40' : 'bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}>{copied ? <Check size={14} weight="bold" /> : <Copy size={14} />}</button>
 }
 
 // Expected reach, trend, best time and characters.
 function Metrics({ item, labelOf }) {
   const [TrendIcon, trendTone] = TREND[item.trend] || TREND.stable
-  return <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+  return <div className={metricRow}>
     <Metric icon={Megaphone} tone="text-[var(--lime-dark)]" caption="Reach" value={item.reachScore != null && <span className="font-mono">{item.reachScore}<span className="text-[11px] text-[var(--muted)]">/100</span></span>}>
       {item.reachScore != null && <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-[var(--line)]"><span className="block h-full rounded-full bg-[var(--lime-dark)]" style={{ width: `${Math.min(100, item.reachScore)}%` }} /></span>}
     </Metric>
     <Metric icon={TrendIcon} tone={trendTone} caption="Trend" value={item.trend && <span className={trendTone}>{labelOf('trend', item.trend)}</span>} />
-    <Metric icon={Clock} tone="text-[#b7791f] dark:text-[#e8c867]" caption="Best time" value={item.bestTime} wrap />
+    <Metric icon={Clock} tone="text-warning-icon" caption="Best time" value={item.bestTime} wrap />
     <Metric icon={TextAa} caption="Characters" value={<CharacterMeter count={item.characters ?? item.post.length} limit={platformOf(item.platform).limit} />} />
   </div>
 }
@@ -253,13 +253,13 @@ function PostRow({ item, labelOf, selected, onPick }) {
   const { icon: Icon, tile } = platformOf(item.platform)
   const FormatIcon = FORMATS[item.format] || Article
   return <article id={`feed-${item.id}`} data-feed-card={item.id}>
-    <button type="button" onClick={onPick} aria-current={selected ? 'true' : undefined} className={`flex w-full items-center gap-3 rounded-2xl p-3 text-left ring-1 transition-all duration-300 ${selected ? 'bg-(--lime)/25 shadow-sm ring-[var(--lime-dark)]/45' : 'bg-[var(--surface)] ring-[var(--line)]/70 hover:-translate-y-0.5 hover:ring-[var(--lime-dark)]/50'}`}>
+    <button type="button" onClick={onPick} aria-current={selected ? 'true' : undefined} className={`flex w-full items-center gap-3 rounded-2xl p-3 text-left ring-1 transition-all duration-300 ${selected ? 'bg-(--lime-tint)/25 shadow-sm ring-[var(--lime-dark)]/45' : 'bg-[var(--surface)] ring-[var(--line)]/70 hover:-translate-y-0.5 hover:ring-[var(--lime-dark)]/50'}`}>
       <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${tile}`}><Icon size={20} weight="fill" /></span>
       <span className="min-w-0 flex-1">
         <span data-card-title className="line-clamp-2 text-sm font-semibold leading-5">{item.name}</span>
         <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-[var(--muted)]">
           <span className="inline-flex items-center gap-1"><FormatIcon size={12} />{labelOf('post_format', item.format)}</span>
-          {posted(item) && <span className="inline-flex items-center gap-1 font-semibold text-[#137333] dark:text-[#81c995]"><PaperPlaneTilt size={12} weight="bold" />Posted{item.views != null && ` · ${compact.format(item.views)} views`}</span>}
+          {posted(item) && <span className="inline-flex items-center gap-1 font-semibold text-success"><PaperPlaneTilt size={12} weight="bold" />Posted{item.views != null && ` · ${compact.format(item.views)} views`}</span>}
         </span>
       </span>
       {item.reachScore != null && <span title={`Expected reach ${item.reachScore} / 100`} className="flex shrink-0 flex-col items-end gap-1">
@@ -283,10 +283,45 @@ function PostPanel({ item, labelOf, now }) {
 
 function Callout({ icon: Icon, title, children }) {
   if (!children) return null
-  return <div className="flex gap-2.5 rounded-xl border-l-4 border-[var(--lime-dark)] bg-(--lime)/15 px-3.5 py-3">
+  return <div className="flex gap-2.5 rounded-xl border-l-4 border-[var(--lime-dark)] bg-(--lime-tint)/15 px-3.5 py-3">
     <Icon size={17} weight="fill" className="mt-0.5 shrink-0 text-[var(--lime-dark)]" />
     <div className="min-w-0"><p className={label}>{title}</p><p className="mt-0.5 text-sm leading-6">{children}</p></div>
   </div>
+}
+
+// A step's own marker, split from its text: a video beat ("0–3 s", maybe with a note such as "screen"), or a slide,
+// tweet or part number. A single number is the step's own number, so only a range ("Slides 2–4") keeps its marker.
+const STEP_MARK = /^(?:((?:slides?|tweets?|parts?|steps?|scenes?|frames?)\s*\d+(?:\s*[–-]\s*\d+)?)|(\d+(?:\.\d+)?\s*[–-]\s*\d+(?:\.\d+)?\s*s(?:ec(?:onds?)?)?))\s*(?:\(([^)]*)\))?\s*:\s*/i
+const stepOf = (line) => {
+  const match = line.match(STEP_MARK)
+  if (!match) return { text: line }
+  const [whole, numbered, time, note] = match
+  const mark = time ? time.replace(/\s*s(?:ec(?:onds?)?)?$/i, ' s').replace(/\s*[–-]\s*/, '–') : /[–-]/.test(numbered) ? numbered : null
+  const text = line.slice(whole.length)
+  return { mark, note, text: text.charAt(0).toUpperCase() + text.slice(1) }
+}
+
+// How the post is built, step by step on a line that joins them: the step's number, its beat or slide range and note
+// (when it has them), then what happens in it.
+function Outline({ steps }) {
+  if (!steps.length) return null
+  return <section>
+    <p className={`${label} flex items-center gap-1.5`}><ListNumbers size={13} weight="bold" />Outline<span className="font-mono font-medium tracking-normal">{steps.length}</span></p>
+    <ol className="mt-3">{steps.map((line, index) => {
+      const step = stepOf(line)
+      return <li key={`${index}-${line}`} className="relative flex gap-3 pb-3.5 last:pb-0">
+        {index < steps.length - 1 && <span aria-hidden="true" className="absolute bottom-0 left-[.6875rem] top-6 w-px bg-[var(--line)]" />}
+        <span className="relative grid size-[1.375rem] shrink-0 place-items-center rounded-full bg-[var(--lime)] font-mono text-[10px] font-bold text-[var(--on-lime)]">{index + 1}</span>
+        <div className="min-w-0 flex-1 pt-px">
+          {(step.mark || step.note) && <span className="mb-1 flex flex-wrap items-center gap-1.5">
+            {step.mark && <span className="rounded-md bg-(--lime-tint)/25 px-1.5 py-0.5 font-mono text-[11px] font-medium leading-4 text-[var(--lime-ink)] ring-1 ring-[var(--lime-dark)]/20">{step.mark}</span>}
+            {step.note && <span className="rounded-md bg-[var(--paper)] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-[var(--muted)] ring-1 ring-[var(--line)]/70">{step.note}</span>}
+          </span>}
+          <p className="text-sm leading-5">{step.text}</p>
+        </div>
+      </li>
+    })}</ol>
+  </section>
 }
 
 // One post's details, in its dialog and in the panel beside the queue: the full post, how it is built (hook, outline,
@@ -321,14 +356,16 @@ function PostDetails({ item, labelOf, now }) {
     <div className="mt-4"><Metrics item={item} labelOf={labelOf} /></div>
     {posted(item) && <div className="mt-3"><Results item={item} /></div>}
 
-    <div className="mt-5 grid gap-5 @2xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+    {/* Two columns when there is room: the post itself (preview, hook, outline) on the left; its call to action, why it
+        works, where else to post it and the details on the right, so neither side runs on alone. */}
+    <div className="mt-5 grid items-start gap-5 @xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
       <div className="space-y-4 text-sm leading-6">
         <PostPreview item={item} labelOf={labelOf} />
         <Callout icon={Sparkle} title="Hook (first line)">{item.hook}</Callout>
-        {item.outline.length > 0 && <section>
-          <p className={`${label} flex items-center gap-1.5`}><ListNumbers size={13} weight="bold" />Outline</p>
-          <ol className="mt-2 space-y-1.5">{item.outline.map((step, index) => <li key={`${index}-${step}`} className="flex gap-2.5"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--lime)] font-mono text-[11px] font-bold text-[#26320b]">{index + 1}</span><span className="pt-0.5">{step.replace(/^(Slides?|Tweet|Part|Step)?\s*[\d–-]*:\s*/i, '')}</span></li>)}</ol>
-        </section>}
+        <Outline steps={item.outline} />
+      </div>
+
+      <div className="space-y-4 text-sm leading-6">
         <Callout icon={Target} title="Call to action">{item.callToAction}</Callout>
         {item.whyThisWorks && <section><p className={`${label} flex items-center gap-1.5`}><Lightbulb size={13} weight="bold" />Why this works</p><p className="mt-1.5 text-[var(--muted)]">{item.whyThisWorks}</p></section>}
         {item.repurposeFor.length > 0 && <section>
@@ -338,15 +375,8 @@ function PostDetails({ item, labelOf, now }) {
             return <span key={platform} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}><Icon size={13} weight="fill" />{labelOf('repurpose_for', platform)}</span>
           })}</div>
         </section>}
+        <FactList facts={facts} />
       </div>
-
-      {/* The details list runs to the bottom of the left column, its rows spread evenly. */}
-      <dl className="flex flex-col self-stretch rounded-2xl bg-[var(--paper)] px-3.5 py-1.5 text-[13px] ring-1 ring-[var(--line)]/70">
-        {facts.map(([Icon, title, value]) => <div key={title} className="flex max-h-14 min-h-11 flex-1 items-center justify-between gap-3 border-t border-[var(--line)]/60 py-2 first:border-t-0">
-          <dt className="flex shrink-0 items-center gap-2.5 text-[var(--muted)]"><FactIcon icon={Icon} title={title} />{title}</dt>
-          <dd className="text-right font-semibold">{value}</dd>
-        </div>)}
-      </dl>
     </div>
   </div>
 }

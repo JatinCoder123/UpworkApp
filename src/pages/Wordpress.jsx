@@ -9,7 +9,7 @@ import { ClearFilters, NothingMatches, SectionPanel, sectionLabel as label } fro
 import FeedSearch from '../components/FeedSearch'
 import FeedFilterDialog from '../components/FeedFilterDialog'
 import FilterListDialog from '../components/FilterListDialog'
-import { FactIcon, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader } from '../components/FeedParts'
+import { FactList, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow } from '../components/FeedParts'
 import { DialogHeader, Modal, primaryButton } from '../components/ui'
 import ErrorBoundary, { CardError, DialogError } from '../components/ErrorBoundary'
 import { useAuth } from '../contexts/AuthContext'
@@ -29,30 +29,30 @@ import { timeAgo, useNow } from '../lib/time'
 
 // Item type: icon and tile colour (item_type keys).
 const TYPES = {
-  plugin: [Plug, 'bg-[#e8eafe] text-[#3b3f8f] dark:bg-[#252845] dark:text-[#b9befa]'],
-  theme: [PaintBrush, 'bg-[#fce7f3] text-[#9d2a6a] dark:bg-[#3d1d30] dark:text-[#f3a6d0]'],
-  block: [SquaresFour, 'bg-[#ddf6ea] text-[#1f6b4a] dark:bg-[#17352a] dark:text-[#8fdcb6]'],
-  extension: [PuzzlePiece, 'bg-[#fff0d7] text-[#8a5a00] dark:bg-[#3a2e17] dark:text-[#f2c26b]'],
-  template: [Layout, 'bg-[#e0f2fe] text-[#1e5a85] dark:bg-[#18303f] dark:text-[#9fd0f2]'],
-  market_news: [Newspaper, 'bg-[#e8eaf0] text-[#334155] dark:bg-[#262a33] dark:text-[#c3cad6]'],
+  plugin: [Plug, 'bg-tone-indigo-bg text-tone-indigo'],
+  theme: [PaintBrush, 'bg-tone-pink-bg text-tone-pink'],
+  block: [SquaresFour, 'bg-tone-mint-bg text-tone-mint'],
+  extension: [PuzzlePiece, 'bg-tone-amber-bg text-tone-amber'],
+  template: [Layout, 'bg-info-bg text-info'],
+  market_news: [Newspaper, 'bg-tone-slate-bg text-tone-slate'],
 }
 const TREND = {
-  rising: [TrendUp, 'text-[#3f7d1c] dark:text-[#a8d86e]'],
+  rising: [TrendUp, 'text-rise'],
   stable: [Minus, 'text-[var(--muted)]'],
-  declining: [TrendDown, 'text-[#9a3412] dark:text-[#fdba9a]'],
+  declining: [TrendDown, 'text-clay'],
 }
 const PRICING_ICONS = { free: Tag, paid: CurrencyDollar, freemium: Stack }
 // Pricing chips in the filters: lime free, blue paid, purple freemium.
 const PRICING_TONE = {
-  free: 'bg-(--lime)/40 text-[var(--ink)]',
-  paid: 'bg-[#e0f2fe] text-[#0369a1] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc]',
-  freemium: 'bg-[#efe4fb] text-[#6b2fa8] dark:bg-[#2e1f45] dark:text-[#d2b4fa]',
+  free: 'bg-(--lime-tint)/40 text-[var(--ink)]',
+  paid: 'bg-info-bg text-info',
+  freemium: 'bg-tone-violet-bg text-tone-violet',
 }
 // Trend chips in the filters: green rising, grey stable, red declining.
 const TREND_TONE = {
-  rising: 'bg-[#e9f6dc] text-[#3f7d1c] dark:bg-[#1f3315] dark:text-[#a8d86e]',
+  rising: 'bg-rise-bg text-rise',
   stable: 'bg-[var(--paper)] text-[var(--muted)]',
-  declining: 'bg-[#fbe1d8] text-[#9a3412] dark:bg-[#4a2318] dark:text-[#fdba9a]',
+  declining: 'bg-clay-bg text-clay',
 }
 // Sorts the gateway applies (see FEEDS in services/api).
 const SORTS = [{ id: 'demand', label: 'Highest demand' }, { id: 'newest', label: 'Newest first' }, { id: 'installs', label: 'Most installs' }, { id: 'sales', label: 'Most sales' }, { id: 'rating', label: 'Top rated' }]
@@ -171,8 +171,8 @@ export default function Wordpress() {
               <ErrorBoundary name="wordpress-index" fallbackProps={INDEX_ERROR} resetKey={items}><FeedIndex items={items} activeId={activeId} onJump={jumpTo}
                 meta={(item) => { const [TypeIcon] = TYPES[item.itemType] || [Tag]; return <><TypeIcon size={10} />{labelOf('item_type', item.itemType)}</> }}
                 mark={(item) => item.demandScore != null && <span title={`Demand score ${item.demandScore}`} className="mt-0.5 shrink-0 self-start rounded-md bg-[var(--paper)] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{item.demandScore}</span>} /></ErrorBoundary>
-              <div className="min-w-0">
-                <section className={`grid content-start gap-4 transition-opacity min-[1400px]:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="wordpress-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><FeedCard item={item} labelOf={labelOf} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
+              <div className="@container min-w-0">
+                <section className={`grid content-start gap-4 transition-opacity @4xl:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="wordpress-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><FeedCard item={item} labelOf={labelOf} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
                 <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} />
               </div>
             </div>
@@ -207,19 +207,19 @@ function TrendChip({ trend, labelOf }) {
 function Metrics({ item, labelOf }) {
   const [TrendIcon, trendTone] = TREND[item.trend] || TREND.stable
   const sales = item.installs == null && item.sales != null
-  return <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+  return <div className={metricRow}>
     <Metric icon={Gauge} tone="text-[var(--lime-dark)]" caption="Demand" value={item.demandScore != null && <span className="font-mono">{item.demandScore}<span className="text-[11px] text-[var(--muted)]">/100</span></span>}>
       {item.demandScore != null && <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-[var(--line)]"><span className="block h-full rounded-full bg-[var(--lime-dark)]" style={{ width: `${Math.min(100, item.demandScore)}%` }} /></span>}
     </Metric>
     <Metric icon={TrendIcon} tone={trendTone} caption="Trend" value={item.trend && <span className={trendTone}>{labelOf('trend', item.trend)}</span>} />
     <Metric icon={sales ? ShoppingCart : DownloadSimple} caption={sales ? 'Sales' : 'Installs'} value={(item.installs ?? item.sales) != null && <span className="font-mono">{compact.format(item.installs ?? item.sales)}</span>} />
-    <Metric icon={Star} tone="text-[#c99a06]" caption="Rating" value={item.rating != null && <span className="font-mono">{item.rating.toFixed(1)}</span>} />
+    <Metric icon={Star} tone="text-star" caption="Rating" value={item.rating != null && <span className="font-mono">{item.rating.toFixed(1)}</span>} />
     <Metric icon={Tag} caption="Price" value={<PriceValue item={item} labelOf={labelOf} />} wrap />
   </div>
 }
 
 function Opportunity({ text, clamp = false }) {
-  return <div className="flex gap-2.5 rounded-xl border-l-4 border-[var(--lime-dark)] bg-(--lime)/15 px-3.5 py-3">
+  return <div className="flex gap-2.5 rounded-xl border-l-4 border-[var(--lime-dark)] bg-(--lime-tint)/15 px-3.5 py-3">
     <Lightbulb size={17} weight="fill" className="mt-0.5 shrink-0 text-[var(--lime-dark)]" />
     <div className="min-w-0"><p className={label}>Opportunity for us</p><p className={`mt-0.5 text-sm leading-6 ${clamp ? 'line-clamp-2' : ''}`}>{text}</p></div>
   </div>
@@ -231,7 +231,7 @@ function Tags({ tags, labelOf }) {
 }
 
 function FeedCard({ item, labelOf, onOpen }) {
-  return <article id={`feed-${item.id}`} data-feed-card={item.id} className={`flex scroll-mt-[calc(var(--shell-h)+1rem)] flex-col gap-3.5 rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(30,40,25,.1)]`}>
+  return <article id={`feed-${item.id}`} data-feed-card={item.id} className={`flex scroll-mt-[calc(var(--shell-h)+1rem)] flex-col gap-3.5 rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgb(var(--shadow-rgb)/.1)]`}>
     <header className="flex items-start gap-3">
       <TypeTile type={item.itemType} />
       <div className="min-w-0 flex-1">
@@ -276,7 +276,7 @@ function FeedDialog({ item, labelOf, now, onClose }) {
       <TypeChip type={item.itemType} labelOf={labelOf} />
       <TrendChip trend={item.trend} labelOf={labelOf} />
       <div className="ml-auto flex flex-wrap items-center gap-2 text-xs font-bold">
-        {item.sourceUrl && <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--lime)] px-3.5 py-2 text-[#26320b] transition-transform hover:-translate-y-0.5"><Globe size={13} weight="bold" />Open on {labelOf('source', item.source)}<ArrowSquareOut size={12} weight="bold" /></a>}
+        {item.sourceUrl && <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--lime)] px-3.5 py-2 text-[var(--on-lime)] transition-transform hover:-translate-y-0.5"><Globe size={13} weight="bold" />Open on {labelOf('source', item.source)}<ArrowSquareOut size={12} weight="bold" /></a>}
         {item.demoUrl && <a href={item.demoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3.5 py-2 text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)]"><Eye size={13} weight="bold" />View demo<ArrowSquareOut size={12} weight="bold" /></a>}
       </div>
     </div>
@@ -284,7 +284,7 @@ function FeedDialog({ item, labelOf, now, onClose }) {
 
     <div className="mt-4"><Metrics item={item} labelOf={labelOf} /></div>
 
-    <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+    <div className="@container mt-5"><div className="grid gap-5 @xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
       <div className="space-y-4 text-sm leading-6">
         {item.description && <section>
           <p className={`${label} flex items-center gap-1.5`}><Newspaper size={13} weight="bold" />What is happening</p>
@@ -295,13 +295,7 @@ function FeedDialog({ item, labelOf, now, onClose }) {
 
       </div>
 
-      {/* The details list runs to the bottom of the left column, its rows spread evenly. */}
-      <dl className="flex flex-col rounded-2xl bg-[var(--paper)] px-3.5 py-1.5 text-[13px] ring-1 ring-[var(--line)]/70">
-        {facts.map(([Icon, title, value]) => <div key={title} className="flex max-h-14 min-h-11 flex-1 items-center justify-between gap-3 border-t border-[var(--line)]/60 py-2 first:border-t-0">
-          <dt className="flex items-center gap-2.5 text-[var(--muted)]"><FactIcon icon={Icon} title={title} />{title}</dt>
-          <dd className="text-right font-semibold">{value}</dd>
-        </div>)}
-      </dl>
-    </div>
+      <FactList facts={facts} />
+    </div></div>
   </Modal>
 }

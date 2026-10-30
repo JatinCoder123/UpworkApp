@@ -28,7 +28,7 @@ export default function AdminPanel() {
 
   const openTab = (id, extra = {}) => setParams({ tab: id, ...extra }, { replace: false })
   const retry = () => { catalog.permissions.refetch(); catalog.roles.refetch(); catalog.users.refetch() }
-  const tabClass = (active) => `inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${active ? 'bg-[var(--ink)] text-white dark:bg-(--lime) dark:text-[#26320b]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`
+  const tabClass = (active) => `inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${active ? 'bg-[var(--ink)] text-white dark:bg-(--lime) dark:text-[var(--on-lime)]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`
 
   return <Shell>
     <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-6 sm:px-6 md:pt-8">

@@ -53,12 +53,12 @@ export function Avatar({ name, large = false }) {
 
 export function RoleBadge({ role }) {
   return role
-    ? <span className="inline-flex max-w-[9rem] shrink-0 items-center truncate rounded-full bg-(--lime)/30 px-2 py-0.5 text-[10px] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/25">{role}</span>
+    ? <span className="inline-flex max-w-[9rem] shrink-0 items-center truncate rounded-full bg-(--lime-tint)/30 px-2 py-0.5 text-[10px] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/25">{role}</span>
     : <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--frame)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted)]">No role</span>
 }
 
 export function AdminBadge() {
-  return <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-bold text-white dark:bg-(--lime) dark:text-[#26320b]"><ShieldCheck size={11} weight="fill" />Admin</span>
+  return <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--ink)] px-2 py-0.5 text-[10px] font-bold text-white dark:bg-(--lime) dark:text-[var(--on-lime)]"><ShieldCheck size={11} weight="fill" />Admin</span>
 }
 
 /** On/off switch. `pending` shows a spinner in the knob while the change is being saved. */

@@ -45,15 +45,15 @@ export function JsonView({ json }) {
       if (match.index > last) out.push(text.slice(last, match.index))
       const token = match[0]
       const cls = token.startsWith('"')
-        ? (/:\s*$/.test(token) ? 'font-bold text-[var(--accent-strong)] dark:text-(--lime)' : 'text-amber-700 dark:text-amber-300')
-        : /^(true|false)$/.test(token) ? 'font-bold text-emerald-600 dark:text-emerald-400'
-          : token === 'null' ? 'font-bold text-rose-500'
-            : 'font-medium text-blue-600 dark:text-sky-300'
+        ? (/:\s*$/.test(token) ? 'font-bold text-[var(--accent-strong)] dark:text-[var(--lime-ink)]' : 'text-warning')
+        : /^(true|false)$/.test(token) ? 'font-bold text-success'
+          : token === 'null' ? 'font-bold text-danger-solid'
+            : 'font-medium text-tone-blue'
       out.push(<span key={match.index} className={cls}>{token}</span>)
       last = match.index + token.length
     }
     if (last < text.length) out.push(text.slice(last))
     return out
   }, [json])
-  return <pre className="max-h-[24rem] overflow-auto whitespace-pre p-4 font-mono text-xs leading-relaxed text-[var(--ink)] selection:bg-(--lime) selection:text-[#26320b]">{parts}</pre>
+  return <pre className="max-h-[24rem] overflow-auto whitespace-pre p-4 font-mono text-xs leading-relaxed text-[var(--ink)] selection:bg-(--lime) selection:text-[var(--on-lime)]">{parts}</pre>
 }

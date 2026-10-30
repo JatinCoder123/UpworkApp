@@ -109,17 +109,17 @@ export default function AskAiSelection({ children, className }) {
         onMouseDown={(event) => event.preventDefault()}
         onClick={open}
         style={{ top: Math.max(8, anchor.top - 44), left: anchor.left }}
-        className="fixed z-[70] inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[var(--ink)] px-3.5 py-2 text-xs font-semibold text-white shadow-[0_10px_30px_rgba(20,24,16,.28)] ring-1 ring-white/10 transition-transform duration-200 hover:scale-105 active:scale-95"
+        className="fixed z-[70] inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[var(--ink)] px-3.5 py-2 text-xs font-semibold text-white shadow-[0_10px_30px_rgb(var(--shadow-rgb)/.28)] ring-1 ring-white/10 transition-transform duration-200 hover:scale-105 active:scale-95"
       >
-        <Sparkle size={13} weight="fill" className="text-[var(--lime)]" />Ask AI
+        <Sparkle size={13} weight="fill" className="text-[var(--hero-accent)]" />Ask AI
       </button>,
       document.body,
     )}
 
     {quote && createPortal(
-      <section role="dialog" aria-label="Ask AI about the selected text" className="fixed inset-x-4 bottom-4 z-[70] flex max-h-[min(36rem,calc(100dvh-2rem))] flex-col overflow-hidden rounded-[1.6rem] bg-[var(--surface)] shadow-[0_24px_70px_rgba(30,32,25,.28)] ring-1 ring-[var(--line)] sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-[26rem]">
+      <section role="dialog" aria-label="Ask AI about the selected text" className="fixed inset-x-4 bottom-4 z-[70] flex max-h-[min(36rem,calc(100dvh-2rem))] flex-col overflow-hidden rounded-[1.6rem] bg-[var(--surface)] shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.28)] ring-1 ring-[var(--line)] sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-[26rem]">
         <header className="flex items-center gap-2 border-b border-[var(--line)]/70 px-5 py-3.5">
-          <span className="grid size-7 place-items-center rounded-full bg-[var(--lime)] text-[#26320b]"><Sparkle size={14} weight="fill" /></span>
+          <span className="grid size-7 place-items-center rounded-full bg-[var(--lime)] text-[var(--on-lime)]"><Sparkle size={14} weight="fill" /></span>
           <p className="flex-1 text-sm font-semibold">Ask AI</p>
           <button type="button" onClick={close} aria-label="Close" className="grid size-8 place-items-center rounded-full text-[var(--muted)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)]"><X size={15} /></button>
         </header>
@@ -128,7 +128,7 @@ export default function AskAiSelection({ children, className }) {
           <blockquote className="line-clamp-4 border-l-2 border-[var(--lime-dark)] pl-3 text-xs leading-5 text-[var(--muted)]">{quote}</blockquote>
 
           <div className="flex flex-wrap gap-1.5">
-            {QUICK_PROMPTS.map((item) => <button key={item} type="button" disabled={ask.isPending} onClick={() => run(item)} className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ring-1 transition-colors disabled:opacity-50 ${prompt === item && (ask.isPending || ask.isSuccess) ? 'bg-[var(--lime)]/30 text-[var(--ink)] ring-[var(--lime-dark)]' : 'bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}>{item}</button>)}
+            {QUICK_PROMPTS.map((item) => <button key={item} type="button" disabled={ask.isPending} onClick={() => run(item)} className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ring-1 transition-colors disabled:opacity-50 ${prompt === item && (ask.isPending || ask.isSuccess) ? 'bg-[var(--lime-tint)]/30 text-[var(--ink)] ring-[var(--lime-dark)]' : 'bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}>{item}</button>)}
           </div>
 
           {ask.isPending && <div className="flex items-center gap-2.5 rounded-2xl bg-[var(--paper)] px-4 py-3 text-xs font-semibold text-[var(--muted)]"><span className="size-4 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />Thinking… this can take up to 20 seconds.</div>}

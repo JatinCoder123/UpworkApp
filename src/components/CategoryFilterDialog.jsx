@@ -76,7 +76,7 @@ export default function CategoryFilterDialog({
                 }}
                 className={`group flex items-center justify-between gap-3 rounded-2xl p-3 text-left transition-all duration-200 ring-1 ${
                   isSelected
-                    ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/40 shadow-sm'
+                    ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-[var(--lime-dark)]/40 shadow-sm'
                     : 'bg-[var(--paper)] text-[var(--ink)] ring-[var(--line)]/60 hover:bg-[var(--surface)] hover:ring-[var(--line)]'
                 }`}
               >
@@ -84,7 +84,7 @@ export default function CategoryFilterDialog({
                   <span
                     className={`grid size-6 shrink-0 place-items-center rounded-full text-xs transition-colors ${
                       isSelected
-                        ? 'bg-black/15 text-[#26320b]'
+                        ? 'bg-black/15 text-[var(--on-lime)]'
                         : 'bg-[var(--surface)] text-[var(--muted)] group-hover:text-[var(--ink)]'
                     }`}
                   >
@@ -102,7 +102,7 @@ export default function CategoryFilterDialog({
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${
                     isSelected
-                      ? 'bg-black/15 text-[#26320b]'
+                      ? 'bg-black/15 text-[var(--on-lime)]'
                       : 'bg-[var(--surface)] text-[var(--muted)]'
                   }`}
                 >

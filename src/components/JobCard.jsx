@@ -12,7 +12,7 @@ import { asArray, asObject } from '../lib/safe'
 
 function matchTone(score) {
   if (score >= 75) return 'var(--lime-dark)'
-  if (score >= 55) return '#d9a53a'
+  if (score >= 55) return 'var(--score-mid)'
   return 'var(--danger)'
 }
 
@@ -30,9 +30,9 @@ function ReactionButton({ active, onClick, label, activeStyle, count, children }
   </button>
 }
 
-const LIKE_STYLE = 'bg-[#fff1f2] text-[#e11d48] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/30'
-const SAVE_STYLE = 'bg-[#e0f2fe] text-[#0369a1] ring-1 ring-[#bae6fd] dark:bg-[#7dd3fc]/20 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30'
-const FAVORITE_STYLE = 'bg-[#fef9c3] text-[#b45309] ring-1 ring-[#fde047] dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/30'
+const LIKE_STYLE = 'bg-like-bg text-like ring-1 ring-like-line'
+const SAVE_STYLE = 'bg-info-bg text-info ring-1 ring-info-line'
+const FAVORITE_STYLE = 'bg-favorite-bg text-favorite ring-1 ring-favorite-line'
 
 // Like, save (or favorite, on live jobs) and Teams share as one pill in the top-right corner of a card's main column.
 // CRM jobs pass `onLike`, `onSave` and the total likes from every user; saves are private and show no count.
@@ -42,16 +42,16 @@ export function JobCardActions({ job, liked, onLike, likeCount, saved, onSave, f
   const [sharing, setSharing] = useState(false)
   return <div className="absolute right-4 top-4 z-10 flex items-center gap-1 rounded-full bg-[var(--paper)] p-1">
     {onLike && <ReactionButton active={liked} onClick={onLike} label={liked ? 'Unlike job' : 'Like job'} count={likeCount} activeStyle={LIKE_STYLE}>
-      <Heart size={15} weight={liked ? 'fill' : 'regular'} className={liked ? 'text-[#fb7185] dark:text-[#fda4af]' : ''} />
+      <Heart size={15} weight={liked ? 'fill' : 'regular'} className={liked ? 'text-like-icon' : ''} />
     </ReactionButton>}
     {onSave
       ? <ReactionButton active={saved} onClick={onSave} label={saved ? 'Unsave job' : 'Save job'} activeStyle={SAVE_STYLE}>
-        <BookmarkSimple size={15} weight={saved ? 'fill' : 'regular'} className={saved ? 'text-[#0284c7] dark:text-[#7dd3fc]' : ''} />
+        <BookmarkSimple size={15} weight={saved ? 'fill' : 'regular'} className={saved ? 'text-info-icon' : ''} />
       </ReactionButton>
       : onFavorite && <ReactionButton active={favorite} onClick={onFavorite} label={favorite ? 'Remove from favorites' : 'Add to favorites'} activeStyle={FAVORITE_STYLE}>
-        <Star size={15} weight={favorite ? 'fill' : 'regular'} className={favorite ? 'text-[#f59e0b] dark:text-[#fde047]' : ''} />
+        <Star size={15} weight={favorite ? 'fill' : 'regular'} className={favorite ? 'text-favorite-icon' : ''} />
       </ReactionButton>}
-    <ReactionButton active={false} onClick={() => setSharing(true)} label="Share in Teams"><MicrosoftTeamsLogo size={15} weight="fill" className="text-[#4b53bc]" /></ReactionButton>
+    <ReactionButton active={false} onClick={() => setSharing(true)} label="Share in Teams"><MicrosoftTeamsLogo size={15} weight="fill" className="text-brand-teams" /></ReactionButton>
     {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="View job on Upwork" title="View job on Upwork" className="grid size-8 place-items-center rounded-full transition-all duration-300 hover:bg-[var(--raised)] active:scale-90"><UpworkLogo size={20} /></a>}
     {sharing && <ShareJobDialog job={job} mode="teams" onClose={() => setSharing(false)} />}
   </div>
@@ -81,7 +81,7 @@ export default function JobCard({ job, index, now, rejectReason = '', liked, sav
   const isNew = job.status === 'New'
   const summary = job.summary || job.description
 
-  return <article id={`job-${job.id}`} data-card data-job-id={job.id} className="group relative scroll-mt-[calc(var(--shell-h)+1rem)] rounded-[1.6rem] bg-[var(--frame)] p-1 ring-1 ring-[var(--line)]/60 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(30,40,25,.1)]">
+  return <article id={`job-${job.id}`} data-card data-job-id={job.id} className="group relative scroll-mt-[calc(var(--shell-h)+1rem)] rounded-[1.6rem] bg-[var(--frame)] p-1 ring-1 ring-[var(--line)]/60 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgb(var(--shadow-rgb)/.1)]">
     <span aria-hidden="true" className="absolute inset-y-6 left-0 w-1 rounded-r-full" style={{ background: matchTone(score) }} />
     <div className="grid overflow-hidden rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] md:grid-cols-[minmax(0,1fr)_17rem]">
       <div className="relative min-w-0">
@@ -89,28 +89,28 @@ export default function JobCard({ job, index, now, rejectReason = '', liked, sav
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pr-48">
           {index != null && <span className="font-mono text-[11px] font-bold text-[var(--muted)]">{String(index + 1).padStart(2, '0')}</span>}
           <StatusPill status={job.status} />
-          {job.status === 'Rejected' && rejectReason && <span title={`Not a fit: ${rejectReason}`} className="max-w-[18rem] truncate rounded-full bg-[#fbe1d8] px-2.5 py-0.5 text-[11px] font-bold text-[#9a3412] ring-1 ring-[#f1b39c] dark:bg-[#4a2318] dark:text-[#fdba9a] dark:ring-[#7c3a26]">{rejectReason}</span>}
+          {job.status === 'Rejected' && rejectReason && <span title={`Not a fit: ${rejectReason}`} className="max-w-[18rem] truncate rounded-full bg-clay-bg px-2.5 py-0.5 text-[11px] font-bold text-clay ring-1 ring-clay-line">{rejectReason}</span>}
           {saved && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#e0f2fe] px-2.5 py-0.5 text-[10px] font-bold text-[#075985] ring-1 ring-[#bae6fd] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30">
-              <BookmarkSimple size={11} weight="fill" className="text-[#0284c7] dark:text-[#7dd3fc]" /> Saved
+            <span className="inline-flex items-center gap-1 rounded-full bg-info-bg px-2.5 py-0.5 text-[10px] font-bold text-info ring-1 ring-info-line">
+              <BookmarkSimple size={11} weight="fill" className="text-info-icon" /> Saved
             </span>
           )}
           {liked && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#ffe4e6] px-2.5 py-0.5 text-[10px] font-bold text-[#be123c] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/15 dark:text-[#fda4af] dark:ring-[#fda4af]/30">
-              <Heart size={11} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" /> Liked
+            <span className="inline-flex items-center gap-1 rounded-full bg-like-bg px-2.5 py-0.5 text-[10px] font-bold text-like ring-1 ring-like-line">
+              <Heart size={11} weight="fill" className="text-like-icon" /> Liked
             </span>
           )}
           {isNew && <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--accent)] opacity-60" /><span className="relative size-2 rounded-full bg-[var(--accent)]" /></span>}
           <time dateTime={job.postedAt} title={job.posted} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-strong)]"><Clock size={12} weight="bold" />{timeAgo(job.postedAt, now) || job.posted}</time>
           {/* Solid colours only (no see-through tints), so it looks the same in every browser and theme. */}
-          {job.preference && <span title="Matches your preferences" className="inline-flex items-center gap-1 rounded-full bg-[#fff1e6] px-2 py-0.5 text-[10px] font-semibold text-[#c2410c] ring-1 ring-[#fed7aa] dark:bg-[#3b1d0e] dark:text-[#fdba74] dark:ring-[#7c2d12]"><Fire size={10} weight="fill" className="text-[#f97316]" />Hot</span>}
+          {job.preference && <span title="Matches your preferences" className="inline-flex items-center gap-1 rounded-full bg-tone-orange-bg px-2 py-0.5 text-[10px] font-semibold text-tone-orange ring-1 ring-tone-orange-line"><Fire size={10} weight="fill" className="text-tone-orange-solid" />Hot</span>}
           {job.appliedAt && <span title={`You applied on ${job.appliedAt}`} className="inline-flex items-center gap-1 rounded-full bg-[var(--ok-bg)] px-2.5 py-0.5 text-[10px] font-bold text-[var(--ok)]"><CheckCircle size={11} weight="fill" />You applied {job.appliedAgo || ''}{job.appliedAgo ? ' · ' : ''}{job.appliedAt}</span>}
         </div>
         <h3 className="mt-3 text-lg font-semibold leading-snug tracking-[-.025em] transition-colors duration-300 group-hover:text-[var(--accent-strong)] sm:text-[1.2rem]">{job.title}</h3>
         {summary && <p className="mt-2 line-clamp-2 max-w-3xl text-[13px] leading-6 text-[var(--muted)]">{summary}</p>}
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
           <Fact icon={MapPin}>{client.country || 'Location not shared'}</Fact>
-          {client.rating != null && <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--muted)]"><Star size={13} weight="fill" className="text-[#e6a817]" /><span className="font-semibold text-[var(--text)]">{Number(client.rating).toFixed(1)}</span>{client.reviews != null && `(${client.reviews})`}</span>}
+          {client.rating != null && <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--muted)]"><Star size={13} weight="fill" className="text-star" /><span className="font-semibold text-[var(--text)]">{Number(client.rating).toFixed(1)}</span>{client.reviews != null && `(${client.reviews})`}</span>}
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${client.paymentVerified ? 'bg-[var(--ok-bg)] text-[var(--ok)]' : 'bg-[var(--bad-bg)] text-[var(--bad)]'}`}><SealCheck size={11} weight="fill" />{client.paymentVerified ? 'Payment verified' : 'Payment unverified'}</span>
           {client.isNew && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--warn)]"><Sparkle size={11} weight="fill" />New client</span>}
           <Fact icon={Briefcase}>{[client.hires != null && `${client.hires} hires`, client.proposals != null && `${client.proposals} proposals`].filter(Boolean).join(' · ')}</Fact>

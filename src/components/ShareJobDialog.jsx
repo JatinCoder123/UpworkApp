@@ -91,7 +91,7 @@ function RecipientPicker({ members, loading, selected, exclude, nameOf, onAdd, o
         className="min-w-[10rem] flex-1 bg-transparent py-1 text-xs outline-none"
       />
     </div>
-    {listOpen && <div id="share-suggestions" role="listbox" className="absolute inset-x-0 top-full z-20 mt-1.5 max-h-60 overflow-y-auto rounded-2xl bg-[var(--surface)] p-1 shadow-[0_18px_50px_rgba(30,32,25,.18)] ring-1 ring-[var(--line)] [scrollbar-width:thin]">
+    {listOpen && <div id="share-suggestions" role="listbox" className="absolute inset-x-0 top-full z-20 mt-1.5 max-h-60 overflow-y-auto rounded-2xl bg-[var(--surface)] p-1 shadow-[0_18px_50px_rgb(var(--shadow-rgb)/.18)] ring-1 ring-[var(--line)] [scrollbar-width:thin]">
       {loading && !suggestions.length ? <p className="p-3 text-xs text-[var(--muted)]">Loading teammates…</p>
         : suggestions.length ? suggestions.map((person, index) => <button
           key={person.email}
@@ -103,7 +103,7 @@ function RecipientPicker({ members, loading, selected, exclude, nameOf, onAdd, o
           onMouseEnter={() => setActive(index)}
           className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${index === active ? 'bg-[var(--paper)]' : ''}`}
         >
-          {person.typed ? <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--lime)] text-[#26320b]"><Plus size={13} weight="bold" /></span> : <Avatar name={person.name} />}
+          {person.typed ? <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--lime)] text-[var(--on-lime)]"><Plus size={13} weight="bold" /></span> : <Avatar name={person.name} />}
           <span className="min-w-0 flex-1">
             <span className="block truncate text-xs font-semibold">{person.typed ? `Add ${person.email}` : person.name}</span>
             <span className="block truncate text-[11px] text-[var(--muted)]">{person.typed ? 'Not in the CRM user list' : [person.title, person.email].filter(Boolean).join(' · ')}</span>
@@ -180,11 +180,11 @@ export function ShareDialog({ noun = 'job', eyebrow, title, link, text, subject,
         <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{selected.length ? 'Opens a Teams chat with these people and the message ready to send.' : 'Leave this empty to pick any chat or channel in Teams instead.'}</p>
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)]">Cancel</button>
-          <button type="button" disabled={!message.trim()} onClick={() => (selected.length ? sendChat() : open(teamsShareUrl(link, message.trim())))} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#4b53bc] px-5 py-3 text-xs font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50"><MicrosoftTeamsLogo size={16} weight="fill" />{selected.length ? `Send to ${selected.length === 1 ? nameOf(selected[0]) : `${selected.length} people`}` : 'Share in Teams'}<ArrowSquareOut size={14} /></button>
+          <button type="button" disabled={!message.trim()} onClick={() => (selected.length ? sendChat() : open(teamsShareUrl(link, message.trim())))} className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-teams px-5 py-3 text-xs font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50"><MicrosoftTeamsLogo size={16} weight="fill" />{selected.length ? `Send to ${selected.length === 1 ? nameOf(selected[0]) : `${selected.length} people`}` : 'Share in Teams'}<ArrowSquareOut size={14} /></button>
         </div>
       </>
       : <>
-        <div className="mt-5 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Teammates{selected.length > 0 && <span className="ml-2 rounded-full bg-[var(--lime)] px-1.5 py-0.5 text-[#26320b]">{selected.length}</span>}</p>{selected.length > 0 && <button type="button" onClick={() => setSelected([])} className="text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear</button>}</div>
+        <div className="mt-5 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Teammates{selected.length > 0 && <span className="ml-2 rounded-full bg-[var(--lime)] px-1.5 py-0.5 text-[var(--on-lime)]">{selected.length}</span>}</p>{selected.length > 0 && <button type="button" onClick={() => setSelected([])} className="text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear</button>}</div>
         <RecentPeople people={recent} selected={selected} onPick={add} onForget={forget} />
         <label className="mt-2 flex items-center gap-2 rounded-full bg-[var(--paper)] px-4 py-2.5 ring-1 ring-black/5 focus-within:ring-[var(--lime-dark)]"><MagnifyingGlass size={14} className="text-[var(--muted)]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name or email" aria-label="Search teammates" className="min-w-0 flex-1 bg-transparent text-xs outline-none" /></label>
         <div className="mt-2 max-h-56 overflow-y-auto rounded-2xl ring-1 ring-[var(--line)] [scrollbar-width:thin]">
@@ -192,7 +192,7 @@ export function ShareDialog({ noun = 'job', eyebrow, title, link, text, subject,
             : isError ? <p role="alert" className="flex items-start gap-2 p-4 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" /><span className="flex-1">{error?.message || 'Could not load teammates.'}</span><button type="button" onClick={() => refetch()} className="underline underline-offset-4">Retry</button></p>
               : visible.length ? visible.map((member) => {
                 const active = selected.some((email) => sameEmail(email, member.email))
-                return <button key={member.id} type="button" aria-pressed={active} onClick={() => (active ? remove(member.email) : add(member))} className={`flex w-full items-center gap-3 border-b border-[var(--line)]/60 px-3 py-2.5 text-left last:border-0 transition-colors ${active ? 'bg-[var(--lime)]/25' : 'hover:bg-[var(--paper)]'}`}>
+                return <button key={member.id} type="button" aria-pressed={active} onClick={() => (active ? remove(member.email) : add(member))} className={`flex w-full items-center gap-3 border-b border-[var(--line)]/60 px-3 py-2.5 text-left last:border-0 transition-colors ${active ? 'bg-[var(--lime-tint)]/25' : 'hover:bg-[var(--paper)]'}`}>
                   <Avatar name={member.name} />
                   <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{member.name}</span><span className="block truncate text-[11px] text-[var(--muted)]">{[member.title, member.email].filter(Boolean).join(' · ')}</span></span>
                   {active && <CheckCircle size={17} weight="fill" className="shrink-0 text-[var(--accent-strong)]" />}
@@ -203,7 +203,7 @@ export function ShareDialog({ noun = 'job', eyebrow, title, link, text, subject,
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)]">Cancel</button>
           <button type="button" disabled={!selected.length || !message.trim()} onClick={() => { rememberSelected(); window.location.href = `mailto:${selected.join(',')}?subject=${encodeURIComponent(subject || title)}&body=${encodeURIComponent(message.trim())}` }} className="inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-xs font-bold ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)] disabled:opacity-50"><EnvelopeSimple size={15} />Email instead</button>
-          <button type="button" disabled={!selected.length || !message.trim()} onClick={sendChat} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#4b53bc] px-5 py-3 text-xs font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50"><MicrosoftTeamsLogo size={16} weight="fill" />Notify in Teams<ArrowSquareOut size={14} /></button>
+          <button type="button" disabled={!selected.length || !message.trim()} onClick={sendChat} className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-teams px-5 py-3 text-xs font-bold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-50"><MicrosoftTeamsLogo size={16} weight="fill" />Notify in Teams<ArrowSquareOut size={14} /></button>
         </div>
       </>}
   </Modal>

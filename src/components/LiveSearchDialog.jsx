@@ -57,11 +57,11 @@ export default function LiveSearchDialog({ skillRecords = [], skillsLoading = fa
     <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--muted)]">Scan Upwork directly for fresh posts in your skills, before they reach the feed.</p>
 
     {scanning ? <div className="live-hero mt-7 grid gap-6 rounded-[1.6rem] p-6 sm:grid-cols-[9rem_1fr] sm:items-center" role="status" aria-live="polite">
-      <div className="mx-auto w-36"><div className="live-scope" data-scanning="true"><span className="live-ping" /><span className="live-ping" /><span className="live-sweep" /><span className="absolute left-1/2 top-1/2 z-[1] size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#c8e875] shadow-[0_0_20px_#c8e875]" /></div></div>
+      <div className="mx-auto w-36"><div className="live-scope" data-scanning="true"><span className="live-ping" /><span className="live-ping" /><span className="live-sweep" /><span className="absolute left-1/2 top-1/2 z-[1] size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--hero-accent)] shadow-[0_0_20px_var(--hero-accent)]" /></div></div>
       <div className="min-w-0">
         <p className="flex items-center justify-between text-[11px] font-semibold text-white/50"><span>Scanning the last {windowLabel(settings.minutes)}</span><span className="font-mono">{elapsed}s</span></p>
         <ol className="mt-3 space-y-2">{steps.map((text, index) => <li key={text} className={`flex items-center gap-2.5 text-xs font-semibold transition-opacity duration-300 ${index > step ? 'opacity-25' : 'opacity-100'} ${index < step ? 'text-white/55' : 'text-white'}`}>
-          {index < step ? <span className="grid size-3.5 shrink-0 place-items-center rounded-full bg-[#c8e875] text-[8px] text-[#1d2810]">✓</span> : <span className={`size-3.5 shrink-0 rounded-full border-2 border-white/20 ${index === step ? 'animate-spin border-t-[#c8e875]' : ''}`} />}
+          {index < step ? <span className="grid size-3.5 shrink-0 place-items-center rounded-full bg-[var(--hero-accent)] text-[8px] text-[var(--on-hero-accent)]">✓</span> : <span className={`size-3.5 shrink-0 rounded-full border-2 border-white/20 ${index === step ? 'animate-spin border-t-[var(--hero-accent)]' : ''}`} />}
           {text}
         </li>)}</ol>
         <button type="button" onClick={stop} className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-xs font-bold text-white ring-1 ring-white/15 hover:bg-white/15"><X size={12} weight="bold" />Stop</button>

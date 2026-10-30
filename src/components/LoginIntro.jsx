@@ -26,16 +26,16 @@ export default function LoginIntro({ onComplete }) {
     return () => ctx.revert()
   }, [onComplete])
 
-  return <div ref={root} data-intro-scene className="fixed inset-0 z-[100] overflow-hidden bg-[#11130f] text-white">
+  return <div ref={root} data-intro-scene className="fixed inset-0 z-[100] overflow-hidden bg-[var(--hero-deep)] text-white">
     <div aria-hidden="true" className="intro-grid absolute inset-0 opacity-30" />
-    <div aria-hidden="true" className="absolute left-1/2 top-1/2 size-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--lime)]/[.08] blur-[110px]" />
+    <div aria-hidden="true" className="absolute left-1/2 top-1/2 size-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--lime-tint)]/[.08] blur-[110px]" />
     <button type="button" onClick={onComplete} className="absolute right-5 top-5 z-20 rounded-full border border-white/15 px-4 py-2 text-[10px] font-bold uppercase tracking-[.18em] text-white/55 transition-colors hover:border-white/30 hover:text-white sm:right-8 sm:top-8">Skip intro</button>
 
     <main className="relative grid min-h-[100dvh] place-items-center px-6">
       <div role="status" aria-live="polite" className="flex flex-col items-center text-center">
         <div className="relative grid size-40 place-items-center sm:size-48">
           <div data-intro-orbit aria-hidden="true" className="intro-orbit absolute inset-0 rounded-full border border-white/15">
-            <span className="absolute left-1/2 top-0 grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[var(--lime)] text-[var(--ink)] shadow-[0_0_40px_rgba(200,245,93,.38)]"><ArrowUpRight size={16} weight="bold" /></span>
+            <span className="absolute left-1/2 top-0 grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[var(--lime)] text-[var(--on-lime)] shadow-[0_0_40px_color-mix(in_srgb,var(--hero-accent)_38%,transparent)]"><ArrowUpRight size={16} weight="bold" /></span>
           </div>
           <div data-intro-mark className="scale-[1.8] sm:scale-[2.15]"><Mark dark /></div>
         </div>

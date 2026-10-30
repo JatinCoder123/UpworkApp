@@ -36,28 +36,28 @@ const STATUS_THEME = {
   processing: {
     Icon: Sparkle,
     iconColor: 'text-[var(--lime-dark)]',
-    iconBg: 'bg-[var(--lime)]/15',
+    iconBg: 'bg-[var(--lime-tint)]/15',
     subtitle: 'Drafting article & synthesizing sources...',
     animate: true,
   },
   compiling: {
     Icon: Sparkle,
-    iconColor: 'text-amber-600 dark:text-amber-400',
-    iconBg: 'bg-amber-500/15',
+    iconColor: 'text-warning-icon',
+    iconBg: 'bg-warning-solid/15',
     subtitle: 'Packaging Word document...',
     animate: true,
   },
   completed: {
     Icon: CheckCircle,
-    iconColor: 'text-emerald-600 dark:text-emerald-400',
-    iconBg: 'bg-emerald-500/12',
+    iconColor: 'text-success',
+    iconBg: 'bg-success-solid/12',
     subtitle: 'Document is ready to view or download',
     animate: false,
   },
   failed: {
     Icon: WarningCircle,
-    iconColor: 'text-rose-600 dark:text-rose-400',
-    iconBg: 'bg-rose-500/12',
+    iconColor: 'text-danger',
+    iconBg: 'bg-danger-solid/12',
     subtitle: 'Generation could not be completed',
     animate: false,
   },
@@ -172,7 +172,7 @@ export default function DocNotificationBell() {
         <div
           role="region"
           aria-label="Document notifications panel"
-          className="absolute right-0 top-12 z-50 w-[min(94vw,23rem)] sm:w-[25rem] rounded-[1.6rem] bg-black/5 p-1.5 ring-1 ring-black/5 shadow-[0_24px_70px_rgba(30,32,25,.18)] backdrop-blur-xl animate-in fade-in-0 zoom-in-95 duration-150"
+          className="absolute right-0 top-12 z-50 w-[min(94vw,23rem)] sm:w-[25rem] rounded-[1.6rem] bg-black/5 p-1.5 ring-1 ring-black/5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.18)] backdrop-blur-xl animate-in fade-in-0 zoom-in-95 duration-150"
         >
           <div className="flex max-h-[82vh] flex-col rounded-[calc(1.6rem-.375rem)] bg-[var(--surface)] p-3.5">
             {/* Header */}
@@ -182,7 +182,7 @@ export default function DocNotificationBell() {
                   Notifications
                 </h3>
                 {unreadCount > 0 && (
-                  <span className="rounded-full bg-[var(--lime)]/30 px-2 py-0.5 text-[10px] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/25">
+                  <span className="rounded-full bg-[var(--lime-tint)]/30 px-2 py-0.5 text-[10px] font-bold text-[var(--accent-strong)] ring-1 ring-[var(--lime-dark)]/25">
                     {unreadCount}
                   </span>
                 )}
@@ -205,7 +205,7 @@ export default function DocNotificationBell() {
                     type="button"
                     onClick={() => clearAll()}
                     title="Clear all notifications"
-                    className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-black/[.04] hover:text-rose-600 dark:hover:bg-white/[.05] transition-colors"
+                    className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-black/[.04] hover:text-danger dark:hover:bg-white/[.05] transition-colors"
                   >
                     <Trash size={14} />
                   </button>
@@ -307,7 +307,7 @@ export default function DocNotificationBell() {
                                   removeNotification(notif.id)
                                 }}
                                 title="Dismiss"
-                                className="opacity-0 group-hover:opacity-100 p-0.5 text-[var(--muted)] hover:text-rose-600 transition-opacity"
+                                className="opacity-0 group-hover:opacity-100 p-0.5 text-[var(--muted)] hover:text-danger transition-opacity"
                               >
                                 <X size={12} />
                               </button>

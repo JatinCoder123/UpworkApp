@@ -71,7 +71,8 @@ const ideaShareMessage = (item, noteId) => [
   ideaLink(item),
 ].filter(Boolean).join('\n')
 
-const SITE_TONES = ['#c8e875', '#cbc6ef', '#f6c9a8', '#b8e0d2', '#f2d27a', '#a9c8f0', '#f0b5c4']
+// A site's mark colour, picked from the category tones by its name (so it stays the same, and follows dark mode).
+const SITE_TONES = ['bg-rise-bg text-rise', 'bg-tone-violet-bg text-tone-violet', 'bg-tone-orange-bg text-tone-orange', 'bg-tone-mint-bg text-tone-mint', 'bg-tone-amber-bg text-tone-amber', 'bg-tone-blue-bg text-tone-blue', 'bg-tone-pink-bg text-tone-pink']
 
 function siteTone(site) {
   const hash = [...asText(site)].reduce((sum, char) => sum + char.charCodeAt(0), 0)
@@ -110,8 +111,7 @@ function useDesktop() {
 function SiteMark({ site, size = 'size-9' }) {
   return (
     <span
-      className={`${size} grid shrink-0 place-items-center rounded-xl text-xs font-bold uppercase text-[#26320b]`}
-      style={{ background: siteTone(site) }}
+      className={`${size} grid shrink-0 place-items-center rounded-xl text-xs font-bold uppercase ${siteTone(site)}`}
     >
       {asText(site).replace(/^www\./, '').slice(0, 2)}
     </span>
@@ -365,7 +365,7 @@ export default function SiteContent() {
         )}
 
         <div className={`${stickyBand} mt-4`}>
-          <div className="flex flex-col gap-2 rounded-[1.6rem] bg-[var(--surface)] p-2 ring-1 ring-[var(--line)]/70 shadow-[0_18px_50px_rgba(30,32,25,.08)]">
+          <div className="flex flex-col gap-2 rounded-[1.6rem] bg-[var(--surface)] p-2 ring-1 ring-[var(--line)]/70 shadow-[0_18px_50px_rgb(var(--shadow-rgb)/.08)]">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center justify-between">
               <div className="flex shrink-0 items-center gap-1.5">
                 <HScroll
@@ -382,7 +382,7 @@ export default function SiteContent() {
                       onClick={() => setCategory(item)}
                       className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-bold transition-all duration-300 ${
                         category === item
-                          ? 'bg-[var(--lime)] !text-[#26320b] shadow-sm'
+                          ? 'bg-[var(--lime)] !text-[var(--on-lime)] shadow-sm'
                           : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'
                       }`}
                     >
@@ -397,7 +397,7 @@ export default function SiteContent() {
                   title="Browse all categories"
                   className={`grid size-8 shrink-0 place-items-center rounded-full transition-all duration-300 hover:rotate-45 ${
                     category !== 'All'
-                      ? 'bg-[var(--lime)] text-[#26320b] ring-2 ring-[var(--lime-dark)]/40 shadow-xs'
+                      ? 'bg-[var(--lime)] text-[var(--on-lime)] ring-2 ring-[var(--lime-dark)]/40 shadow-xs'
                       : 'text-[var(--muted)] ring-1 ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'
                   }`}
                 >
@@ -463,7 +463,7 @@ export default function SiteContent() {
                     <div
                       id="site-content-search-history"
                       onMouseDown={(event) => event.preventDefault()}
-                      className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5"
+                      className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.2)] ring-1 ring-black/5"
                     >
                       <div className="rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
                         <div className="flex items-center justify-between px-2 pb-1.5 pt-1">
@@ -527,7 +527,7 @@ export default function SiteContent() {
             {hasFilters && (
               <div className="flex flex-wrap items-center justify-end gap-2 border-t border-black/[.06] px-1 pt-2 dark:border-white/[.08]">
                 {debouncedSearch && (
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime-tint)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
                     <span>"{debouncedSearch}"</span>
                     <button
                       type="button"
@@ -540,7 +540,7 @@ export default function SiteContent() {
                   </span>
                 )}
                 {urgentOnly && (
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime-tint)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
                     <span>Hurry up</span>
                     <button
                       type="button"
@@ -553,7 +553,7 @@ export default function SiteContent() {
                   </span>
                 )}
                 {hideDone && (
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime-tint)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
                     <span>Hide done</span>
                     <button
                       type="button"
@@ -566,7 +566,7 @@ export default function SiteContent() {
                   </span>
                 )}
                 {site !== 'All' && (
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime-tint)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
                     <span>Site: {site}</span>
                     <button
                       type="button"
@@ -579,7 +579,7 @@ export default function SiteContent() {
                   </span>
                 )}
                 {category !== 'All' && (
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime-tint)]/35 px-3 py-1 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
                     <span>Category: {category}</span>
                     <button
                       type="button"
@@ -794,7 +794,7 @@ function IdeaCard({ item, selected, onSelect }) {
             </span>
           )}
           {item.keywords?.primary && (
-            <span className="max-w-[11rem] truncate rounded-full bg-[var(--lime)]/30 px-2 py-0.5 text-[9px] font-semibold text-[var(--accent-strong)]">
+            <span className="max-w-[11rem] truncate rounded-full bg-[var(--lime-tint)]/30 px-2 py-0.5 text-[9px] font-semibold text-[var(--accent-strong)]">
               {item.keywords.primary}
             </span>
           )}
@@ -1096,7 +1096,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
         <button
           type="button"
           onClick={() => setSharing(true)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-[#4b53bc] px-3.5 py-1.5 text-[11px] font-bold text-white shadow-sm hover:brightness-110 active:scale-95 transition-all"
+          className="inline-flex items-center gap-1.5 rounded-full bg-brand-teams px-3.5 py-1.5 text-[11px] font-bold text-white shadow-sm hover:brightness-110 active:scale-95 transition-all"
         >
           <MicrosoftTeamsLogo size={13} weight="fill" />
           Share in Teams
@@ -1167,8 +1167,8 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
         </form>}
 
         {/* The prompt (notes_blog) and guidelines the writer uses, in their own window to read or edit. */}
-        <button type="button" onClick={() => setInstructionsOpen(true)} className="group mt-3 flex w-full items-center gap-3 rounded-2xl bg-(--lime)/20 px-4 py-3 text-left ring-1 ring-[var(--lime-dark)]/35 transition-colors hover:bg-(--lime)/35">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--lime)] text-[#26320b]"><BookOpenText size={17} weight="bold" /></span>
+        <button type="button" onClick={() => setInstructionsOpen(true)} className="group mt-3 flex w-full items-center gap-3 rounded-2xl bg-(--lime-tint)/20 px-4 py-3 text-left ring-1 ring-[var(--lime-dark)]/35 transition-colors hover:bg-(--lime-tint)/35">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--lime)] text-[var(--on-lime)]"><BookOpenText size={17} weight="bold" /></span>
           <span className="min-w-0 flex-1">
             <span className="block text-[13px] font-bold text-[var(--ink)]">Prompt &amp; guidelines</span>
             <span className="block text-[11px] leading-4 text-[var(--muted)]">See or edit what the writer is told before it makes the document</span>
@@ -1189,7 +1189,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
       {item.angle && (
         <div
           data-detail-part
-          className="mt-5 flex gap-3 rounded-2xl bg-[var(--lime)]/20 p-4 ring-1 ring-[var(--lime-dark)]/20"
+          className="mt-5 flex gap-3 rounded-2xl bg-[var(--lime-tint)]/20 p-4 ring-1 ring-[var(--lime-dark)]/20"
         >
           <Quotes size={18} weight="fill" className="mt-0.5 shrink-0 text-[var(--accent-strong)]" />
           <div>
@@ -1412,7 +1412,7 @@ function DocSection({
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-[var(--lime)] px-2 py-0.5 text-[9px] font-bold text-[#26320b] uppercase tracking-wider">
+                  <span className="rounded-full bg-[var(--lime)] px-2 py-0.5 text-[9px] font-bold text-[var(--on-lime)] uppercase tracking-wider">
                     DOCX
                   </span>
                   <span className="text-[10px] text-[var(--muted)]">
@@ -1672,12 +1672,12 @@ function DocProcessingStages({ status, itemId, noteId, noteDateEntered, userName
   return (
     <div className="relative overflow-hidden rounded-2xl bg-[var(--surface)] p-4 sm:p-5 ring-1 ring-[var(--line)] shadow-sm">
       {/* Background ambient shimmer matching theme */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-[var(--lime)]/5 to-transparent animate-pulse" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-[var(--lime-tint)]/5 to-transparent animate-pulse" />
 
       {/* Header */}
       <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)]/60 pb-3.5">
         <div className="flex items-center gap-3">
-          <div className="relative grid size-10 place-items-center rounded-xl bg-[var(--lime)]/25 text-[#26320b] dark:text-[#c0df78] ring-1 ring-[var(--lime-dark)]/30">
+          <div className="relative grid size-10 place-items-center rounded-xl bg-[var(--lime-tint)]/25 text-[var(--lime-ink)] ring-1 ring-[var(--lime-dark)]/30">
             <Sparkle size={19} weight="fill" className="animate-spin text-[var(--lime-dark)]" />
             <span className="absolute -top-1 -right-1 flex size-2.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--lime)] opacity-75" />
@@ -1689,7 +1689,7 @@ function DocProcessingStages({ status, itemId, noteId, noteDateEntered, userName
               <h4 className="text-xs sm:text-sm font-bold text-[var(--ink)]">
                 {stageHeaderInfo.title}
               </h4>
-              <span className="rounded-full bg-[var(--lime)]/30 px-2 py-0.5 text-[10px] font-bold text-[#26320b] dark:text-[#c0df78]">
+              <span className="rounded-full bg-[var(--lime-tint)]/30 px-2 py-0.5 text-[10px] font-bold text-[var(--lime-ink)]">
                 {stageHeaderInfo.badge}
               </span>
             </div>
@@ -1736,7 +1736,7 @@ function DocProcessingStages({ status, itemId, noteId, noteDateEntered, userName
               key={step.title}
               className={`flex items-start gap-2.5 rounded-xl p-2.5 transition-all ${
                 isCurrent
-                  ? 'bg-[var(--lime)]/15 ring-1 ring-[var(--lime-dark)]/35'
+                  ? 'bg-[var(--lime-tint)]/15 ring-1 ring-[var(--lime-dark)]/35'
                   : isDone
                   ? 'bg-[var(--ok-bg)]/40'
                   : 'opacity-55'

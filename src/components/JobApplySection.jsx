@@ -54,8 +54,8 @@ export default function JobApplySection({ job, statusLabel, dismissed, rejectRea
     <div className="mt-3"><Chips job={job} /></div>
 
     {resolved && onUndo
-      ? <div className={`mt-5 flex items-center gap-3 rounded-2xl p-2.5 ring-1 ${resolved === 'applied' ? 'bg-[var(--lime)]/20 text-[var(--accent-strong)] ring-[var(--lime-dark)]/25 dark:bg-[var(--lime)]/10' : 'bg-[var(--reject-bg)] text-[var(--reject-text)] ring-[var(--reject-line)]'}`}>
-        <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${resolved === 'applied' ? 'bg-[var(--lime)] text-[#26320b]' : 'bg-[var(--reject-tile)]'}`}>{resolved === 'applied' ? <PaperPlaneTilt size={15} weight="fill" /> : <X size={15} weight="bold" />}</span>
+      ? <div className={`mt-5 flex items-center gap-3 rounded-2xl p-2.5 ring-1 ${resolved === 'applied' ? 'bg-[var(--lime-tint)]/20 text-[var(--accent-strong)] ring-[var(--lime-dark)]/25 dark:bg-[var(--lime-tint)]/10' : 'bg-[var(--reject-bg)] text-[var(--reject-text)] ring-[var(--reject-line)]'}`}>
+        <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${resolved === 'applied' ? 'bg-[var(--lime)] text-[var(--on-lime)]' : 'bg-[var(--reject-tile)]'}`}>{resolved === 'applied' ? <PaperPlaneTilt size={15} weight="fill" /> : <X size={15} weight="bold" />}</span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold leading-4">{resolved === 'applied' ? 'Applied' : 'Not a fit'}</p>
           <p className="mt-0.5 truncate text-[11px] leading-4 opacity-75">{resolved === 'applied' ? 'In your Applied list' : rejectReason ? `Reason: ${rejectReason}` : 'In your Rejected list'}</p>
@@ -67,7 +67,7 @@ export default function JobApplySection({ job, statusLabel, dismissed, rejectRea
       </div>
       : <div className="mt-5 flex h-11 gap-1 rounded-2xl bg-[var(--raised)] p-1 ring-1 ring-[var(--line)]">
         {/* Applied button disabled: clicking Apply on Upwork now marks the job as applied.
-        <button type="button" onClick={onApplied} aria-pressed={applied} className={segment(applied, 'bg-[var(--lime)]/45 text-[#26320b]')}><PaperPlaneTilt size={14} weight={applied ? 'fill' : 'regular'} />Applied</button>
+        <button type="button" onClick={onApplied} aria-pressed={applied} className={segment(applied, 'bg-[var(--lime-tint)]/45 text-[var(--lime-ink)]')}><PaperPlaneTilt size={14} weight={applied ? 'fill' : 'regular'} />Applied</button>
         */}
         {/* CRM jobs ask why (kept in the activity log); live jobs keep their simple on / off toggle. */}
         {askReason
@@ -83,10 +83,10 @@ export default function JobApplySection({ job, statusLabel, dismissed, rejectRea
         aria-pressed={liked}
         aria-label={liked ? 'Unlike job' : 'Like job'}
         title={liked ? 'Unlike' : 'Like'}
-        className={squareButton(liked, 'bg-[#fff1f2] text-[#e11d48] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/30')}
+        className={squareButton(liked, 'bg-like-bg text-like ring-1 ring-like-line')}
       >
         <span className="flex items-center gap-1">
-          <Heart size={18} weight={liked ? 'fill' : 'regular'} className={liked ? 'text-[#fb7185] dark:text-[#fda4af]' : ''} />
+          <Heart size={18} weight={liked ? 'fill' : 'regular'} className={liked ? 'text-like-icon' : ''} />
           <Count value={likeCount} />
         </span>
       </button>}
@@ -96,9 +96,9 @@ export default function JobApplySection({ job, statusLabel, dismissed, rejectRea
         aria-pressed={saved}
         aria-label={saved ? 'Unsave job' : 'Save job'}
         title={saved ? 'Unsave' : 'Save'}
-        className={squareButton(saved, 'bg-[#e0f2fe] text-[#0369a1] ring-1 ring-[#bae6fd] dark:bg-[#7dd3fc]/20 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30')}
+        className={squareButton(saved, 'bg-info-bg text-info ring-1 ring-info-line')}
       >
-        <BookmarkSimple size={18} weight={saved ? 'fill' : 'regular'} className={saved ? 'text-[#0284c7] dark:text-[#7dd3fc]' : ''} />
+        <BookmarkSimple size={18} weight={saved ? 'fill' : 'regular'} className={saved ? 'text-info-icon' : ''} />
       </button>
       : onFavorite && <button
         type="button"
@@ -106,12 +106,12 @@ export default function JobApplySection({ job, statusLabel, dismissed, rejectRea
         aria-pressed={favorite}
         aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
         title={favorite ? 'Remove from favorites' : 'Add to favorites'}
-        className={squareButton(favorite, 'bg-[#fef9c3] text-[#b45309] ring-1 ring-[#fde047] dark:bg-[#fef08a]/20 dark:text-[#fde047] dark:ring-[#fde047]/30')}
+        className={squareButton(favorite, 'bg-favorite-bg text-favorite ring-1 ring-favorite-line')}
       >
-        <Star size={18} weight={favorite ? 'fill' : 'regular'} className={favorite ? 'text-[#f59e0b] dark:text-[#fde047]' : ''} />
+        <Star size={18} weight={favorite ? 'fill' : 'regular'} className={favorite ? 'text-favorite-icon' : ''} />
       </button>}
       <button type="button" onClick={() => copy('link', jobShareLink(job))} aria-label="Copy job link" title={copied === 'link' ? 'Copied' : 'Copy link'} className={squareButton(false)}>{copied === 'link' ? <Check size={16} weight="bold" className="text-[var(--accent-strong)]" /> : <LinkSimple size={16} />}</button>
-      <button type="button" onClick={() => onShare('teams')} aria-label="Share in Teams" title="Share in Teams" className={squareButton(false)}><MicrosoftTeamsLogo size={17} weight="fill" className="text-[#4b53bc]" /></button>
+      <button type="button" onClick={() => onShare('teams')} aria-label="Share in Teams" title="Share in Teams" className={squareButton(false)}><MicrosoftTeamsLogo size={17} weight="fill" className="text-brand-teams" /></button>
       <button type="button" onClick={() => onShare('notify')} aria-label="Notify team" title="Notify team" className={squareButton(false)}><UsersThree size={16} weight="bold" /></button>
       {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="View job on Upwork" title="View job on Upwork" className={squareButton(false)}><UpworkLogo size={24} /></a>}
     </div>
@@ -138,7 +138,7 @@ function RejectReasonMenu({ dismissed, onReject }) {
 
   return <div ref={root} className="relative flex flex-1">
     <button type="button" onClick={() => setOpen((value) => !value)} aria-pressed={dismissed} aria-haspopup="menu" aria-expanded={open} className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 text-xs font-semibold transition-colors ${dismissed || open ? 'bg-[var(--reject-bg)] text-[var(--reject-text)] ring-1 ring-[var(--reject-line)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}><X size={14} />Not a fit</button>
-    {open && <div role="menu" aria-label="Why is this job not a fit?" className="absolute left-0 right-0 top-[calc(100%+.5rem)] z-30 rounded-2xl bg-[var(--surface)] p-1.5 shadow-[0_18px_50px_rgba(20,28,21,.18)] ring-1 ring-[var(--line)]">
+    {open && <div role="menu" aria-label="Why is this job not a fit?" className="absolute left-0 right-0 top-[calc(100%+.5rem)] z-30 rounded-2xl bg-[var(--surface)] p-1.5 shadow-[0_18px_50px_rgb(var(--shadow-rgb)/.18)] ring-1 ring-[var(--line)]">
       <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Why is it not a fit?</p>
       {REJECT_REASONS.map((reason) => <button key={reason} type="button" role="menuitem" onClick={() => pick(reason)} className={item}>{reason}</button>)}
       {writing

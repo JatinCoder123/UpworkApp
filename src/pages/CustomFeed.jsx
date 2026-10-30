@@ -77,14 +77,14 @@ function FeedOverview({ feed, build, status, onEdit, onClose }) {
 
   return <>
     <header className="flex flex-wrap items-start gap-4">
-      <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[var(--lime)] text-[#26320b]"><Rows size={22} weight="bold" /></span>
+      <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[var(--lime)] text-[var(--on-lime)]"><Rows size={22} weight="bold" /></span>
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">Feed<FeedBuildStatus status={status} /></p>
         <h1 className="mt-1.5 text-3xl font-semibold tracking-[-.05em] [overflow-wrap:anywhere]">{asText(feed.module_label) || asText(feed.name)}</h1>
         <p className="mt-1 text-xs text-[var(--muted)]">{asText(feed.name)} · <span className="font-mono">{asText(feed.module_name)}</span></p>
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
-        {status === 'built' && moduleUrl && <a href={moduleUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-(--lime)/35 px-4 py-2 text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/40 transition-colors hover:bg-(--lime)/55"><ArrowSquareOut size={13} weight="bold" />Open in CRM</a>}
+        {status === 'built' && moduleUrl && <a href={moduleUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-(--lime-tint)/35 px-4 py-2 text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/40 transition-colors hover:bg-(--lime-tint)/55"><ArrowSquareOut size={13} weight="bold" />Open in CRM</a>}
         <button type="button" onClick={onEdit} disabled={BUILDING.includes(status)} title={BUILDING.includes(status) ? 'It can be edited once the build ends' : undefined} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-4 py-2 text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)] disabled:opacity-50"><PencilSimple size={13} weight="bold" />Edit feed</button>
         {onClose && <button type="button" aria-label="Close dialog" onClick={onClose} className={iconButton}><X size={16} /></button>}
       </div>
@@ -134,7 +134,7 @@ function Facts({ title, items, empty, note }) {
   return <section className={card}>
     <p className={sectionLabel}>{title}</p>
     <div className="mt-3 flex flex-wrap gap-1.5">
-      {items.length ? items.map((item) => <span key={item} className="rounded-full bg-(--lime)/25 px-3 py-1 text-xs font-semibold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/35">{item}</span>) : <span className="text-[13px] text-[var(--muted)]">{empty}</span>}
+      {items.length ? items.map((item) => <span key={item} className="rounded-full bg-(--lime-tint)/25 px-3 py-1 text-xs font-semibold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/35">{item}</span>) : <span className="text-[13px] text-[var(--muted)]">{empty}</span>}
     </div>
     {note && <p className="mt-2 text-[11px] text-[var(--muted)]">{note}</p>}
   </section>

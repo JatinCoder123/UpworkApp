@@ -52,7 +52,7 @@ export default function GlobalErrorToast() {
 
   if (!toasts.length) return null
   return <div aria-live="assertive" className="pointer-events-none fixed bottom-4 right-4 z-[110] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2.5 sm:bottom-6 sm:right-6">
-    {toasts.map((toast) => <div key={toast.id} role="alert" className="pointer-events-auto rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/10">
+    {toasts.map((toast) => <div key={toast.id} role="alert" className="pointer-events-auto rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.2)] ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/10">
       <div className="flex items-start gap-3 rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-3.5">
         <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-[var(--bad-bg)] text-[var(--bad)]"><WarningCircle size={16} weight="fill" /></span>
         <div className="min-w-0 flex-1">

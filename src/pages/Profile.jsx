@@ -44,15 +44,15 @@ export default function Profile() {
   return <Shell><main className="mx-auto w-full max-w-[1100px] px-4 pb-24 pt-14 sm:px-6 md:pt-20">
     <div className="rounded-[2.3rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
       <section className="relative overflow-hidden rounded-[calc(2.3rem-.375rem)] bg-[var(--surface)] p-6 sm:p-10">
-        <div className="absolute right-0 top-0 h-56 w-72 bg-[var(--lime)]/20 blur-[90px]" />
+        <div className="absolute right-0 top-0 h-56 w-72 bg-[var(--lime-tint)]/20 blur-[90px]" />
         <div className="relative flex flex-col justify-between gap-10 md:flex-row md:items-end">
           <div>
-            <div className="grid size-24 place-items-center rounded-[2rem] bg-[var(--ink)] text-2xl font-bold text-white shadow-[0_20px_50px_rgba(20,22,18,.2)]">{userInitials(user?.name)}</div>
+            <div className="grid size-24 place-items-center rounded-[2rem] bg-[var(--ink)] text-2xl font-bold text-white shadow-[0_20px_50px_rgb(var(--shadow-rgb)/.2)]">{userInitials(user?.name)}</div>
             <p className={`mt-7 ${eyebrow}`}>{admin ? `Administrator${role ? ` · ${role}` : ''}` : role || 'No role yet'}</p>
             <h1 className="mt-3 text-5xl font-semibold tracking-[-.065em] sm:text-7xl">{user?.name || 'Your profile'}</h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">{user?.email}</p>
           </div>
-          <button onClick={logout} className={`${primaryButton} self-start bg-[#f5d6cf] text-[var(--danger)] md:self-auto`}><span>Log out</span><span className="grid size-8 place-items-center rounded-full bg-white/45"><SignOut size={15} /></span></button>
+          <button onClick={logout} className={`${primaryButton} self-start bg-[var(--bad-bg)] text-[var(--danger)] md:self-auto`}><span>Log out</span><span className="grid size-8 place-items-center rounded-full bg-white/45"><SignOut size={15} /></span></button>
         </div>
       </section>
     </div>

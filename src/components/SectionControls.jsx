@@ -16,13 +16,13 @@ export function SectionPanel({ children }) {
 export function SectionTab({ active, onClick, count, children }) {
   return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-sm font-semibold transition-colors duration-300 ${active ? 'border-[var(--text)] text-[var(--text)]' : 'border-transparent text-[var(--muted)] hover:text-[var(--text)]'}`}>
     {children}
-    {count != null && <span className={`rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold tabular-nums ${active ? 'bg-[var(--lime)] !text-[#26320b]' : 'bg-[var(--paper)] text-[var(--muted)]'}`}>{count}</span>}
+    {count != null && <span className={`rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold tabular-nums ${active ? 'bg-[var(--lime)] !text-[var(--on-lime)]' : 'bg-[var(--paper)] text-[var(--muted)]'}`}>{count}</span>}
   </button>
 }
 
 // index.css gives buttons `font: inherit`, so the text size and weight sit on the inner span.
 export function FilterToggle({ active, onClick, children }) {
-  return <button type="button" aria-pressed={active} onClick={onClick} className={`shrink-0 rounded-full px-3.5 py-2 ring-1 transition-all duration-300 ${active ? 'bg-(--lime)/40 text-[var(--ink)] ring-[var(--lime-dark)]/40' : 'bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]/60'}`}><span className="text-[13px] font-semibold">{children}</span></button>
+  return <button type="button" aria-pressed={active} onClick={onClick} className={`shrink-0 rounded-full px-3.5 py-2 ring-1 transition-all duration-300 ${active ? 'bg-(--lime-tint)/40 text-[var(--ink)] ring-[var(--lime-dark)]/40' : 'bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]/60'}`}><span className="text-[13px] font-semibold">{children}</span></button>
 }
 
 export function NothingMatches({ onClear }) {

@@ -10,7 +10,7 @@ import { asArray, asObject, asText } from '../lib/safe'
 export function freshnessTone(minutes, windowMinutes) {
   const ratio = Math.min(1, minutes / Math.max(windowMinutes, 1))
   if (ratio < .34) return 'var(--lime-dark)'
-  if (ratio < .67) return '#d9a53a'
+  if (ratio < .67) return 'var(--score-mid)'
   return 'var(--orange)'
 }
 
@@ -38,15 +38,15 @@ export default function LiveJobCard({ job, index, now, windowMinutes, justIn, ap
   const client = asObject(job.clientStats), tags = asArray(job.tags)
   const earlyBird = isEarlyBird(job, now)
 
-  return <article id={`live-${job.id}`} data-card data-job-id={job.id} style={{ '--fresh': tone }} className={`live-card group scroll-mt-[calc(var(--shell-h)+1rem)] rounded-[1.6rem] bg-[var(--frame)] p-1 ring-1 ring-[var(--line)]/60 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(30,40,25,.1)] ${justIn ? 'live-just-in' : ''}`}>
+  return <article id={`live-${job.id}`} data-card data-job-id={job.id} style={{ '--fresh': tone }} className={`live-card group scroll-mt-[calc(var(--shell-h)+1rem)] rounded-[1.6rem] bg-[var(--frame)] p-1 ring-1 ring-[var(--line)]/60 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgb(var(--shadow-rgb)/.1)] ${justIn ? 'live-just-in' : ''}`}>
     <span aria-hidden="true" className="absolute inset-y-6 left-0 z-10 w-1 rounded-r-full" style={{ background: tone }} />
     <div className="relative grid overflow-hidden rounded-[calc(1.6rem-.25rem)] bg-[var(--surface)] md:grid-cols-[minmax(0,1fr)_17rem]">
       <div className="relative min-w-0">
       <Link to={`/live-jobs/${job.id}`} onClick={previewClick(onOpen)} className="block min-w-0 p-5 sm:p-6">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pr-20">
           {index != null && <span className="font-mono text-[11px] font-bold text-[var(--muted)]">{String(index + 1).padStart(2, '0')}</span>}
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-[#c8e875]"><span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#c8e875] opacity-70" /><span className="relative size-1.5 rounded-full bg-[#c8e875]" /></span>Live</span>
-          {justIn && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--lime)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-[#26320b]"><Sparkle size={11} weight="fill" />Just in</span>}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-[var(--hero-accent)]"><span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--hero-accent)] opacity-70" /><span className="relative size-1.5 rounded-full bg-[var(--hero-accent)]" /></span>Live</span>
+          {justIn && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--lime)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-[var(--on-lime)]"><Sparkle size={11} weight="fill" />Just in</span>}
           {earlyBird && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-bg)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-[var(--warn)]"><Lightning size={11} weight="fill" />Early bird</span>}
           {job.renewedAt && <span className="rounded-full bg-[var(--paper)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] text-[var(--muted)]">Renewed</span>}
           <time dateTime={job.postedAt} className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: tone }}><Clock size={12} weight="bold" />{timeAgo(job.postedAt, now)}</time>
@@ -70,7 +70,7 @@ export default function LiveJobCard({ job, index, now, windowMinutes, justIn, ap
       </div>
 
       <JobCardAside job={job} extra={<>
-        {(applied || dismissed) && <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] ${applied ? 'bg-[var(--lime)]/45 text-[#26320b]' : 'bg-[var(--bad-bg)] text-[var(--bad)]'}`}>{applied ? 'Applied' : 'Not a fit'}</span>}
+        {(applied || dismissed) && <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] ${applied ? 'bg-[var(--lime-tint)]/45 text-[var(--lime-ink)]' : 'bg-[var(--bad-bg)] text-[var(--bad)]'}`}>{applied ? 'Applied' : 'Not a fit'}</span>}
         {onSaveToCrm && <div>
           {crmSaved
             ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ok-bg)] px-3 py-1.5 text-[11px] font-bold text-[var(--ok)] ring-1 ring-[var(--ok)]/30"><CheckCircle size={13} weight="fill" />Saved to CRM</span>

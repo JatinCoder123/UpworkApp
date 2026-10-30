@@ -559,7 +559,7 @@ export default function Domain() {
             [Brain, 'Let AI coin names', 'Describe your idea. AI drafts distinctive names and keeps only the ones that are actually free to register.'],
             [ShieldCheck, 'Screen before you buy', 'Each shortlisted name is researched on the live web across 43 brand, trademark, SEO and growth checks.'],
           ].map(([Icon, title, text], index) => <article key={title} style={{ '--i': index * 2 }} className="domain-chip-in rounded-[1.75rem] bg-[var(--surface)] p-6 ring-1 ring-[var(--line)]">
-            <span className="grid size-11 place-items-center rounded-2xl bg-[var(--lime)]/35 text-[var(--accent-strong)]"><Icon size={20} weight="duotone" /></span>
+            <span className="grid size-11 place-items-center rounded-2xl bg-[var(--lime-tint)]/35 text-[var(--accent-strong)]"><Icon size={20} weight="duotone" /></span>
             <p className="mt-5 font-mono text-[11px] text-[var(--muted)]">0{index + 1}</p>
             <h3 className="mt-1 text-lg font-semibold tracking-[-.03em]">{title}</h3>
             <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{text}</p>
@@ -570,7 +570,7 @@ export default function Domain() {
       {saved && <SavedDrawer crmEnabled={Boolean(integrations.crm)} initialTab={saved} onClose={() => setSaved(null)} onOpenSearch={openSavedSearch} onCopy={copyDomain} onUnfavorite={unfavoriteFromDrawer} />}
 
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
-        {toast && <p key={toast} className="domain-ticker rounded-full bg-[var(--ink)] px-5 py-3 text-xs font-semibold text-white shadow-[0_18px_50px_rgba(20,28,21,.3)]">{toast}</p>}
+        {toast && <p key={toast} className="domain-ticker rounded-full bg-[var(--ink)] px-5 py-3 text-xs font-semibold text-white shadow-[0_18px_50px_rgb(var(--shadow-rgb)/.3)]">{toast}</p>}
       </div>
     </Shell>
   )

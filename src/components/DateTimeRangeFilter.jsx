@@ -46,14 +46,14 @@ export default function DateTimeRangeFilter({
         if (!open) setDraft(value)
         setOpen((current) => !current)
       }}
-      className={`flex h-10 items-center gap-2 rounded-full px-3 text-xs font-semibold ring-1 transition-all duration-300 ${active ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/35' : 'bg-[var(--paper)] text-[var(--muted)] ring-black/5 hover:text-[var(--ink)]'}`}
+      className={`flex h-10 items-center gap-2 rounded-full px-3 text-xs font-semibold ring-1 transition-all duration-300 ${active ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-[var(--lime-dark)]/35' : 'bg-[var(--paper)] text-[var(--muted)] ring-black/5 hover:text-[var(--ink)]'}`}
     >
       <CalendarBlank size={15} weight={active ? 'fill' : 'regular'} />
       <span className="hidden max-w-44 truncate sm:block">{formatDateRange(value)}</span>
       <CaretDown size={12} className={`transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
     </button>
 
-    {open && <div className={`absolute top-12 z-50 w-[min(23rem,calc(100vw-2rem))] rounded-[1.5rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5 ${align === 'left' ? 'left-0' : 'right-0'}`}>
+    {open && <div className={`absolute top-12 z-50 w-[min(23rem,calc(100vw-2rem))] rounded-[1.5rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.2)] ring-1 ring-black/5 ${align === 'left' ? 'left-0' : 'right-0'}`}>
       <div className="rounded-[calc(1.5rem-.375rem)] bg-[var(--surface)] p-4">
         <div className="flex items-start justify-between gap-4">
           <div><p className="text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">{label}</p><p className="mt-1 text-sm font-semibold">Choose a time window</p></div>
@@ -63,8 +63,8 @@ export default function DateTimeRangeFilter({
         <div className="mt-4 grid grid-cols-2 gap-2">
           {DATE_RANGE_PRESETS.map((preset) => {
             const selected = draft.preset === preset.id
-            return <button key={preset.id} type="button" onClick={() => choosePreset(preset.id)} className={`flex min-h-14 items-center gap-2 rounded-xl p-2.5 text-left ring-1 transition-colors ${selected ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/35' : 'bg-[var(--paper)] ring-black/5 hover:ring-black/15'}`}>
-              <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold">{preset.label}</span><span className={`mt-0.5 block truncate text-[8px] ${selected ? 'text-[#536520]' : 'text-[var(--muted)]'}`}>{preset.note}</span></span>
+            return <button key={preset.id} type="button" onClick={() => choosePreset(preset.id)} className={`flex min-h-14 items-center gap-2 rounded-xl p-2.5 text-left ring-1 transition-colors ${selected ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-[var(--lime-dark)]/35' : 'bg-[var(--paper)] ring-black/5 hover:ring-black/15'}`}>
+              <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold">{preset.label}</span><span className={`mt-0.5 block truncate text-[8px] ${selected ? 'text-[var(--accent-strong)]' : 'text-[var(--muted)]'}`}>{preset.note}</span></span>
               {selected && <Check size={13} weight="bold" />}
             </button>
           })}

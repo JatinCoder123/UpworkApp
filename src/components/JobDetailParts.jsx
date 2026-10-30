@@ -26,10 +26,10 @@ export function LinkifiedDescription({ text }) {
 // `accent` adds the same lime wash the job header uses, for sections that should stand out.
 export function Panel({ icon: Icon, title, subtitle, action, accent = false, children }) {
   return <section data-detail className={`${card} relative overflow-hidden`}>
-    {accent && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[var(--lime)]/25 to-transparent" />}
+    {accent && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[var(--lime-tint)]/25 to-transparent" />}
     <header className="relative flex items-start justify-between gap-3">
       <div className="flex items-center gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--lime)]/30 text-[var(--accent-strong)]"><Icon size={17} weight="duotone" /></span>
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[var(--lime-tint)]/30 text-[var(--accent-strong)]"><Icon size={17} weight="duotone" /></span>
         <div><h2 className="text-base font-semibold tracking-[-.015em]">{title}</h2>{subtitle && <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>}</div>
       </div>
       {action}
@@ -52,7 +52,7 @@ export function FactTile({ icon: Icon, label, value, note, wrap = false }) {
 function Stars({ rating }) {
   return <span className="flex items-center gap-0.5" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => {
     const fill = Math.max(0, Math.min(1, rating - index))
-    return <span key={index} className="relative inline-block size-4"><Star size={16} weight="fill" className="absolute inset-0 text-black/[.12] dark:text-white/15" /><span className="absolute inset-0 overflow-hidden" style={{ width: `${fill * 100}%` }}><Star size={16} weight="fill" className="text-[#e6a817]" /></span></span>
+    return <span key={index} className="relative inline-block size-4"><Star size={16} weight="fill" className="absolute inset-0 text-black/[.12] dark:text-white/15" /><span className="absolute inset-0 overflow-hidden" style={{ width: `${fill * 100}%` }}><Star size={16} weight="fill" className="text-star" /></span></span>
   })}</span>
 }
 
@@ -247,7 +247,7 @@ export function CoverLetter({ job, onLetter }) {
         </div>}
 
     {/* Regenerate: what should change (typed, or quick picks added), then the generator writes a new letter. */}
-    {request !== null && <form onSubmit={startRegenerate} className="mt-4 rounded-2xl bg-[var(--lime)]/[.12] p-4 ring-1 ring-[var(--lime-dark)]/25">
+    {request !== null && <form onSubmit={startRegenerate} className="mt-4 rounded-2xl bg-[var(--lime-tint)]/[.12] p-4 ring-1 ring-[var(--lime-dark)]/25">
       <label className="block">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-strong)]"><Sparkle size={14} weight="fill" />What should change in the cover letter?</span>
         <textarea autoFocus rows={3} maxLength={2000} value={request} onChange={(event) => setRequest(event.target.value)} placeholder="e.g. Make it shorter and mention our Shopify work" className="mt-2 w-full resize-y rounded-xl bg-[var(--surface)] px-3 py-2 text-sm leading-6 outline-none ring-1 ring-[var(--line)] placeholder:text-[var(--muted)] focus:ring-[var(--lime-dark)]" />

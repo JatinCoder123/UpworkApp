@@ -10,7 +10,7 @@ import { ClearFilters, NothingMatches, SectionPanel, SectionTab, sectionLabel as
 import FeedSearch from '../components/FeedSearch'
 import FeedFilterDialog from '../components/FeedFilterDialog'
 import FilterListDialog from '../components/FilterListDialog'
-import { FactIcon, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader } from '../components/FeedParts'
+import { FactList, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow } from '../components/FeedParts'
 import { DialogHeader, Modal, primaryButton } from '../components/ui'
 import ErrorBoundary, { CardError, DialogError } from '../components/ErrorBoundary'
 import { useAuth } from '../contexts/AuthContext'
@@ -32,30 +32,30 @@ import { timeAgo, useNow } from '../lib/time'
 
 // Content group tabs and card tiles (content_group keys).
 const GROUPS = {
-  news: [Newspaper, 'bg-[#e8eafe] text-[#3b3f8f] dark:bg-[#252845] dark:text-[#b9befa]'],
-  learning: [GraduationCap, 'bg-[#ddf6ea] text-[#1f6b4a] dark:bg-[#17352a] dark:text-[#8fdcb6]'],
-  suggestion: [Lightbulb, 'bg-[#fff0d7] text-[#8a5a00] dark:bg-[#3a2e17] dark:text-[#f2c26b]'],
+  news: [Newspaper, 'bg-tone-indigo-bg text-tone-indigo'],
+  learning: [GraduationCap, 'bg-tone-mint-bg text-tone-mint'],
+  suggestion: [Lightbulb, 'bg-tone-amber-bg text-tone-amber'],
 }
 // Learning format icons (learning_format keys); a learning card's tile shows its format.
 const FORMATS = { video: YoutubeLogo, github_repo: GithubLogo, book: BookOpen, course: GraduationCap, article: Article }
 // Priority and impact (CRM fields): badge colours and the filter's colour dots.
 const PRIORITY = {
-  high: ['bg-[#fde2e1] text-[#b42318] ring-[#f7c1bd] dark:bg-[#3d1a18] dark:text-[#fca5a0] dark:ring-[#6b2a25]', 'bg-[#e5484d]'],
-  medium: ['bg-[#f6e8b8] text-[#655419] ring-[#e8d48a] dark:bg-[#383017] dark:text-[#e8c867] dark:ring-[#56491f]', 'bg-[#e0a526]'],
-  low: ['bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)]', 'bg-[#94a3b8]'],
+  high: ['bg-danger-bg text-danger ring-danger-line', 'bg-danger-solid'],
+  medium: ['bg-warning-bg text-warning ring-warning-line', 'bg-warning-solid'],
+  low: ['bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)]', 'bg-tone-slate-solid'],
 }
 const IMPACT = {
-  major: ['bg-[#efe4fb] text-[#6b2fa8] ring-[#dcc6f5] dark:bg-[#2e1f45] dark:text-[#d2b4fa] dark:ring-[#4a3370]', 'bg-[#8b5cf6]'],
-  medium: ['bg-[#e0f2fe] text-[#0369a1] ring-[#bae6fd] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30', 'bg-[#38bdf8]'],
-  minor: ['bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)]', 'bg-[#94a3b8]'],
+  major: ['bg-tone-violet-bg text-tone-violet ring-tone-violet-line', 'bg-tone-violet-solid'],
+  medium: ['bg-info-bg text-info ring-info-line', 'bg-info-solid'],
+  minor: ['bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)]', 'bg-tone-slate-solid'],
 }
 // Access and cost share one style (access / cost keys): lime free, green open source, blue paid, slate closed API;
 // each with its icon. Used by the Access strip, the filter and the card badge.
 const ACCESS_TONE = {
-  free: 'bg-(--lime)/40 text-[var(--ink)] ring-[var(--lime-dark)]/40',
-  open_source: 'bg-[#ddf6ea] text-[#1f6b4a] ring-[#b5e8cf] dark:bg-[#17352a] dark:text-[#8fdcb6] dark:ring-[#2a5a45]',
-  paid: 'bg-[#e0f2fe] text-[#0369a1] ring-[#bae6fd] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30',
-  closed_api: 'bg-[#e8eaf0] text-[#334155] ring-[#cbd2dc] dark:bg-[#262a33] dark:text-[#c3cad6] dark:ring-[#3a404c]',
+  free: 'bg-(--lime-tint)/40 text-[var(--ink)] ring-[var(--lime-dark)]/40',
+  open_source: 'bg-tone-mint-bg text-tone-mint ring-tone-mint-line',
+  paid: 'bg-info-bg text-info ring-info-line',
+  closed_api: 'bg-tone-slate-bg text-tone-slate ring-tone-slate-line',
 }
 const ACCESS_ICONS = { free: Gift, open_source: GitBranch, paid: CurrencyDollar, closed_api: LockKey }
 const RANK = { high: 3, major: 3, medium: 2, low: 1, minor: 1 }
@@ -133,7 +133,7 @@ export default function Llm() {
 
   const used = (key) => options[FIELDS[key][0]] || NONE
   const withIcons = (key, icons) => used(key).map((option) => ({ ...option, icon: icons[option.value]?.[0] || icons[option.value], tone: Array.isArray(icons[option.value]) ? icons[option.value][1] : undefined }))
-  const withDots = (key, tones) => used(key).map((option) => ({ ...option, dot: tones[option.value]?.[1] || 'bg-[#94a3b8]', tone: tones[option.value]?.[0] }))
+  const withDots = (key, tones) => used(key).map((option) => ({ ...option, dot: tones[option.value]?.[1] || 'bg-tone-slate-solid', tone: tones[option.value]?.[0] }))
   const filterSections = [
     { key: 'priorities', title: 'Priority', icon: Flag, kind: 'cards', options: withDots('priorities', PRIORITY) },
     { key: 'impacts', title: 'Impact', icon: Lightning, kind: 'cards', options: withDots('impacts', IMPACT) },
@@ -216,9 +216,9 @@ export default function Llm() {
               <ErrorBoundary name="llm-index" fallbackProps={INDEX_ERROR} resetKey={items}><FeedIndex items={items} activeId={activeId} onJump={jumpTo}
                 meta={(item) => { const [GroupIcon] = GROUPS[item.contentGroup] || [Circle]; return <><GroupIcon size={10} /><span className="truncate">{labelOf('news_type', item.newsType)} · {timeAgo(item.publishedAt, now)}</span></> }}
                 mark={(item) => item.priority && <span title={`${labelOf('priority', item.priority)} priority`} className={`mt-1 size-2 shrink-0 self-start rounded-full ${(PRIORITY[item.priority] || PRIORITY.low)[1]}`} />} /></ErrorBoundary>
-              <div className="min-w-0 space-y-4">
+              <div className="@container min-w-0 space-y-4">
                 {journeys.map(([name, steps]) => <ErrorBoundary key={name} name="llm-journey" fallbackProps={JOURNEY_ERROR} resetKey={steps}><JourneyStrip name={name} steps={steps} labelOf={labelOf} onOpen={openItem} /></ErrorBoundary>)}
-                <section className={`grid content-start gap-4 transition-opacity min-[1400px]:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="llm-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><LlmCard item={item} labelOf={labelOf} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
+                <section className={`grid content-start gap-4 transition-opacity @4xl:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="llm-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><LlmCard item={item} labelOf={labelOf} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
                 <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} />
               </div>
             </div>
@@ -258,7 +258,7 @@ function Tile({ item }) {
 
 // A highlighted line: what to do with it (Use for us), why it was suggested, or what you will get (Outcome).
 function Callout({ icon: Icon, title, text, clamp = false }) {
-  return <div className="flex gap-2.5 rounded-xl border-l-4 border-[var(--lime-dark)] bg-(--lime)/15 px-3.5 py-3">
+  return <div className="flex gap-2.5 rounded-xl border-l-4 border-[var(--lime-dark)] bg-(--lime-tint)/15 px-3.5 py-3">
     <Icon size={17} weight="fill" className="mt-0.5 shrink-0 text-[var(--lime-dark)]" />
     <div className="min-w-0"><p className={label}>{title}</p><p className={`mt-0.5 text-sm leading-6 ${clamp ? 'line-clamp-2' : ''}`}>{text}</p></div>
   </div>
@@ -272,13 +272,13 @@ function Tags({ tags, labelOf }) {
 // The facts that matter for the item's group: model, pricing and availability for news; format, duration, level and
 // stack for learning and suggestions.
 function Facts({ item, labelOf }) {
-  if (item.contentGroup === 'news') return <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+  if (item.contentGroup === 'news') return <div className={metricRow}>
     <Metric icon={Cpu} caption="Model" value={item.modelName} wrap />
     <Metric icon={CurrencyDollar} caption="Pricing" value={item.pricing} wrap />
     <Metric icon={Plugs} caption="Available on" value={item.availability || (item.modelType && labelOf('model_type', item.modelType))} />
   </div>
   const FormatIcon = FORMATS[item.learningFormat] || BookOpen
-  return <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+  return <div className={metricRow}>
     <Metric icon={FormatIcon} caption="Format" value={item.learningFormat && labelOf('learning_format', item.learningFormat)} />
     <Metric icon={Clock} caption="Duration" value={item.duration} />
     <Metric icon={Wrench} caption="Tech stack" value={item.techStack} wrap />
@@ -301,16 +301,16 @@ function JourneyLine({ item }) {
 function JourneyStrip({ name, steps, labelOf, onOpen }) {
   return <section className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
     <div className="flex flex-wrap items-center gap-3">
-      <span className="grid size-10 place-items-center rounded-xl bg-(--lime)/35 text-[var(--accent-strong)]"><Path size={20} weight="bold" /></span>
+      <span className="grid size-10 place-items-center rounded-xl bg-(--lime-tint)/35 text-[var(--accent-strong)]"><Path size={20} weight="bold" /></span>
       <div className="min-w-0 flex-1"><p className={label}>Learning journey</p><h2 className="text-base font-semibold tracking-[-.02em]">{name}</h2></div>
       <span className="rounded-full bg-[var(--paper)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{steps.length} steps</span>
     </div>
-    <ol className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+    <ol className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2">
       {steps.map((step) => {
         const FormatIcon = FORMATS[step.learningFormat] || BookOpen
         return <li key={step.id}>
           <button type="button" onClick={() => onOpen(step.id)} className="flex h-full w-full flex-col gap-1.5 rounded-2xl bg-[var(--paper)] p-3 text-left ring-1 ring-[var(--line)]/60 transition-all duration-300 hover:-translate-y-0.5 hover:ring-[var(--lime-dark)]">
-            <span className="flex items-center justify-between gap-2"><span className="grid size-6 place-items-center rounded-full bg-[var(--lime)] font-mono text-[11px] font-bold text-[#26320b]">{step.stepNumber}</span><ArrowRight size={13} className="text-[var(--muted)]" /></span>
+            <span className="flex items-center justify-between gap-2"><span className="grid size-6 place-items-center rounded-full bg-[var(--lime)] font-mono text-[11px] font-bold text-[var(--on-lime)]">{step.stepNumber}</span><ArrowRight size={13} className="text-[var(--muted)]" /></span>
             <span className="line-clamp-2 text-[13px] font-semibold leading-5">{step.name}</span>
             <span className="mt-auto flex items-center gap-1 text-[11px] text-[var(--muted)]"><FormatIcon size={11} />{labelOf('learning_format', step.learningFormat)}{step.duration && ` · ${step.duration}`}</span>
           </button>
@@ -322,7 +322,7 @@ function JourneyStrip({ name, steps, labelOf, onOpen }) {
 
 function LlmCard({ item, labelOf, onOpen }) {
   const callout = item.useForUs ? [Lightbulb, 'Use for us', item.useForUs] : item.suggestedBecause ? [Sparkle, 'Suggested because', item.suggestedBecause] : item.outcome ? [Target, 'What you will get', item.outcome] : null
-  return <article id={`feed-${item.id}`} data-feed-card={item.id} className={`flex scroll-mt-[calc(var(--shell-h)+1rem)] flex-col gap-3.5 rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(30,40,25,.1)]`}>
+  return <article id={`feed-${item.id}`} data-feed-card={item.id} className={`flex scroll-mt-[calc(var(--shell-h)+1rem)] flex-col gap-3.5 rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgb(var(--shadow-rgb)/.1)]`}>
     <header className="flex items-start gap-3">
       <Tile item={item} />
       <div className="min-w-0 flex-1">
@@ -384,12 +384,12 @@ function LlmDialog({ item, steps, labelOf, now, onOpen, onClose }) {
     <div className="mt-4 flex flex-wrap items-center gap-2">
       <Badges item={item} labelOf={labelOf} />
       <div className="ml-auto flex flex-wrap items-center gap-2 text-xs font-bold">
-        {item.sourceUrl && <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--lime)] px-3.5 py-2 text-[#26320b] transition-transform hover:-translate-y-0.5"><Globe size={13} weight="bold" />Open source<ArrowSquareOut size={12} weight="bold" /></a>}
+        {item.sourceUrl && <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--lime)] px-3.5 py-2 text-[var(--on-lime)] transition-transform hover:-translate-y-0.5"><Globe size={13} weight="bold" />Open source<ArrowSquareOut size={12} weight="bold" /></a>}
         {item.docsUrl && <a href={item.docsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3.5 py-2 text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)]"><BookOpen size={13} weight="bold" />Docs<ArrowSquareOut size={12} weight="bold" /></a>}
       </div>
     </div>
 
-    <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+    <div className="@container mt-5"><div className="grid gap-5 @xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
       <div className="space-y-4 text-sm leading-6">
         <TextBlock icon={Newspaper} title="What it is">{item.description || item.summary}</TextBlock>
         {highlights.length > 0 && <section><p className={`${label} flex items-center gap-1.5`}><ListChecks size={13} weight="bold" />Key highlights</p><ul className="mt-1.5 space-y-1">{highlights.map((line) => <li key={line} className="flex gap-2"><CheckCircle size={15} weight="fill" className="mt-1 shrink-0 text-[var(--lime-dark)]" />{line}</li>)}</ul></section>}
@@ -405,8 +405,8 @@ function LlmDialog({ item, steps, labelOf, now, onOpen, onClose }) {
           <p className={`${label} flex items-center gap-1.5`}><Path size={13} weight="bold" />Journey: {item.journeyName}</p>
           <ol className="mt-2 space-y-1.5">{steps.map((step) => {
             const current = step.id === item.id
-            return <li key={step.id}><button type="button" disabled={current} onClick={() => onOpen(step.id)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px] ring-1 transition-colors ${current ? 'bg-(--lime)/30 ring-[var(--lime-dark)]/40' : 'bg-[var(--paper)] ring-[var(--line)]/60 hover:ring-[var(--lime-dark)]'}`}>
-              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--lime)] font-mono text-[11px] font-bold text-[#26320b]">{step.stepNumber}</span>
+            return <li key={step.id}><button type="button" disabled={current} onClick={() => onOpen(step.id)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px] ring-1 transition-colors ${current ? 'bg-(--lime-tint)/30 ring-[var(--lime-dark)]/40' : 'bg-[var(--paper)] ring-[var(--line)]/60 hover:ring-[var(--lime-dark)]'}`}>
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[var(--lime)] font-mono text-[11px] font-bold text-[var(--on-lime)]">{step.stepNumber}</span>
               <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{step.name}</span>
             </button></li>
           })}</ol>
@@ -414,13 +414,7 @@ function LlmDialog({ item, steps, labelOf, now, onOpen, onClose }) {
 
       </div>
 
-      {/* The details list runs to the bottom of the left column, its rows spread evenly. */}
-      <dl className="flex flex-col self-stretch rounded-2xl bg-[var(--paper)] px-3.5 py-1.5 text-[13px] ring-1 ring-[var(--line)]/70">
-        {facts.map(([Icon, title, value]) => <div key={title} className="flex max-h-14 min-h-11 flex-1 items-center justify-between gap-3 border-t border-[var(--line)]/60 py-2 first:border-t-0">
-          <dt className="flex shrink-0 items-center gap-2.5 text-[var(--muted)]"><FactIcon icon={Icon} title={title} />{title}</dt>
-          <dd className="text-right font-semibold">{value}</dd>
-        </div>)}
-      </dl>
-    </div>
+      <FactList facts={facts} />
+    </div></div>
   </Modal>
 }

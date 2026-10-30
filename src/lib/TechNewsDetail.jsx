@@ -126,7 +126,7 @@ export default function TechNewsDetail() {
 
               {/* HurryUp Badge */}
               {hurryUp && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3.5 py-1.5 text-xs font-bold text-amber-800 dark:text-amber-300 ring-1 ring-amber-500/30">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-solid/20 px-3.5 py-1.5 text-xs font-bold text-warning ring-1 ring-warning-solid/30">
                   <Alarm size={14} weight="fill" />
                   <span>HurryUp</span>
                 </span>
@@ -231,7 +231,7 @@ export default function TechNewsDetail() {
                   <span className="text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">
                     Intelligence Overview
                   </span>
-                  <ShieldCheck size={18} className="text-[#668c16]" />
+                  <ShieldCheck size={18} className="text-[var(--accent)]" />
                 </div>
 
                 <div className="space-y-4 text-xs">
@@ -317,8 +317,8 @@ export default function TechNewsDetail() {
                         Latest News
                       </h3>
                     </div>
-                    <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[9px] font-bold text-emerald-800 dark:text-emerald-300">
-                      <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="flex items-center gap-1.5 rounded-full bg-success-solid/15 px-2.5 py-0.5 text-[9px] font-bold text-success">
+                      <span className="size-1.5 rounded-full bg-success-solid animate-pulse" />
                       <span>Live</span>
                     </span>
                   </div>
@@ -333,20 +333,20 @@ export default function TechNewsDetail() {
                         <div className="flex items-start gap-3">
                           <div className="min-w-0 flex-1 space-y-1">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-bold uppercase tracking-wider text-[#668c16]">
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--accent)]">
                                 {item.category}
                               </span>
                               <span className="text-[9px] text-[var(--muted)]">·</span>
                               <span className="text-[9px] text-[var(--muted)]">{item.posted}</span>
                             </div>
-                            <h4 className="text-xs font-semibold leading-snug text-[var(--ink)] line-clamp-2 transition-colors duration-300 group-hover:text-[#668c16]">
+                            <h4 className="text-xs font-semibold leading-snug text-[var(--ink)] line-clamp-2 transition-colors duration-300 group-hover:text-[var(--accent)]">
                               {item.title}
                             </h4>
                             <div className="flex items-center gap-2 pt-0.5">
                               <span className="text-[10px] text-[var(--muted)] truncate max-w-[110px]">
                                 {item.source}
                               </span>
-                              <span className={`inline-block size-1.5 rounded-full ${item.tier?.squareClass || 'bg-purple-500'}`} />
+                              <span className={`inline-block size-1.5 rounded-full ${item.tier?.squareClass || 'bg-tone-violet-solid'}`} />
                               <span className="text-[9px] font-bold text-[var(--ink)]">{item.tier?.label}</span>
                             </div>
                           </div>

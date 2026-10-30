@@ -21,11 +21,11 @@ export default function FilterListDialog({ title, accent = 'you want to see.', n
 
   return <Modal onClose={applyAndClose} wide={options.length > 8}>
     {/* Short dark header with the lime circles, as in the Jobs skills panel. */}
-    <div className="relative -mx-5 -mt-5 mb-5 overflow-hidden rounded-t-[calc(2rem-.375rem)] bg-[#1f2a21] px-6 py-5 sm:-mx-8 sm:-mt-8 sm:px-8">
-      <span aria-hidden="true" className="pointer-events-none absolute -right-8 -top-12 size-28 rounded-full bg-[#c8df7a]" />
-      <span aria-hidden="true" className="pointer-events-none absolute right-24 top-9 size-7 rounded-full border-2 border-[#c8df7a]/80" />
-      <button type="button" onClick={applyAndClose} aria-label="Close dialog" className="absolute right-4 top-4 z-10 grid size-8 place-items-center rounded-full bg-[#1f2a21] text-white ring-1 ring-white/25 transition-transform hover:scale-105"><X size={14} weight="bold" /></button>
-      <h2 className="relative max-w-[80%] text-xl font-semibold leading-tight tracking-[-.03em] text-white">{title} <span className="font-serif italic text-[#c8df7a]">{accent}</span></h2>
+    <div className="relative -mx-5 -mt-5 mb-5 overflow-hidden rounded-t-[calc(2rem-.375rem)] bg-[var(--hero)] px-6 py-5 sm:-mx-8 sm:-mt-8 sm:px-8">
+      <span aria-hidden="true" className="pointer-events-none absolute -right-8 -top-12 size-28 rounded-full bg-[var(--hero-soft)]" />
+      <span aria-hidden="true" className="pointer-events-none absolute right-24 top-9 size-7 rounded-full border-2 border-[var(--hero-soft)]/80" />
+      <button type="button" onClick={applyAndClose} aria-label="Close dialog" className="absolute right-4 top-4 z-10 grid size-8 place-items-center rounded-full bg-[var(--hero)] text-white ring-1 ring-white/25 transition-transform hover:scale-105"><X size={14} weight="bold" /></button>
+      <h2 className="relative max-w-[80%] text-xl font-semibold leading-tight tracking-[-.03em] text-white">{title} <span className="font-serif italic text-[var(--hero-soft)]">{accent}</span></h2>
     </div>
 
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -48,7 +48,7 @@ export default function FilterListDialog({ title, accent = 'you want to see.', n
         const active = picked.includes(option.value)
         const Icon = option.icon
         const count = countOf?.(option.value)
-        const colours = active ? 'bg-[#d6e9a0] !text-[#26320b] ring-1 ring-[#9fbf4c] shadow-sm' : option.tone ? `${option.tone} opacity-90 hover:opacity-100` : 'skill-chip'
+        const colours = active ? 'bg-[var(--lime-tint)]/55 !text-[var(--lime-ink)] ring-1 ring-[var(--lime-dark)]/50 shadow-sm' : option.tone ? `${option.tone} opacity-90 hover:opacity-100` : 'skill-chip'
         return <button key={option.value} type="button" aria-pressed={active} onClick={() => toggle(option.value)} style={active || option.tone ? undefined : skillStyle(option.value)} className={`rounded-full px-3 py-2 transition-all duration-300 hover:-translate-y-0.5 ${colours} ${empty(option) ? '!opacity-45' : ''}`}>
           <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold">
             {active ? <Check size={13} weight="bold" /> : Icon && <Icon size={14} />}

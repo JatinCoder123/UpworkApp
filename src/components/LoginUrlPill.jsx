@@ -31,7 +31,7 @@ export default function LoginUrlPill() {
         <ArrowSquareOut size={12} className="shrink-0 text-[var(--muted)]" />
       </a>
       {/* Floats above the pill (out of the layout): only its opacity and position animate. */}
-      <span role="tooltip" className="pointer-events-none absolute bottom-full right-0 z-20 mb-2 translate-y-1 whitespace-nowrap rounded-lg bg-[var(--ink)] px-2.5 py-1.5 font-mono text-[10px] font-medium text-white opacity-0 shadow-[0_10px_30px_rgba(30,32,25,.18)] transition-[opacity,transform] duration-200 group-hover/login:translate-y-0 group-hover/login:opacity-100 group-focus-within/login:translate-y-0 group-focus-within/login:opacity-100">
+      <span role="tooltip" className="pointer-events-none absolute bottom-full right-0 z-20 mb-2 translate-y-1 whitespace-nowrap rounded-lg bg-[var(--ink)] px-2.5 py-1.5 font-mono text-[10px] font-medium text-white opacity-0 shadow-[0_10px_30px_rgb(var(--shadow-rgb)/.18)] transition-[opacity,transform] duration-200 group-hover/login:translate-y-0 group-hover/login:opacity-100 group-focus-within/login:translate-y-0 group-focus-within/login:opacity-100">
         {shownUrl}
       </span>
       <button

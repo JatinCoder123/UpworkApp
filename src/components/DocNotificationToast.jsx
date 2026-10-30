@@ -73,7 +73,7 @@ const STATUS_CONFIG = {
     label: 'Processing Article',
     sub: 'Synthesizing sources & AI drafting...',
     color: 'var(--lime-dark)',
-    bg: 'var(--lime)/15',
+    bg: 'var(--lime-tint)/15',
     ring: 'var(--lime-dark)/30',
     Icon: Sparkle,
     animate: true,
@@ -218,7 +218,7 @@ export default function DocNotificationToast() {
             role="status"
             className={`pointer-events-auto overflow-hidden rounded-2xl bg-[var(--surface)] p-3.5 ring-1 transition-all duration-300 hover:shadow-[0_16px_44px_rgba(0,0,0,0.16)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.45)] ${
               isCompleted
-                ? 'ring-[var(--ok)]/40 shadow-[0_16px_40px_rgba(46,125,50,0.18)]'
+                ? 'ring-[var(--ok)]/40 shadow-[0_16px_40px_color-mix(in_srgb,var(--ok)_18%,transparent)]'
                 : 'ring-[var(--line)] shadow-[0_12px_36px_rgba(0,0,0,0.12)]'
             }`}
           >
@@ -270,7 +270,7 @@ export default function DocNotificationToast() {
                       href={toast.viewUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full bg-[var(--lime)] px-2.5 py-1 text-[10px] font-bold text-[#26320b] hover:brightness-105 active:scale-95 transition-all"
+                      className="inline-flex items-center gap-1 rounded-full bg-[var(--lime)] px-2.5 py-1 text-[10px] font-bold text-[var(--on-lime)] hover:brightness-105 active:scale-95 transition-all"
                     >
                       <FileDoc size={11} weight="bold" />
                       <span>View doc</span>

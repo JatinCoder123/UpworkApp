@@ -363,7 +363,7 @@ export default function TechNews() {
                           : 'text-[var(--muted)] hover:text-[var(--ink)]'
                       }`}
                     >
-                      {item === 'YouBlogging' && <YoutubeLogo size={14} weight="fill" className="text-red-500" />}
+                      {item === 'YouBlogging' && <YoutubeLogo size={14} weight="fill" className="text-danger-solid" />}
                       <span>{item}</span>
                       <span
                         className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
@@ -439,7 +439,7 @@ export default function TechNews() {
                     <div
                       id="tech-news-search-history"
                       onMouseDown={(event) => event.preventDefault()}
-                      className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5"
+                      className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.2)] ring-1 ring-black/5"
                     >
                       <div className="rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
                         <div className="flex items-center justify-between px-2 pb-1.5 pt-1">
@@ -501,7 +501,7 @@ export default function TechNews() {
                   title="Filter by Category, Score Tier, and Source Type"
                   className={`relative ${iconButton} ${
                     refinementFilterCount > 0
-                      ? 'bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40 font-bold'
+                      ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-2 ring-[var(--lime-dark)]/40 font-bold'
                       : ''
                   }`}
                 >
@@ -606,7 +606,7 @@ export default function TechNews() {
             ) : isError ? (
               <div className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
                 <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] py-20 text-center">
-                  <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-[var(--paper)] text-rose-500">
+                  <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-[var(--paper)] text-danger-solid">
                     <Newspaper size={24} weight="light" />
                   </div>
                   <p className="text-sm font-semibold text-[var(--ink)]">Could not load stories</p>
@@ -661,12 +661,12 @@ export default function TechNews() {
             <div ref={loadMoreRef} className="py-6 flex flex-col items-center justify-center">
               {isFetchingNextPage ? (
                 <div className="flex items-center gap-2.5 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="size-2 rounded-full bg-success-solid animate-pulse" />
                   <span>Loading more stories from gateway...</span>
                 </div>
               ) : hasNextPage ? (
                 <div className="flex items-center gap-2.5 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="size-2 rounded-full bg-success-solid animate-pulse" />
                   <span>Scroll for more stories</span>
                 </div>
               ) : (
@@ -693,8 +693,8 @@ export default function TechNews() {
                       Latest News
                     </h2>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 text-[10px] font-extrabold text-emerald-950 dark:text-emerald-200 ring-1 ring-emerald-600/30 dark:ring-emerald-500/40 shadow-xs">
-                    <span className="size-2 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse" />
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-success-bg px-2.5 py-1 text-[10px] font-extrabold text-success ring-1 ring-success-solid/30 shadow-xs">
+                    <span className="size-2 rounded-full bg-success-solid animate-pulse" />
                     <span className="tracking-wide">{isLoading || isRefreshing ? 'Loading...' : 'Live Feed'}</span>
                   </span>
                 </div>
@@ -736,14 +736,14 @@ export default function TechNews() {
                           {/* Text Information */}
                           <div className="min-w-0 flex-1 space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="text-[9px] font-bold uppercase tracking-wider text-[#668c16]">
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--accent)]">
                                 {item.category}
                               </span>
                               <span className="text-[9px] text-[var(--muted)]">·</span>
                               <span className="text-[9px] text-[var(--muted)]">{item.posted}</span>
                             </div>
 
-                            <h3 className="text-xs sm:text-sm font-semibold leading-snug text-[var(--ink)] line-clamp-2 transition-colors duration-300 group-hover:text-[#668c16]">
+                            <h3 className="text-xs sm:text-sm font-semibold leading-snug text-[var(--ink)] line-clamp-2 transition-colors duration-300 group-hover:text-[var(--accent)]">
                               {item.title}
                             </h3>
 
@@ -751,7 +751,7 @@ export default function TechNews() {
                               <span className="text-[10px] text-[var(--muted)] truncate max-w-[120px]">
                                 {item.source}
                               </span>
-                              <span className={`inline-block size-1.5 rounded-full ${item.tier?.squareClass || 'bg-purple-500'}`} />
+                              <span className={`inline-block size-1.5 rounded-full ${item.tier?.squareClass || 'bg-tone-violet-solid'}`} />
                               <span className="text-[9px] font-bold text-[var(--ink)]">
                                 {item.tier?.label}
                               </span>

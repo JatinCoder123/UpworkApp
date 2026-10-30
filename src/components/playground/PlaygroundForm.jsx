@@ -99,7 +99,7 @@ export default function PlaygroundForm({ onRun }) {
         {actions.map((action) => {
           const [text, what, , , Icon] = ACTION_INFO[action]
           const on = form.action === action
-          return <button key={action} type="button" role="radio" aria-checked={on} onClick={() => pickAction(action)} className={`flex items-start gap-2.5 rounded-2xl p-3 text-left ring-1 transition-colors ${on ? 'bg-(--lime)/30 ring-2 ring-[var(--lime-dark)]' : 'bg-[var(--paper)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/60'}`}>
+          return <button key={action} type="button" role="radio" aria-checked={on} onClick={() => pickAction(action)} className={`flex items-start gap-2.5 rounded-2xl p-3 text-left ring-1 transition-colors ${on ? 'bg-(--lime-tint)/30 ring-2 ring-[var(--lime-dark)]' : 'bg-[var(--paper)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/60'}`}>
             <Icon size={18} weight={on ? 'fill' : 'bold'} className={`mt-0.5 shrink-0 ${on ? 'text-[var(--accent-strong)]' : 'text-[var(--muted)]'}`} />
             <span className="min-w-0">
               <span className="block text-[13px] font-semibold text-[var(--ink)]">{text}</span>
@@ -151,7 +151,7 @@ export default function PlaygroundForm({ onRun }) {
           <span className="block text-sm font-semibold text-[var(--ink)]">Customize this test <span className="font-normal text-[var(--muted)]">(optional)</span></span>
           <span className="block text-[11px] text-[var(--muted)]">A name, {isCustom ? '' : 'an extra instruction, '}or your own instructions. Only for this test; nothing saved changes.</span>
         </span>
-        {extrasSet > 0 && <span className="shrink-0 rounded-full bg-(--lime)/40 px-2 py-0.5 text-[10px] font-bold text-[var(--ink)]">{extrasSet} set</span>}
+        {extrasSet > 0 && <span className="shrink-0 rounded-full bg-(--lime-tint)/40 px-2 py-0.5 text-[10px] font-bold text-[var(--ink)]">{extrasSet} set</span>}
         <CaretDown size={12} weight="bold" className={`shrink-0 text-[var(--muted)] transition-transform ${extras ? 'rotate-180' : ''}`} />
       </button>
       {extras && <div className="mt-4 space-y-4">

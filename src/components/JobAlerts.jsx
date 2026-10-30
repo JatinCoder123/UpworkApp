@@ -18,9 +18,9 @@ import { timeAgo, useNow } from '../lib/time'
 const APPLIED_ALERT = false
 
 const TONES = {
-  warn: { tile: 'bg-[var(--warn-bg)] text-[var(--warn)] ring-[#e0a526]/35', bar: 'bg-[#e0a526]' },
-  new: { tile: 'bg-(--lime)/45 text-[#3f5a12] ring-[var(--lime-dark)]/40 dark:text-[var(--lime)]', bar: 'bg-[var(--lime-dark)]' },
-  info: { tile: 'bg-[#e0f2fe] text-[#0369a1] ring-[#bae6fd] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30', bar: 'bg-[#38bdf8]' },
+  warn: { tile: 'bg-[var(--warn-bg)] text-[var(--warn)] ring-warning-solid/35', bar: 'bg-warning-solid' },
+  new: { tile: 'bg-(--lime-tint)/45 text-[var(--lime-ink)] ring-[var(--lime-dark)]/40', bar: 'bg-[var(--lime-dark)]' },
+  info: { tile: 'bg-info-bg text-info ring-info-line', bar: 'bg-info-solid' },
 }
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`
 const exactTime = (iso) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
@@ -63,14 +63,14 @@ export default function JobAlerts({ userEmail, allJobs, onShowNew }) {
       const body = <>
         <p className="text-[13px] font-semibold leading-5">{alert.title}</p>
         <p className="mt-0.5 text-xs leading-5 text-[var(--muted)]">{alert.text}</p>
-        {show && <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-[var(--lime)] px-3 py-1.5 text-[11px] font-bold text-[#26320b] transition-transform group-hover/alert:-translate-y-0.5">Show these jobs<ArrowRight size={11} weight="bold" /></span>}
+        {show && <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-[var(--lime)] px-3 py-1.5 text-[11px] font-bold text-[var(--on-lime)] transition-transform group-hover/alert:-translate-y-0.5">Show these jobs<ArrowRight size={11} weight="bold" /></span>}
       </>
-      return <div key={alert.id} role={alert.tone === 'warn' ? 'alert' : 'status'} style={{ animationDelay: `${index * 140}ms` }} className="job-alert pointer-events-auto rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/10">
+      return <div key={alert.id} role={alert.tone === 'warn' ? 'alert' : 'status'} style={{ animationDelay: `${index * 140}ms` }} className="job-alert pointer-events-auto rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.2)] ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/10">
         <div className="relative flex items-start gap-3 overflow-hidden rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-3.5 pl-4">
           <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${tone.bar}`} />
           <span className={`relative grid size-9 shrink-0 place-items-center rounded-xl ring-1 ${tone.tile}`}>
             <Icon size={17} weight="bold" />
-            {alert.tone === 'warn' && <span aria-hidden="true" className="absolute -right-1 -top-1 flex size-2.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#e0a526] opacity-70" /><span className="relative inline-flex size-2.5 rounded-full bg-[#e0a526] ring-2 ring-[var(--surface)]" /></span>}
+            {alert.tone === 'warn' && <span aria-hidden="true" className="absolute -right-1 -top-1 flex size-2.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-warning-solid opacity-70" /><span className="relative inline-flex size-2.5 rounded-full bg-warning-solid ring-2 ring-[var(--surface)]" /></span>}
           </span>
           {show
             ? <button type="button" onClick={show} title="Show these jobs in the list" className="group/alert min-w-0 flex-1 text-left">{body}</button>

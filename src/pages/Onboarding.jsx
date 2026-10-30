@@ -23,7 +23,7 @@ const ROLE_ICONS = {
 const iconFor = (name) => ROLE_ICONS[asText(name).trim().toLowerCase()] || UserCircle
 
 function RoleIcon({ name, active = false }) {
-  return <span className={`grid size-9 shrink-0 place-items-center rounded-xl ring-1 transition-colors ${active ? 'bg-[var(--lime)] text-[#26320b] ring-[var(--lime-dark)]/40' : 'bg-[var(--surface)] text-[var(--accent-strong)] ring-[var(--line)]'}`}>
+  return <span className={`grid size-9 shrink-0 place-items-center rounded-xl ring-1 transition-colors ${active ? 'bg-[var(--lime)] text-[var(--on-lime)] ring-[var(--lime-dark)]/40' : 'bg-[var(--surface)] text-[var(--accent-strong)] ring-[var(--line)]'}`}>
     {createElement(iconFor(name), { size: 17, weight: 'duotone' })}
   </span>
 }
@@ -106,7 +106,7 @@ function RolePicker({ roles, value, onChange, loading, disabled }) {
       aria-labelledby={`${listId}-trigger`}
       aria-activedescendant={`${listId}-option-${active}`}
       onKeyDown={onListKey}
-      className="absolute inset-x-0 top-full z-30 mt-2 max-h-72 overflow-y-auto rounded-2xl bg-[var(--surface)] p-1.5 shadow-[0_24px_60px_rgba(20,28,21,.18)] outline-none ring-1 ring-[var(--line)] [scrollbar-width:thin] dark:shadow-[0_24px_60px_rgba(0,0,0,.45)]"
+      className="absolute inset-x-0 top-full z-30 mt-2 max-h-72 overflow-y-auto rounded-2xl bg-[var(--surface)] p-1.5 shadow-[0_24px_60px_rgb(var(--shadow-rgb)/.18)] outline-none ring-1 ring-[var(--line)] [scrollbar-width:thin] dark:shadow-[0_24px_60px_rgba(0,0,0,.45)]"
     >
       {roles.map((role, index) => {
         const isSelected = role.id === value
@@ -138,7 +138,7 @@ const HOW_IT_WORKS = [
     icon: Broadcast,
     title: 'Collects',
     text: 'New Upwork jobs and tech news, around the clock.',
-    example: <><span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#c8e875] opacity-70" /><span className="relative size-1.5 rounded-full bg-[#c8e875]" /></span>New jobs every hour</>,
+    example: <><span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--hero-accent)] opacity-70" /><span className="relative size-1.5 rounded-full bg-[var(--hero-accent)]" /></span>New jobs every hour</>,
   },
   {
     icon: Sparkle,
@@ -159,15 +159,15 @@ const WORKSPACES = ['Jobs', 'Live Jobs', 'AI News', 'Site Content', 'SEO', 'Doma
 // Three connected steps; a lime dot travels down the line like data moving through the portal.
 function HowItWorks() {
   return <div className="relative">
-    <span aria-hidden="true" className="absolute bottom-7 left-[1.375rem] top-7 w-px bg-gradient-to-b from-[#c8e875]/50 via-white/15 to-[#c8e875]/50" />
-    <span aria-hidden="true" data-flow className="absolute left-[1.1rem] top-7 size-[.55rem] rounded-full bg-[#c8e875] shadow-[0_0_14px_rgba(200,232,117,.8)]" />
+    <span aria-hidden="true" className="absolute bottom-7 left-[1.375rem] top-7 w-px bg-gradient-to-b from-[var(--hero-accent)]/50 via-white/15 to-[var(--hero-accent)]/50" />
+    <span aria-hidden="true" data-flow className="absolute left-[1.1rem] top-7 size-[.55rem] rounded-full bg-[var(--hero-accent)] shadow-[0_0_14px_color-mix(in_srgb,var(--hero-accent)_80%,transparent)]" />
     <ol className="relative space-y-2.5">
       {HOW_IT_WORKS.map(({ icon: Icon, title, text, example }, index) => <li key={title} className="flex items-start gap-4">
-        <span className="relative z-10 grid size-11 shrink-0 place-items-center rounded-xl bg-[#1d281f] text-[#c8e875] ring-1 ring-inset ring-[#c8e875]/30 shadow-[0_0_18px_rgba(200,232,117,.12)]">
+        <span className="relative z-10 grid size-11 shrink-0 place-items-center rounded-xl bg-[var(--hero)] text-[var(--hero-accent)] ring-1 ring-inset ring-[var(--hero-accent)]/30 shadow-[0_0_18px_color-mix(in_srgb,var(--hero-accent)_12%,transparent)]">
           <Icon size={19} weight="duotone" />
         </span>
         <div className={`${glassCard} min-w-0 flex-1 px-4 py-3`}>
-          <p className="flex items-center gap-2 text-sm font-semibold text-white"><span className="font-mono text-[10px] font-bold text-[#c8e875]">0{index + 1}</span>{title}</p>
+          <p className="flex items-center gap-2 text-sm font-semibold text-white"><span className="font-mono text-[10px] font-bold text-[var(--hero-accent)]">0{index + 1}</span>{title}</p>
           <p className="mt-0.5 text-[12.5px] leading-5 text-white/60">{text}</p>
           {/* Example badge; dropped on short screens so the whole overview fits without scrolling. */}
           <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/[.06] px-2.5 py-1 text-[10.5px] font-semibold text-white/80 [@media(max-height:860px)]:hidden">{example}</p>
@@ -227,7 +227,7 @@ export default function Onboarding() {
     {/* Brand side, the same as the sign-in screen. */}
     <section className="relative hidden min-h-[100dvh] flex-col overflow-hidden bg-[var(--ink)] px-14 py-6 text-white lg:flex">
       <GridPattern width={68} height={68} squares={[[1, 1], [3, 4], [6, 2], [9, 7], [13, 3]]} className="app-grid-pattern app-grid-pattern-login pointer-events-none absolute inset-0 z-0" />
-      <div className="pointer-events-none absolute -left-36 top-1/3 size-[28rem] rounded-full bg-[var(--lime)]/10 blur-[110px]" />
+      <div className="pointer-events-none absolute -left-36 top-1/3 size-[28rem] rounded-full bg-[var(--lime-tint)]/10 blur-[110px]" />
       <div data-enter className="relative flex items-center gap-3">
         <Mark />
         <span className="text-sm font-bold tracking-[-.02em]">Outright Feed Portal</span>
@@ -235,7 +235,7 @@ export default function Onboarding() {
       </div>
       <div className="relative my-auto max-w-[34rem] py-6 xl:py-10">
         <h1 data-enter className="text-[clamp(2.6rem,4.2vw,4.2rem)] font-medium leading-[.9] tracking-[-.075em]">
-          Welcome, <span className="font-serif italic text-[var(--lime)]">{firstName}</span>
+          Welcome, <span className="font-serif italic text-[var(--hero-accent)]">{firstName}</span>
         </h1>
         <p data-enter className="mt-4 text-[15px] leading-7 text-white/60">One portal that finds the work, does the groundwork with AI and keeps your team in sync.</p>
         <p data-enter className="mt-6 text-[10px] font-bold uppercase tracking-[.2em] text-white/45 xl:mt-8">How it works</p>
@@ -266,7 +266,7 @@ export default function Onboarding() {
 
       <div className="my-auto w-full py-10">
         <form data-enter onSubmit={submit} className="mx-auto w-full max-w-[29rem] rounded-[2rem] bg-[var(--ink)]/[.04] p-2 ring-1 ring-[var(--line)]/70 dark:bg-white/[.03]">
-          <div className="rounded-[calc(2rem-.5rem)] bg-[var(--surface)] px-5 py-7 shadow-[0_30px_80px_rgba(30,40,25,.1)] dark:shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:px-8 sm:py-10">
+          <div className="rounded-[calc(2rem-.5rem)] bg-[var(--surface)] px-5 py-7 shadow-[0_30px_80px_rgb(var(--shadow-rgb)/.1)] dark:shadow-[0_30px_80px_rgba(0,0,0,.35)] sm:px-8 sm:py-10">
             <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">Workspace setup</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-[-.045em] text-[var(--text)]">Select your role</h2>
 
@@ -281,7 +281,7 @@ export default function Onboarding() {
 
             {error && <p role="alert" className="mt-4 flex items-start gap-2 rounded-2xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" />{error}</p>}
 
-            <button type="submit" disabled={!ready || saving} className={`${primaryButton} mt-7 w-full bg-[var(--lime)] !text-[var(--ink)]`}>
+            <button type="submit" disabled={!ready || saving} className={`${primaryButton} mt-7 w-full bg-[var(--lime)] !text-[var(--on-lime)]`}>
               <span>{saving ? 'Saving…' : 'Continue'}</span>
               <span className="ml-auto grid size-8 place-items-center rounded-full bg-[var(--ink)] text-white">
                 {saving ? <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <ArrowRight size={14} weight="bold" />}

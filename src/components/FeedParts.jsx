@@ -9,7 +9,7 @@ import { sectionLabel as label } from './SectionControls'
 
 // The universal filter button (funnel): lime with a count badge while filters are on, as on Jobs and AI News.
 export function FilterButton({ count, onClick, title = 'Filters' }) {
-  return <button type="button" onClick={onClick} aria-label="Open filters" title={title} className={`relative ${iconButton} ${count ? 'bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40' : ''}`}>
+  return <button type="button" onClick={onClick} aria-label="Open filters" title={title} className={`relative ${iconButton} ${count ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-2 ring-[var(--lime-dark)]/40' : ''}`}>
     <Funnel size={16} weight={count ? 'fill' : 'regular'} />
     {count > 0 && <span className="absolute -right-1 -top-1 grid size-4.5 place-items-center rounded-full bg-[var(--text)] text-[10px] font-bold text-[var(--paper)] ring-2 ring-[var(--surface)]">{count}</span>}
   </button>
@@ -17,7 +17,7 @@ export function FilterButton({ count, onClick, title = 'Filters' }) {
 
 // The wheel (like Site Content's): opens the full list of one field (categories, types). Lime while one is picked.
 export function WheelButton({ active, onClick, title, small = false }) {
-  return <button type="button" onClick={onClick} aria-label={title} title={title} className={`grid ${small ? 'size-8' : 'size-10'} shrink-0 place-items-center rounded-full transition-all duration-300 hover:rotate-45 ${active ? 'bg-[var(--lime)] text-[#26320b] ring-2 ring-[var(--lime-dark)]/40 shadow-xs' : 'text-[var(--muted)] ring-1 ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}>
+  return <button type="button" onClick={onClick} aria-label={title} title={title} className={`grid ${small ? 'size-8' : 'size-10'} shrink-0 place-items-center rounded-full transition-all duration-300 hover:rotate-45 ${active ? 'bg-[var(--lime)] text-[var(--on-lime)] ring-2 ring-[var(--lime-dark)]/40 shadow-xs' : 'text-[var(--muted)] ring-1 ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}>
     <GearSix size={small ? 15 : 17} weight="bold" />
   </button>
 }
@@ -34,10 +34,10 @@ export function FilterStrip({ title, icon: Icon, options, value, countOf, onChan
   // Every CRM choice is shown; the ones with no items (with the other filters on) go last, faded.
   const empty = (option) => countOf?.(option.value) === 0 && !value.includes(option.value)
   const ordered = [...options].sort((a, b) => empty(a) - empty(b))
-  return <div className={`flex min-w-0 items-center gap-2 rounded-full py-1 pl-3.5 pr-1 ring-1 transition-colors ${value.length ? 'bg-(--lime)/15 ring-[var(--lime-dark)]/35' : 'bg-[var(--paper)] ring-[var(--line)]/60'}`}>
+  return <div className={`flex min-w-0 items-center gap-2 rounded-full py-1 pl-3.5 pr-1 ring-1 transition-colors ${value.length ? 'bg-(--lime-tint)/15 ring-[var(--lime-dark)]/35' : 'bg-[var(--paper)] ring-[var(--line)]/60'}`}>
     <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-[var(--muted)]">
       {Icon && <Icon size={13} weight="bold" />}{title}
-      {value.length > 0 && <span className="grid min-w-4 place-items-center rounded-full bg-[var(--lime)] px-1 text-[10px] tracking-normal !text-[#26320b]">{value.length}</span>}
+      {value.length > 0 && <span className="grid min-w-4 place-items-center rounded-full bg-[var(--lime)] px-1 text-[10px] tracking-normal !text-[var(--on-lime)]">{value.length}</span>}
     </span>
     <HScroll className="min-w-0 flex-1" innerClassName="gap-1 py-0.5" fade={value.length ? 'color-mix(in srgb, var(--lime) 15%, var(--paper))' : 'var(--paper)'} label={title.toLowerCase()}>
       {ordered.map((option) => {
@@ -62,18 +62,18 @@ export function FilterStrip({ title, icon: Icon, options, value, countOf, onChan
 
 // Colours of the details-list icons, by row title, the same in every section (light and dark).
 const FACT_TONES = {
-  blue: 'bg-[#e0ecfe] text-[#1d4ed8] dark:bg-[#1c2a45] dark:text-[#8ab4f8]',
-  violet: 'bg-[#efe4fb] text-[#6b2fa8] dark:bg-[#2e1f45] dark:text-[#d2b4fa]',
-  green: 'bg-[#dcf3e3] text-[#137333] dark:bg-[#163323] dark:text-[#81c995]',
-  lime: 'bg-(--lime)/40 text-[#3f5a12] dark:text-[var(--accent-strong)]',
-  amber: 'bg-[#fef3d6] text-[#a56b00] dark:bg-[#3a2e17] dark:text-[#fdd663]',
-  orange: 'bg-[#ffedd5] text-[#c2410c] dark:bg-[#3b1d0e] dark:text-[#fdba74]',
-  rose: 'bg-[#fde2e7] text-[#be123c] dark:bg-[#3d1a22] dark:text-[#fda4af]',
-  sky: 'bg-[#e0f2fe] text-[#0369a1] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc]',
-  teal: 'bg-[#ccfbf1] text-[#0f766e] dark:bg-[#123a35] dark:text-[#5eead4]',
-  indigo: 'bg-[#e8eafe] text-[#3b3f8f] dark:bg-[#252845] dark:text-[#b9befa]',
-  pink: 'bg-[#fce7f3] text-[#9d2a6a] dark:bg-[#3d1d30] dark:text-[#f3a6d0]',
-  slate: 'bg-[#e8eaf0] text-[#334155] dark:bg-[#262a33] dark:text-[#c3cad6]',
+  blue: 'bg-tone-blue-bg text-tone-blue',
+  violet: 'bg-tone-violet-bg text-tone-violet',
+  green: 'bg-success-bg text-success',
+  lime: 'bg-(--lime-tint)/40 text-[var(--lime-ink)]',
+  amber: 'bg-tone-amber-bg text-tone-amber',
+  orange: 'bg-tone-orange-bg text-tone-orange',
+  rose: 'bg-tone-rose-bg text-tone-rose',
+  sky: 'bg-info-bg text-info',
+  teal: 'bg-tone-teal-bg text-tone-teal',
+  indigo: 'bg-tone-indigo-bg text-tone-indigo',
+  pink: 'bg-tone-pink-bg text-tone-pink',
+  slate: 'bg-tone-slate-bg text-tone-slate',
 }
 const FACT_COLOURS = {
   Category: 'violet', Author: 'blue', 'Company / author': 'blue', Source: 'sky', Pricing: 'green', Price: 'green', 'Price range': 'green',
@@ -89,9 +89,29 @@ export function FactIcon({ icon: Icon, title }) {
   return <span className={`grid size-6 shrink-0 place-items-center rounded-lg ${FACT_TONES[FACT_COLOURS[title]] || FACT_TONES.slate}`}><Icon size={13} weight="bold" /></span>
 }
 
+// An item's details list (Category, Price, Published…) in its dialog, drawer or panel: `facts` are [icon, title, value]
+// rows. Each row keeps its own height, so a short or a long list never stretches against the text beside it, and a
+// long value goes under its title instead of squeezing into the right edge.
+export function FactList({ facts }) {
+  if (!facts.length) return null
+  return <dl className="self-start rounded-2xl bg-[var(--paper)] px-3.5 py-1 text-[13px] ring-1 ring-[var(--line)]/70">
+    {facts.map(([Icon, title, value]) => {
+      const long = typeof value === 'string' && value.length > 28
+      return <div key={title} className={`border-t border-[var(--line)]/60 py-2.5 first:border-t-0 ${long ? '' : 'flex items-center justify-between gap-3'}`}>
+        <dt className="flex shrink-0 items-center gap-2.5 text-[var(--muted)]"><FactIcon icon={Icon} title={title} />{title}</dt>
+        <dd className={`font-semibold [overflow-wrap:anywhere] ${long ? 'mt-1.5 pl-[2.125rem] leading-5' : 'min-w-0 text-right'}`}>{value}</dd>
+      </div>
+    })}
+  </dl>
+}
+
+// Layout for a row of Metric tiles. It follows the space it is given (a card, a panel, a dialog), not the screen:
+// as many tiles per line as fit at 7rem or more, and the tiles of a shorter last line share its width.
+export const metricRow = 'flex flex-wrap gap-2 *:min-w-28 *:flex-1'
+
 // A filter in use, with x to remove it (like the Jobs filter chips).
 export function FilterChip({ children, onClear }) {
-  return <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1.5 text-[11px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+  return <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime-tint)]/35 px-3 py-1.5 text-[11px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
     {children}
     <button type="button" onClick={onClear} aria-label={`Remove ${children} filter`} className="grid size-4 place-items-center rounded-full transition-colors hover:bg-black/10 dark:hover:bg-white/15"><X size={11} /></button>
   </span>
@@ -138,7 +158,7 @@ export function FeedIndex({ items, activeId, onJump, meta, mark, fill = false })
       <ol className="space-y-0.5">{items.map((item, index) => {
         const active = activeId === item.id
         return <li key={item.id}>
-          <button type="button" onClick={() => onJump(item.id)} aria-current={active ? 'true' : undefined} className={`flex w-full gap-2.5 rounded-xl px-2 py-2 text-left transition-colors ${active ? 'bg-[var(--lime)]/30' : 'hover:bg-[var(--paper)]'}`}>
+          <button type="button" onClick={() => onJump(item.id)} aria-current={active ? 'true' : undefined} className={`flex w-full gap-2.5 rounded-xl px-2 py-2 text-left transition-colors ${active ? 'bg-[var(--lime-tint)]/30' : 'hover:bg-[var(--paper)]'}`}>
             <span className={`mt-0.5 font-mono text-[11px] font-bold ${active ? 'text-[var(--accent-strong)]' : 'text-[var(--muted)]'}`}>{String(index + 1).padStart(2, '0')}</span>
             <span className="min-w-0 flex-1">
               <span className="line-clamp-2 text-xs font-semibold leading-4">{item.name}</span>

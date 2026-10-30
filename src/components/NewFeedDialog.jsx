@@ -176,7 +176,7 @@ export default function NewFeedDialog({ feedId = '', onClose, onSaved }) {
 
 function Header({ title, eyebrow = 'Feeds', onClose, children }) {
   return <header className="flex items-start gap-3">
-    <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[var(--lime)] text-[#26320b]"><Rows size={20} weight="bold" /></span>
+    <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[var(--lime)] text-[var(--on-lime)]"><Rows size={20} weight="bold" /></span>
     <div className="min-w-0 flex-1">
       <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[var(--muted)]">{eyebrow}</p>
       <h2 className="mt-1 truncate text-2xl font-semibold tracking-[-.04em]">{title}</h2>
@@ -227,8 +227,8 @@ function FeedBuilder({ definition, options, onClose, onSaved }) {
           const active = key === step
           // After a save was tried, a step with errors is marked with how many it has.
           const wrong = tried ? errors.filter((entry) => entry.step === key).length : 0
-          return <button key={key} type="button" onClick={() => setStep(key)} aria-current={active ? 'step' : undefined} className={`flex shrink-0 items-center gap-3 rounded-2xl px-3 py-2.5 text-left ring-1 transition-colors lg:py-3 ${active ? 'bg-(--lime)/30 ring-[var(--lime-dark)]/45' : wrong ? 'bg-[var(--paper)] ring-[var(--bad)]/60' : 'bg-[var(--paper)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/50'}`}>
-            <span className={`grid size-8 shrink-0 place-items-center rounded-xl ${active ? 'bg-[var(--lime)] text-[#26320b]' : 'bg-[var(--surface)] text-[var(--muted)] ring-1 ring-[var(--line)]/70'}`}><Icon size={15} weight="bold" /></span>
+          return <button key={key} type="button" onClick={() => setStep(key)} aria-current={active ? 'step' : undefined} className={`flex shrink-0 items-center gap-3 rounded-2xl px-3 py-2.5 text-left ring-1 transition-colors lg:py-3 ${active ? 'bg-(--lime-tint)/30 ring-[var(--lime-dark)]/45' : wrong ? 'bg-[var(--paper)] ring-[var(--bad)]/60' : 'bg-[var(--paper)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/50'}`}>
+            <span className={`grid size-8 shrink-0 place-items-center rounded-xl ${active ? 'bg-[var(--lime)] text-[var(--on-lime)]' : 'bg-[var(--surface)] text-[var(--muted)] ring-1 ring-[var(--line)]/70'}`}><Icon size={15} weight="bold" /></span>
             <span className="min-w-0">
               <span className="flex items-center gap-1.5 whitespace-nowrap text-[13px] font-semibold text-[var(--ink)]"><span className="hidden font-mono text-[10px] text-[var(--muted)] lg:inline">{index + 1}</span>{text}{wrong > 0 && <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bad-bg)] px-1.5 py-px text-[10px] font-bold text-[var(--bad)]" aria-label={`${wrong} to fix`}><WarningCircle size={11} weight="fill" />{wrong}</span>}</span>
               <span className="hidden text-[11px] leading-4 text-[var(--muted)] lg:block">{stepSummary(key, form) || about}</span>
@@ -343,7 +343,7 @@ function FieldsStep({ form, update, check, types }) {
             </span>
           </label>
           <div className="flex items-center gap-2 text-xs font-bold sm:mt-[1.6rem]">
-            <button type="button" role="switch" aria-checked={field.required} onClick={() => setField(field.key, { required: !field.required })} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 ring-1 transition-colors ${field.required ? 'bg-(--lime)/35 text-[var(--accent-strong)] ring-[var(--lime-dark)]/40' : 'text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`}>{field.required && <Check size={12} weight="bold" />}Required</button>
+            <button type="button" role="switch" aria-checked={field.required} onClick={() => setField(field.key, { required: !field.required })} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 ring-1 transition-colors ${field.required ? 'bg-(--lime-tint)/35 text-[var(--accent-strong)] ring-[var(--lime-dark)]/40' : 'text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`}>{field.required && <Check size={12} weight="bold" />}Required</button>
             <button type="button" onClick={() => remove(field.key)} aria-label={`Remove ${field.label || `field ${index + 1}`}`} className="grid size-9 place-items-center rounded-full text-[var(--muted)] transition-colors hover:bg-[var(--bad-bg)] hover:text-[var(--bad)]"><Trash size={15} /></button>
           </div>
         </div>
@@ -358,7 +358,7 @@ function FieldsStep({ form, update, check, types }) {
         </div>
       </li>)}
     </ol>
-    <div className="mt-3 text-xs font-bold"><button type="button" id="feed-fields" onClick={add} className={`flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed py-3 text-[var(--ink)] transition-colors hover:border-[var(--lime-dark)] hover:bg-(--lime)/10 ${check.error('fields') ? 'border-[var(--bad)]' : 'border-[var(--line)]'}`}><Plus size={14} weight="bold" />Add field</button></div>
+    <div className="mt-3 text-xs font-bold"><button type="button" id="feed-fields" onClick={add} className={`flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed py-3 text-[var(--ink)] transition-colors hover:border-[var(--lime-dark)] hover:bg-(--lime-tint)/10 ${check.error('fields') ? 'border-[var(--bad)]' : 'border-[var(--line)]'}`}><Plus size={14} weight="bold" />Add field</button></div>
     <Note check={check} name="fields" />
   </>
 }
@@ -373,8 +373,8 @@ function ActionsStep({ form, update, actions }) {
       {actions.map((action) => {
         const [text, about, Icon] = ACTIONS[action] || [action, '', Sparkle]
         const on = form.actions.includes(action)
-        return <button key={action} type="button" role="checkbox" aria-checked={on} onClick={() => toggle(action)} className={`flex items-center gap-3 rounded-2xl p-3.5 text-left ring-1 transition-colors ${on ? 'bg-(--lime)/25 ring-[var(--lime-dark)]/50' : 'bg-[var(--paper)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/50'}`}>
-          <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${on ? 'bg-[var(--lime)] text-[#26320b]' : 'bg-[var(--surface)] text-[var(--muted)] ring-1 ring-[var(--line)]/70'}`}><Icon size={18} weight="bold" /></span>
+        return <button key={action} type="button" role="checkbox" aria-checked={on} onClick={() => toggle(action)} className={`flex items-center gap-3 rounded-2xl p-3.5 text-left ring-1 transition-colors ${on ? 'bg-(--lime-tint)/25 ring-[var(--lime-dark)]/50' : 'bg-[var(--paper)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/50'}`}>
+          <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${on ? 'bg-[var(--lime)] text-[var(--on-lime)]' : 'bg-[var(--surface)] text-[var(--muted)] ring-1 ring-[var(--line)]/70'}`}><Icon size={18} weight="bold" /></span>
           <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[var(--ink)]">Generate {text.toLowerCase()}</span><span className="block text-[11px] text-[var(--muted)]">{about}</span></span>
           <span className={`grid size-5 shrink-0 place-items-center rounded-md ring-1 ${on ? 'bg-[var(--ink)] text-[var(--surface)] ring-[var(--ink)]' : 'ring-[var(--line)]'}`}>{on && <Check size={12} weight="bold" />}</span>
         </button>
@@ -421,7 +421,7 @@ function AccessStep({ form, update, check, roles, access }) {
     <div id="feed-roles" tabIndex={-1} role="group" aria-label="Roles" aria-invalid={check.error('roles') ? true : undefined} aria-describedby={check.error('roles') ? 'feed-roles-error' : undefined} className={`mt-2 flex flex-wrap gap-2 rounded-2xl text-xs font-bold outline-none ${check.error('roles') ? 'p-2 ring-1 ring-[var(--bad)]' : ''}`}>
       {roles.map((role) => {
         const on = form.roles.includes(role)
-        return <button key={role} type="button" role="checkbox" aria-checked={on} onClick={() => toggle(role)} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 ring-1 transition-colors ${on ? 'bg-(--lime)/35 text-[var(--ink)] ring-[var(--lime-dark)]/50' : 'bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`}>{on && <Check size={12} weight="bold" />}{role}</button>
+        return <button key={role} type="button" role="checkbox" aria-checked={on} onClick={() => toggle(role)} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 ring-1 transition-colors ${on ? 'bg-(--lime-tint)/35 text-[var(--ink)] ring-[var(--lime-dark)]/50' : 'bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`}>{on && <Check size={12} weight="bold" />}{role}</button>
       })}
     </div>
     <Note check={check} name="roles" />
@@ -430,7 +430,7 @@ function AccessStep({ form, update, check, roles, access }) {
       {access.map((value) => {
         const [text, about] = ACCESS[value] || [value, '']
         const on = form.role_access === value
-        return <button key={value} type="button" role="radio" aria-checked={on} onClick={() => update({ role_access: value })} className={`rounded-2xl p-3.5 text-left ring-1 transition-colors ${on ? 'bg-(--lime)/25 ring-[var(--lime-dark)]/50' : 'bg-[var(--paper)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/50'}`}>
+        return <button key={value} type="button" role="radio" aria-checked={on} onClick={() => update({ role_access: value })} className={`rounded-2xl p-3.5 text-left ring-1 transition-colors ${on ? 'bg-(--lime-tint)/25 ring-[var(--lime-dark)]/50' : 'bg-[var(--paper)] ring-[var(--line)]/70 hover:ring-[var(--lime-dark)]/50'}`}>
           <span className="flex items-center gap-2 text-[13px] font-semibold text-[var(--ink)]"><span className={`grid size-4 place-items-center rounded-full ring-1 ${on ? 'ring-[var(--ink)]' : 'ring-[var(--line)]'}`}>{on && <span className="size-2 rounded-full bg-[var(--ink)]" />}</span>{text}</span>
           <span className="mt-1 block pl-6 text-[11px] text-[var(--muted)]">{about}</span>
         </button>

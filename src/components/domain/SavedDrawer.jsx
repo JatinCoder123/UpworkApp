@@ -79,7 +79,7 @@ export default function SavedDrawer({ crmEnabled, initialTab = 'history', onClos
                   return <li key={item.crm_result_id} className="flex items-center gap-3 rounded-2xl bg-[var(--paper)] p-3.5 ring-1 ring-[var(--line)]/70">
                     <div className="min-w-0 flex-1"><DomainName domain={item.domain} className="text-lg leading-tight" /><p className="mt-0.5 truncate text-[11px] text-[var(--muted)]">{plan ? `${formatPrice(plan.price)} first year · ` : ''}{item.brand_score ? `Score ${item.brand_score} · ` : ''}{item.search_input}</p></div>
                     <button type="button" onClick={() => onCopy(item)} aria-label={`Copy ${item.domain}`} className="grid size-9 place-items-center rounded-full bg-[var(--surface)] ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)]"><Copy size={14} /></button>
-                    <button type="button" onClick={() => unfavorite(item)} aria-label={`Remove ${item.domain} from favorites`} className="grid size-9 place-items-center rounded-full bg-[var(--lime)] text-[#26320b]"><Star size={14} weight="fill" /></button>
+                    <button type="button" onClick={() => unfavorite(item)} aria-label={`Remove ${item.domain} from favorites`} className="grid size-9 place-items-center rounded-full bg-[var(--lime)] text-[var(--on-lime)]"><Star size={14} weight="fill" /></button>
                   </li>
                 })}
               </ul> : <EmptyState icon={Star} title="No favorites yet" text="Star any domain in your results to keep it here." />}

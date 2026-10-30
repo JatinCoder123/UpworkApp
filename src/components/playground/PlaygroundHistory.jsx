@@ -27,7 +27,7 @@ export default function PlaygroundHistory({ activeId, onOpen }) {
             {tests.data.map((test) => {
               const when = timeAgo(testTime(test.updated), now)
               return <li key={test.id}>
-                <button type="button" onClick={() => onOpen(test.id)} aria-current={test.id === activeId || undefined} className={`flex w-full items-center gap-3 px-5 py-3 text-left transition-colors sm:px-6 ${test.id === activeId ? 'bg-(--lime)/20' : 'hover:bg-[var(--paper)]'}`}>
+                <button type="button" onClick={() => onOpen(test.id)} aria-current={test.id === activeId || undefined} className={`flex w-full items-center gap-3 px-5 py-3 text-left transition-colors sm:px-6 ${test.id === activeId ? 'bg-(--lime-tint)/20' : 'hover:bg-[var(--paper)]'}`}>
                   <ActionIcon action={test.action} size={17} weight="bold" className="shrink-0 text-[var(--muted)]" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold text-[var(--ink)]">{test.title || actionName(test.action)}</span>

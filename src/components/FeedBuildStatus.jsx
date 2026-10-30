@@ -5,7 +5,7 @@ const LOOK = {
   draft: ['Draft', 'bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)]', NotePencil],
   queued: ['Queued', 'bg-[var(--warn-bg)] text-[var(--warn)] ring-[var(--warn)]/25', CircleNotch],
   building: ['Building', 'bg-[var(--warn-bg)] text-[var(--warn)] ring-[var(--warn)]/25', CircleNotch],
-  built: ['Built', 'bg-(--lime)/35 text-[var(--accent-strong)] ring-[var(--lime-dark)]/40', CheckCircle],
+  built: ['Built', 'bg-(--lime-tint)/35 text-[var(--accent-strong)] ring-[var(--lime-dark)]/40', CheckCircle],
   failed: ['Failed', 'bg-[var(--bad-bg)] text-[var(--bad)] ring-[var(--bad)]/25', WarningCircle],
 }
 

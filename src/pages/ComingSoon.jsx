@@ -35,7 +35,7 @@ export default function ComingSoon({
               <Icon size={26} weight="duotone" />
             </div>
 
-            <span className="mt-6 inline-flex items-center gap-2 rounded-full bg-[var(--lime)] px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[.16em] text-[#26320b] ring-1 ring-[var(--lime-dark)]/30 shadow-xs">
+            <span className="mt-6 inline-flex items-center gap-2 rounded-full bg-[var(--lime)] px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[.16em] text-[var(--on-lime)] ring-1 ring-[var(--lime-dark)]/30 shadow-xs">
               <Sparkle size={13} weight="fill" />
               Coming Soon
             </span>

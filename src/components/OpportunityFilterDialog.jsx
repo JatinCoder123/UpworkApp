@@ -106,7 +106,7 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
   // Every sub category in the CRM dropdown is a tab, each with its skill count.
   const subcategoryTabs = asArray(groupOptions.subcategory)
   const pickCategory = (value) => { setCategory(value); setSubcategory('') }
-  const tabClass = (active, small = false) => `inline-flex shrink-0 items-center gap-1.5 rounded-full ${small ? 'px-2.5 py-1 text-[9px]' : 'px-3 py-1.5 text-[10px]'} font-bold ring-1 transition-colors ${active ? (small ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/40' : 'bg-[var(--text)] text-[var(--paper)] ring-[var(--text)]') : 'bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`
+  const tabClass = (active, small = false) => `inline-flex shrink-0 items-center gap-1.5 rounded-full ${small ? 'px-2.5 py-1 text-[9px]' : 'px-3 py-1.5 text-[10px]'} font-bold ring-1 transition-colors ${active ? (small ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-[var(--lime-dark)]/40' : 'bg-[var(--text)] text-[var(--paper)] ring-[var(--text)]') : 'bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)]'}`
   const countBadge = (active, total) => total == null ? null : <span className={`rounded-full px-1.5 py-px text-[9px] tabular-nums ${active ? 'bg-black/10 dark:bg-white/15' : 'bg-[var(--paper)]'}`}>{total}</span>
   // Removing a filter takes effect on the list straight away; new picks still wait for "Apply filters".
   const removeNow = (next) => onRemove({ skills, extraFilters, ...next })
@@ -153,12 +153,12 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
   return (
     <Modal onClose={applyAndClose} wide>
       {/* Dark header with the lime circles, as in the design. */}
-      <div className="relative -mx-5 -mt-5 mb-6 overflow-hidden rounded-t-[calc(2rem-.375rem)] bg-[#1f2a21] px-6 pb-7 pt-12 sm:-mx-8 sm:-mt-8 sm:px-8">
-        <span aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-44 rounded-full bg-[#c8df7a]" />
-        <span aria-hidden="true" className="pointer-events-none absolute right-12 top-20 size-12 rounded-full border-2 border-[#c8df7a]/80" />
+      <div className="relative -mx-5 -mt-5 mb-6 overflow-hidden rounded-t-[calc(2rem-.375rem)] bg-[var(--hero)] px-6 pb-7 pt-12 sm:-mx-8 sm:-mt-8 sm:px-8">
+        <span aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-44 rounded-full bg-[var(--hero-soft)]" />
+        <span aria-hidden="true" className="pointer-events-none absolute right-12 top-20 size-12 rounded-full border-2 border-[var(--hero-soft)]/80" />
         {/* Solid dark circle, so the x shows clearly on top of the lime circle. */}
-        <button type="button" onClick={applyAndClose} aria-label="Close dialog" className="absolute right-6 top-6 z-10 grid size-9 place-items-center rounded-full bg-[#1f2a21] text-white shadow-[0_4px_14px_rgba(0,0,0,.25)] ring-1 ring-white/25 transition-transform hover:scale-105"><X size={15} weight="bold" /></button>
-        <h2 className="relative max-w-[17rem] text-[1.75rem] font-semibold leading-[1.05] tracking-[-.045em] text-white">Find the skills that <span className="block font-serif italic text-[#c8df7a]">fit you.</span></h2>
+        <button type="button" onClick={applyAndClose} aria-label="Close dialog" className="absolute right-6 top-6 z-10 grid size-9 place-items-center rounded-full bg-[var(--hero)] text-white shadow-[0_4px_14px_rgba(0,0,0,.25)] ring-1 ring-white/25 transition-transform hover:scale-105"><X size={15} weight="bold" /></button>
+        <h2 className="relative max-w-[17rem] text-[1.75rem] font-semibold leading-[1.05] tracking-[-.045em] text-white">Find the skills that <span className="block font-serif italic text-[var(--hero-soft)]">fit you.</span></h2>
       </div>
 
       {!skillsOnly && <div className="space-y-1"><ExtraFilterFields value={filters} onChange={changeFilters} /></div>}
@@ -207,12 +207,12 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
           })}
         </div>}
 
-        {mutationError && <p role="alert" className="mt-4 rounded-xl bg-[#f5d6cf] px-3 py-2 text-[10px] font-semibold text-[var(--danger)]">{mutationError.message || 'The skill change could not be saved.'}</p>}
+        {mutationError && <p role="alert" className="mt-4 rounded-xl bg-[var(--bad-bg)] px-3 py-2 text-[10px] font-semibold text-[var(--danger)]">{mutationError.message || 'The skill change could not be saved.'}</p>}
 
         {isAdding && (
           <div className="mt-4 flex items-center gap-2 rounded-xl bg-[var(--raised)] p-2 ring-1 ring-[var(--lime-dark)]/40">
             <input autoFocus value={newSkill} onChange={(event) => setNewSkill(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); handleAddSkill() } else if (event.key === 'Escape') { event.stopPropagation(); setIsAdding(false); setNewSkill('') } }} placeholder="Enter a skill name" className="min-w-0 flex-1 bg-transparent px-2 text-xs font-semibold text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" />
-            <button type="button" disabled={!newSkill.trim() || createMutation.isPending} onClick={handleAddSkill} className="grid size-7 place-items-center rounded-lg bg-[var(--lime)] text-[#26320b] disabled:opacity-40" aria-label="Create skill">{createMutation.isPending ? <CircleNotch size={13} className="animate-spin" /> : <Check size={13} weight="bold" />}</button>
+            <button type="button" disabled={!newSkill.trim() || createMutation.isPending} onClick={handleAddSkill} className="grid size-7 place-items-center rounded-lg bg-[var(--lime)] text-[var(--on-lime)] disabled:opacity-40" aria-label="Create skill">{createMutation.isPending ? <CircleNotch size={13} className="animate-spin" /> : <Check size={13} weight="bold" />}</button>
             <button type="button" onClick={() => { setIsAdding(false); setNewSkill('') }} className="grid size-7 place-items-center rounded-lg bg-[var(--paper)] text-[var(--muted)]" aria-label="Cancel"><X size={12} weight="bold" /></button>
           </div>
         )}
@@ -221,18 +221,18 @@ export default function OpportunityFilterDialog({ skills = [], extraFilters = EM
           {visibleSkills.map((record) => editing?.id === record.id ? (
             <div key={record.id} className="flex items-center gap-1 rounded-full bg-[var(--raised)] p-1 ring-1 ring-[var(--lime-dark)]">
               <input autoFocus value={editing.name} onChange={(event) => setEditing((current) => ({ ...current, name: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') handleUpdateSkill(); if (event.key === 'Escape') { event.stopPropagation(); setEditing(null) } }} className="w-32 bg-transparent px-2 text-[10px] font-semibold outline-none" />
-              <button type="button" onClick={handleUpdateSkill} disabled={!editing.name.trim() || updateMutation.isPending} className="grid size-6 place-items-center rounded-full bg-[var(--lime)] text-[#26320b] disabled:opacity-40" aria-label="Save skill">{updateMutation.isPending ? <CircleNotch size={11} className="animate-spin" /> : <Check size={11} weight="bold" />}</button>
+              <button type="button" onClick={handleUpdateSkill} disabled={!editing.name.trim() || updateMutation.isPending} className="grid size-6 place-items-center rounded-full bg-[var(--lime)] text-[var(--on-lime)] disabled:opacity-40" aria-label="Save skill">{updateMutation.isPending ? <CircleNotch size={11} className="animate-spin" /> : <Check size={11} weight="bold" />}</button>
               <button type="button" onClick={() => setEditing(null)} className="grid size-6 place-items-center rounded-full text-[var(--muted)]" aria-label="Cancel editing"><X size={10} weight="bold" /></button>
             </div>
           ) : (
-            <div key={record.id} className={`group flex items-center rounded-full ring-1 transition-all duration-300 ${record._deleting ? 'opacity-55' : ''} ${selectedSkills.includes(record.name) ? 'bg-[#d6e9a0] text-[#26320b] ring-[#9fbf4c]' : 'bg-[var(--raised)] text-[var(--ink)] ring-[var(--line)]'}`}>
+            <div key={record.id} className={`group flex items-center rounded-full ring-1 transition-all duration-300 ${record._deleting ? 'opacity-55' : ''} ${selectedSkills.includes(record.name) ? 'bg-[var(--lime-tint)]/55 text-[var(--lime-ink)] ring-[var(--lime-dark)]/50' : 'bg-[var(--raised)] text-[var(--ink)] ring-[var(--line)]'}`}>
               <button type="button" disabled={record._creating || record._deleting} onClick={() => toggleSkill(record.name)} className="inline-flex items-center gap-1 py-2 pl-3 pr-2 text-[11px] font-semibold disabled:cursor-wait">{selectedSkills.includes(record.name) && <Check size={11} weight="bold" />}{record.name}</button>
               {record._creating ? <span className="mr-2 grid size-5 place-items-center" aria-label="Creating skill"><CircleNotch size={11} className="animate-spin" /></span> : <button type="button" disabled={record._deleting} onClick={() => { setEditing({ id: record.id, name: asText(record.name), previousName: record.name }); setDeleteCandidate(null) }} className="grid size-6 place-items-center rounded-full opacity-45 transition-opacity hover:bg-black/5 hover:opacity-100 disabled:pointer-events-none" aria-label={`Rename ${record.name}`}><PencilSimple size={10} /></button>}
               {!record._creating && (record._deleting ? <span className="mr-2 grid size-6 place-items-center" aria-label="Deleting skill"><CircleNotch size={11} className="animate-spin" /></span> :
               deleteCandidate === record.id ? <>
                 <button type="button" onClick={() => deleteMutation.mutate(record.id)} disabled={deleteMutation.isPending} className="grid size-6 place-items-center rounded-full bg-[var(--danger)] text-white" aria-label={`Confirm delete ${record.name}`}>{deleteMutation.isPending ? <CircleNotch size={10} className="animate-spin" /> : <Check size={10} weight="bold" />}</button>
                 <button type="button" onClick={() => setDeleteCandidate(null)} className="mr-1 grid size-6 place-items-center rounded-full" aria-label="Cancel delete"><X size={10} /></button>
-              </> : <button type="button" onClick={() => { setDeleteCandidate(record.id); setEditing(null) }} className="mr-1 grid size-6 place-items-center rounded-full opacity-45 transition-opacity hover:bg-[#f5d6cf] hover:text-[var(--danger)] hover:opacity-100" aria-label={`Delete ${record.name}`}><Trash size={10} /></button>)}
+              </> : <button type="button" onClick={() => { setDeleteCandidate(record.id); setEditing(null) }} className="mr-1 grid size-6 place-items-center rounded-full opacity-45 transition-opacity hover:bg-[var(--bad-bg)] hover:text-[var(--danger)] hover:opacity-100" aria-label={`Delete ${record.name}`}><Trash size={10} /></button>)}
             </div>
           ))}
           {(isLoading || (category && groupLoading)) && <span className="rounded-full bg-[var(--surface)] px-3 py-2 text-[10px] font-semibold text-[var(--muted)]">Loading skills…</span>}

@@ -40,7 +40,7 @@ export default function HScroll({ children, className = '', innerClassName = 'ga
     style={{ background: `linear-gradient(${direction < 0 ? 'to right' : 'to left'}, ${fade} 55%, transparent)` }}
     className={`absolute inset-y-0 z-10 flex w-12 items-center ${direction < 0 ? 'left-0 justify-start' : 'right-0 justify-end'}`}
   >
-    <span className="grid size-7 place-items-center rounded-full bg-[var(--raised)] text-[var(--ink)] shadow-[0_4px_14px_rgba(30,32,25,.14)] ring-1 ring-[var(--line)] transition-transform hover:scale-110 active:scale-95">{direction < 0 ? <CaretLeft size={13} weight="bold" /> : <CaretRight size={13} weight="bold" />}</span>
+    <span className="grid size-7 place-items-center rounded-full bg-[var(--raised)] text-[var(--ink)] shadow-[0_4px_14px_rgb(var(--shadow-rgb)/.14)] ring-1 ring-[var(--line)] transition-transform hover:scale-110 active:scale-95">{direction < 0 ? <CaretLeft size={13} weight="bold" /> : <CaretRight size={13} weight="bold" />}</span>
   </button>
 
   return <div {...rest} className={`relative min-w-0 ${className}`}>

@@ -79,7 +79,7 @@ export const saveLiveSettings = (settings) => write(localStorage, SETTINGS_KEY, 
 export function competition(applicants) {
   if (applicants < 5) return { label: 'Wide open', tone: 'var(--lime-dark)', level: 1 }
   if (applicants < 15) return { label: 'Low competition', tone: 'var(--lime-dark)', level: 2 }
-  if (applicants < 35) return { label: 'Getting busy', tone: '#d9a53a', level: 3 }
+  if (applicants < 35) return { label: 'Getting busy', tone: 'var(--score-mid)', level: 3 }
   return { label: 'Crowded', tone: 'var(--danger)', level: 4 }
 }
 

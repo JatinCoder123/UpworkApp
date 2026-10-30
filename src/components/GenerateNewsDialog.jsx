@@ -105,7 +105,7 @@ export default function GenerateNewsDialog({ storyTitle, onClose }) {
             ) : (
               <div className="mt-5 rounded-2xl bg-[var(--ink)] p-5 text-white">
                 <div className="flex items-start gap-4">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--lime)] text-[var(--ink)]"><FilePlus size={19} weight="bold" /></span>
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--lime)] text-[var(--on-lime)]"><FilePlus size={19} weight="bold" /></span>
                   <div><h3 className="text-sm font-bold">Ready to create a new document</h3><p className="mt-1.5 text-xs leading-5 text-white/60">The draft will use the selected news story as its source. Edit the title above if needed, then generate it.</p></div>
                 </div>
               </div>
@@ -113,7 +113,7 @@ export default function GenerateNewsDialog({ storyTitle, onClose }) {
 
             <div className="mt-6 flex flex-col-reverse items-stretch justify-between gap-3 border-t border-[var(--line)] pt-5 sm:flex-row sm:items-center">
               <p className="text-[11px] text-[var(--muted)]">This demo shows sample progress and does not publish changes.</p>
-              <button type="button" disabled={!canGenerate} onClick={generate} className="inline-flex items-center justify-center gap-3 rounded-full bg-[var(--lime)] py-3 pl-5 pr-3 text-sm font-bold text-[#26320b] transition-all duration-300 hover:-translate-y-0.5 active:scale-[.98] disabled:pointer-events-none disabled:opacity-40">
+              <button type="button" disabled={!canGenerate} onClick={generate} className="inline-flex items-center justify-center gap-3 rounded-full bg-[var(--lime)] py-3 pl-5 pr-3 text-sm font-bold text-[var(--on-lime)] transition-all duration-300 hover:-translate-y-0.5 active:scale-[.98] disabled:pointer-events-none disabled:opacity-40">
                 Generate <span className="grid size-7 place-items-center rounded-full bg-[var(--ink)] text-white"><ArrowRight size={14} /></span>
               </button>
             </div>
@@ -123,7 +123,7 @@ export default function GenerateNewsDialog({ storyTitle, onClose }) {
         {status === 'generating' && (
           <div className="grid min-h-80 place-items-center py-6 text-center" aria-live="polite">
             <div className="w-full max-w-md">
-              <div className="relative mx-auto grid size-20 place-items-center rounded-full bg-[var(--ink)] text-[var(--lime)]">
+              <div className="relative mx-auto grid size-20 place-items-center rounded-full bg-[var(--ink)] text-[var(--hero-accent)]">
                 <MagicWand size={28} weight="fill" className="animate-pulse" />
                 <span className="absolute inset-[-8px] rounded-full border border-[var(--lime-dark)]/40 animate-ping" />
               </div>
@@ -133,8 +133,8 @@ export default function GenerateNewsDialog({ storyTitle, onClose }) {
                 {GENERATION_STEPS.map((step, index) => {
                   const complete = index < activeStep
                   const active = index === activeStep
-                  return <div key={step} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-xs font-semibold transition-all duration-500 ${active ? 'translate-x-1 bg-[var(--lime)] text-[#26320b]' : complete ? 'text-[var(--ink)]' : 'text-[var(--muted)]/45'}`}>
-                    <span className={`grid size-6 shrink-0 place-items-center rounded-full ${active ? 'bg-[var(--ink)] text-white' : complete ? 'bg-[var(--ink)] text-[var(--lime)]' : 'bg-black/5 dark:bg-white/5'}`}>{complete ? <Check size={13} weight="bold" /> : index + 1}</span>
+                  return <div key={step} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-xs font-semibold transition-all duration-500 ${active ? 'translate-x-1 bg-[var(--lime)] text-[var(--on-lime)]' : complete ? 'text-[var(--ink)]' : 'text-[var(--muted)]/45'}`}>
+                    <span className={`grid size-6 shrink-0 place-items-center rounded-full ${active ? 'bg-[var(--ink)] text-white' : complete ? 'bg-[var(--ink)] text-[var(--hero-accent)]' : 'bg-black/5 dark:bg-white/5'}`}>{complete ? <Check size={13} weight="bold" /> : index + 1}</span>
                     {step}
                   </div>
                 })}

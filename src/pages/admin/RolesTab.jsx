@@ -24,7 +24,7 @@ export default function RolesTab({ catalog }) {
           : roles.map((role) => {
             const active = selected?.id === role.id
             return <li key={role.id}>
-              <button type="button" aria-current={active} onClick={() => setSelectedId(role.id)} className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${active ? 'bg-(--lime)/20 ring-1 ring-[var(--lime-dark)]/30' : 'hover:bg-[var(--paper)]'}`}>
+              <button type="button" aria-current={active} onClick={() => setSelectedId(role.id)} className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors ${active ? 'bg-(--lime-tint)/20 ring-1 ring-[var(--lime-dark)]/30' : 'hover:bg-[var(--paper)]'}`}>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-[var(--text)]">{role.name}</span>
                   <span className="block text-[11px] text-[var(--muted)]">{asArray(role.permissionIds).length} permissions · {usersWith(role)} {usersWith(role) === 1 ? 'user' : 'users'}</span>
@@ -103,8 +103,8 @@ function RoleEditor({ role, permissions, userCount }) {
             const checked = draft.has(permission.id)
             const changed = checked !== saved.includes(permission.id)
             return <li key={permission.id}>
-              <button type="button" role="checkbox" aria-checked={checked} disabled={saving} onClick={() => toggle(permission.id)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ring-1 transition-colors hover:ring-[var(--lime-dark)]/60 disabled:opacity-60 ${checked ? 'bg-(--lime)/15 ring-[var(--lime-dark)]/25' : 'bg-[var(--surface)] ring-[var(--line)]'}`}>
-                <span className={`grid size-5 shrink-0 place-items-center rounded-md ring-1 ${checked ? 'bg-(--lime) text-[#26320b] ring-[var(--lime-dark)]/40' : 'bg-[var(--paper)] ring-[var(--line)]'}`}>{checked && <Check size={12} weight="bold" />}</span>
+              <button type="button" role="checkbox" aria-checked={checked} disabled={saving} onClick={() => toggle(permission.id)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left ring-1 transition-colors hover:ring-[var(--lime-dark)]/60 disabled:opacity-60 ${checked ? 'bg-(--lime-tint)/15 ring-[var(--lime-dark)]/25' : 'bg-[var(--surface)] ring-[var(--line)]'}`}>
+                <span className={`grid size-5 shrink-0 place-items-center rounded-md ring-1 ${checked ? 'bg-(--lime) text-[var(--on-lime)] ring-[var(--lime-dark)]/40' : 'bg-[var(--paper)] ring-[var(--line)]'}`}>{checked && <Check size={12} weight="bold" />}</span>
                 <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--text)]">{permission.name}</span>
                 {changed && <span className="shrink-0 rounded-full bg-[var(--warn-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--warn)]">{checked ? 'adding' : 'removing'}</span>}
               </button>

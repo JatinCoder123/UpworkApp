@@ -28,8 +28,8 @@ function Pipeline({ step }) {
   return <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
     {STEPS.map(({ label, detail, icon: Icon }, index) => {
       const state = index < step ? 'done' : index === step ? 'active' : 'todo'
-      return <li key={label} className={`relative rounded-2xl p-3 ring-1 transition-all duration-500 ${state === 'active' ? 'bg-white/12 ring-[var(--lime)]/60' : state === 'done' ? 'bg-white/[.06] ring-white/10' : 'ring-white/[.07]'}`}>
-        <span className={`grid size-8 place-items-center rounded-xl transition-colors duration-500 ${state === 'todo' ? 'bg-white/[.06] text-white/40' : 'bg-[var(--lime)] text-[#26320b]'}`}>
+      return <li key={label} className={`relative rounded-2xl p-3 ring-1 transition-all duration-500 ${state === 'active' ? 'bg-white/12 ring-[var(--lime-tint)]/60' : state === 'done' ? 'bg-white/[.06] ring-white/10' : 'ring-white/[.07]'}`}>
+        <span className={`grid size-8 place-items-center rounded-xl transition-colors duration-500 ${state === 'todo' ? 'bg-white/[.06] text-white/40' : 'bg-[var(--lime)] text-[var(--on-lime)]'}`}>
           {state === 'done' ? <Check size={15} weight="bold" /> : <Icon size={15} weight="bold" className={state === 'active' ? 'domain-pulse-dot' : ''} />}
         </span>
         <p className={`mt-2.5 text-xs font-bold ${state === 'todo' ? 'text-white/45' : 'text-white'}`}>{label}</p>
@@ -58,7 +58,7 @@ function ScrambleChips() {
 function CandidateStream({ candidates }) {
   const visible = candidates.slice(-36)
   return <ul className="flex flex-wrap gap-2" aria-label="Names checked so far">
-    {visible.map((candidate, index) => <li key={candidate.domain} style={{ '--i': index % 25 }} className={`domain-chip-in inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 font-mono text-xs ring-1 transition-colors duration-500 ${candidate.status === 'free' ? 'bg-[var(--lime)] text-[#26320b] ring-[var(--lime-dark)] shadow-[0_8px_24px_rgba(185,230,83,.25)]' : candidate.status === 'taken' ? 'bg-white/[.04] text-white/60 ring-white/10' : candidate.status === 'unknown' ? 'bg-white/[.04] text-white/50 ring-white/10' : 'bg-white/[.08] text-white ring-white/15'}`}>
+    {visible.map((candidate, index) => <li key={candidate.domain} style={{ '--i': index % 25 }} className={`domain-chip-in inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 font-mono text-xs ring-1 transition-colors duration-500 ${candidate.status === 'free' ? 'bg-[var(--lime)] text-[var(--on-lime)] ring-[var(--lime-dark)] shadow-[0_8px_24px_color-mix(in_srgb,var(--lime)_25%,transparent)]' : candidate.status === 'taken' ? 'bg-white/[.04] text-white/60 ring-white/10' : candidate.status === 'unknown' ? 'bg-white/[.04] text-white/50 ring-white/10' : 'bg-white/[.08] text-white ring-white/15'}`}>
       {candidate.status === 'checking' && <span className="domain-pulse-dot size-1.5 rounded-full bg-[var(--lime)]" />}
       {candidate.status === 'free' && <Check size={12} weight="bold" />}
       {candidate.status === 'taken' && <X size={11} weight="bold" className="text-white/45" />}
@@ -82,11 +82,11 @@ export function NamingLab({ lab, startedAt, subject }) {
     free ? `${free} free ${free === 1 ? 'name' : 'names'} so far` : 'Filtering out the taken ones',
   ][Math.min(lab.step, 2)]
 
-  return <section className="relative mt-8 overflow-hidden rounded-[2rem] bg-[var(--ink)] p-5 text-white shadow-[0_28px_80px_rgba(25,35,27,.22)] sm:p-8" aria-live="polite" aria-busy="true">
-    <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-[var(--lime)]/15 blur-3xl" />
+  return <section className="relative mt-8 overflow-hidden rounded-[2rem] bg-[var(--ink)] p-5 text-white shadow-[0_28px_80px_rgb(var(--shadow-rgb)/.22)] sm:p-8" aria-live="polite" aria-busy="true">
+    <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-[var(--lime-tint)]/15 blur-3xl" />
     <div className="relative flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
-        <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[var(--lime)]"><Flask size={14} weight="fill" />Naming lab · round {lab.round || 1} of 5</p>
+        <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.2em] text-[var(--hero-accent)]"><Flask size={14} weight="fill" />Naming lab · round {lab.round || 1} of 5</p>
         <h2 className="mt-3 text-[clamp(1.6rem,3.4vw,2.6rem)] font-semibold leading-[1.02] tracking-[-.05em]">{headline}</h2>
         {subject && <p className="mt-2 line-clamp-1 max-w-2xl text-xs text-white/55">for “{subject}”</p>}
       </div>
@@ -126,17 +126,17 @@ export function ScreeningBanner({ startedAt, count }) {
   const tip = TIPS[Math.floor(index / 2) % TIPS.length]
   return <div className="mt-6 overflow-hidden rounded-[1.75rem] bg-[var(--ink)] p-5 text-white sm:p-6" role="status" aria-live="off">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck size={17} weight="fill" className="text-[var(--lime)]" />Deep-screening {count} {count === 1 ? 'name' : 'names'} across 43 checks</p>
+      <p className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck size={17} weight="fill" className="text-[var(--hero-accent)]" />Deep-screening {count} {count === 1 ? 'name' : 'names'} across 43 checks</p>
       <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[.08] px-3 py-1 font-mono text-xs ring-1 ring-white/10"><Timer size={13} weight="bold" />{elapsed}</span>
     </div>
     <div className="mt-4 flex flex-wrap gap-1.5">
       {CHECK_CATEGORIES.map((name, itemIndex) => {
         const CategoryIcon = CATEGORY_ICONS[name]
-        return <span key={name} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold transition-all duration-500 ${itemIndex === index % CHECK_CATEGORIES.length ? 'bg-[var(--lime)] text-[#26320b]' : 'bg-white/[.06] text-white/50'}`}><CategoryIcon size={11} weight="bold" />{name}</span>
+        return <span key={name} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold transition-all duration-500 ${itemIndex === index % CHECK_CATEGORIES.length ? 'bg-[var(--lime)] text-[var(--on-lime)]' : 'bg-white/[.06] text-white/50'}`}><CategoryIcon size={11} weight="bold" />{name}</span>
       })}
     </div>
     <p key={category} className="domain-ticker mt-4 flex items-center gap-2 text-xs text-white/70">{Icon && <Icon size={13} />}Researching {category.toLowerCase()} signals on the live web… this can take a couple of minutes.</p>
-    <p key={tip} className="domain-ticker mt-3 flex items-start gap-2 border-t border-white/10 pt-3 text-xs leading-5 text-white/80"><Lightbulb size={14} weight="fill" className="mt-0.5 shrink-0 text-[var(--lime)]" />{tip}</p>
+    <p key={tip} className="domain-ticker mt-3 flex items-start gap-2 border-t border-white/10 pt-3 text-xs leading-5 text-white/80"><Lightbulb size={14} weight="fill" className="mt-0.5 shrink-0 text-[var(--hero-accent)]" />{tip}</p>
   </div>
 }
 
@@ -167,7 +167,7 @@ function TriviaQuiz() {
   return <div className="rounded-[1.75rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)] sm:p-6">
     <div className="flex items-center justify-between gap-3">
       <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]"><GameController size={15} weight="duotone" />Domain trivia</p>
-      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--lime)]/35 px-2.5 py-1 text-[10px] font-bold"><Trophy size={11} weight="fill" />{score.right}/{score.total}</span>
+      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--lime-tint)]/35 px-2.5 py-1 text-[10px] font-bold"><Trophy size={11} weight="fill" />{score.right}/{score.total}</span>
     </div>
     <p key={position} className="domain-ticker mt-4 text-base font-semibold leading-snug tracking-[-.02em]">{item.question}</p>
     <div className="mt-4 grid gap-2">

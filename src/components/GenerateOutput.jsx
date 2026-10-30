@@ -16,10 +16,10 @@ import { isRunning, stageOf } from '../lib/generation'
 
 // Each stage's label, colours and icon (the spinner turns while the output is being made).
 const STAGE_LOOK = {
-  queued: ['Queued', 'bg-[#f6e8b8] text-[#655419] ring-[#e8d48a] dark:bg-[#383017] dark:text-[#e8c867] dark:ring-[#56491f]', Hourglass],
-  processing: ['Generating', 'bg-(--lime)/40 text-[var(--ink)] ring-[var(--lime-dark)]/40', CircleNotch],
-  completed: ['Ready', 'bg-[#dcf3e3] text-[#137333] ring-[#b7e1c3] dark:bg-[#163323] dark:text-[#81c995] dark:ring-[#2a5a3c]', CheckCircle],
-  failed: ['Failed', 'bg-[#fde2e1] text-[#b42318] ring-[#f7c1bd] dark:bg-[#3d1a18] dark:text-[#fca5a0] dark:ring-[#6b2a25]', WarningCircle],
+  queued: ['Queued', 'bg-warning-bg text-warning ring-warning-line', Hourglass],
+  processing: ['Generating', 'bg-(--lime-tint)/40 text-[var(--ink)] ring-[var(--lime-dark)]/40', CircleNotch],
+  completed: ['Ready', 'bg-success-bg text-success ring-success-line', CheckCircle],
+  failed: ['Failed', 'bg-danger-bg text-danger ring-danger-line', WarningCircle],
 }
 // The steps shown while an output is made.
 const STEPS = [['queued', 'Queued'], ['processing', 'Generating'], ['completed', 'Ready']]
@@ -64,8 +64,8 @@ export function OutputRow({ output, type, icon: Icon, name, short, example, pane
         {stage !== 'idle' && <span key={stage} className="shrink-0 animate-[domain-chip-in_.35s_ease-out]"><StageChip stage={stage} /></span>}
       </span>
       <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
-        <button type="button" onClick={onPanel} aria-pressed={panelOpen} title={panelOpen ? 'Close the prompt and guidelines' : 'Open the prompt and guidelines beside the details'} className={`${pill} ring-1 ${panelOpen ? 'bg-(--lime)/35 text-[var(--ink)] ring-[var(--lime-dark)]/40' : 'text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}><BookOpenText size={13} weight="bold" />Prompt &amp; guidelines</button>
-        {stage === 'completed' && output.viewUrl && <a href={output.viewUrl} target="_blank" rel="noreferrer" className={`${pill} bg-[var(--lime)] text-[#26320b] hover:-translate-y-0.5`}><Eye size={13} weight="bold" />View</a>}
+        <button type="button" onClick={onPanel} aria-pressed={panelOpen} title={panelOpen ? 'Close the prompt and guidelines' : 'Open the prompt and guidelines beside the details'} className={`${pill} ring-1 ${panelOpen ? 'bg-(--lime-tint)/35 text-[var(--ink)] ring-[var(--lime-dark)]/40' : 'text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}><BookOpenText size={13} weight="bold" />Prompt &amp; guidelines</button>
+        {stage === 'completed' && output.viewUrl && <a href={output.viewUrl} target="_blank" rel="noreferrer" className={`${pill} bg-[var(--lime)] text-[var(--on-lime)] hover:-translate-y-0.5`}><Eye size={13} weight="bold" />View</a>}
         {stage === 'completed' && output.downloadUrl && <DownloadButton url={output.downloadUrl} className={`${pill} bg-[var(--paper)] text-[var(--ink)] ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)] disabled:opacity-70`} />}
         {stage === 'completed' && published && <LoginUrlPill />}
         {!running && draft === null && <button type="button" onClick={() => { generate.reset(); setDraft(output?.suggestion || '') }} className={`${pill} ${stage === 'idle' ? 'bg-[var(--text)] text-[var(--paper)] hover:-translate-y-0.5' : 'bg-[var(--paper)] text-[var(--ink)] ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)]'}`}>
@@ -104,7 +104,7 @@ function PublishChoice({ output, publish }) {
       Do you want to publish it on WordPress?
     </label>
     {publish.on && <span className="flex animate-[domain-chip-in_.35s_ease-out] items-center gap-2">
-      {output.posted && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#137333] dark:text-[#81c995]"><CheckCircle size={12} weight="fill" />Posted</span>}
+      {output.posted && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-success"><CheckCircle size={12} weight="fill" />Posted</span>}
       <LoginUrlPill />
     </span>}
     {publish.isError && <p role="alert" className="w-full text-xs font-semibold text-[var(--danger)]">Your answer could not be saved. Please try again.</p>}

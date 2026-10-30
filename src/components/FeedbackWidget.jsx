@@ -20,7 +20,7 @@ export function Stars({ value, onChange, size = 18 }) {
   return <div className="flex items-center gap-0.5" role={onChange ? 'radiogroup' : undefined} aria-label="Rating">
     {[1, 2, 3, 4, 5].map((star) => {
       const on = star <= value
-      const icon = <Star size={size} weight={on ? 'fill' : 'regular'} className={on ? 'text-[#e6a817]' : 'text-[var(--muted)]'} />
+      const icon = <Star size={size} weight={on ? 'fill' : 'regular'} className={on ? 'text-star' : 'text-[var(--muted)]'} />
       return onChange
         ? <button key={star} type="button" role="radio" aria-checked={value === star} aria-label={`${star} of 5`} onClick={() => onChange(value === star ? 0 : star)} className="rounded p-0.5 transition-transform hover:scale-110">{icon}</button>
         : <span key={star}>{icon}</span>
@@ -29,19 +29,18 @@ export function Stars({ value, onChange, size = 18 }) {
 }
 
 /**
- * "Feedback" button on every signed-in page. The form knows the section and page it was opened on; the user adds a
+ * "Feedback" on every signed-in page: `trigger(open)` draws its button, which the Shell keeps in the sidebar and the
+ * phone menu so it never covers the page. The form knows the section and page it was opened on; the user adds a
  * type, an optional 1-5 rating and the message, saved in the CRM (outr_feedback). Below it, the user's own feedback
  * with its status.
  */
-export default function FeedbackWidget() {
+export default function FeedbackWidget({ trigger }) {
   const { user } = useAuth()
   const location = useLocation()
   const [open, setOpen] = useState(false)
   if (!user) return null
   return <>
-    <button type="button" onClick={() => setOpen(true)} aria-label="Give feedback" title="Give feedback" className="fixed bottom-5 left-5 z-40 inline-flex items-center gap-2 rounded-full bg-[var(--text)] py-2.5 pl-3.5 pr-4 text-xs font-bold text-[var(--paper)] shadow-[0_10px_30px_rgba(0,0,0,.25)] transition-transform hover:-translate-y-0.5">
-      <ChatCircleText size={16} weight="fill" />Feedback
-    </button>
+    {trigger(() => setOpen(true))}
     {open && <FeedbackDialog user={user} section={sectionForPath(location.pathname)} pageUrl={`${location.pathname}${location.search}`} onClose={() => setOpen(false)} />}
   </>
 }

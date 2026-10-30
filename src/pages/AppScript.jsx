@@ -11,7 +11,7 @@ import FeedFilterDialog from '../components/FeedFilterDialog'
 import FilterListDialog from '../components/FilterListDialog'
 import GenerationInstructions from '../components/GenerationInstructions'
 import { ItemDrawer, OutputRow, StageChip } from '../components/GenerateOutput'
-import { FactIcon, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader } from '../components/FeedParts'
+import { FactList, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow } from '../components/FeedParts'
 import { primaryButton } from '../components/ui'
 import ErrorBoundary, { CardError, DialogError, SectionError } from '../components/ErrorBoundary'
 import { useAuth } from '../contexts/AuthContext'
@@ -37,30 +37,30 @@ import { timeAgo, useNow } from '../lib/time'
 
 // Google apps: icon and colour (google_app keys). The card's tile shows the first app.
 const APPS = {
-  sheets: [Table, 'bg-[#dcf3e3] text-[#137333] dark:bg-[#163323] dark:text-[#81c995]'],
-  gmail: [EnvelopeSimple, 'bg-[#fce4e2] text-[#c5221f] dark:bg-[#3d1a18] dark:text-[#f28b82]'],
-  drive: [GoogleDriveLogo, 'bg-[#fef3d6] text-[#a56b00] dark:bg-[#3a2e17] dark:text-[#fdd663]'],
-  docs: [FileText, 'bg-[#e1ecfd] text-[#1a56c4] dark:bg-[#1c2a45] dark:text-[#8ab4f8]'],
-  forms: [ClipboardText, 'bg-[#efe4fb] text-[#6b2fa8] dark:bg-[#2e1f45] dark:text-[#d2b4fa]'],
-  calendar: [CalendarBlank, 'bg-[#e1ecfd] text-[#1a56c4] dark:bg-[#1c2a45] dark:text-[#8ab4f8]'],
-  slides: [PresentationChart, 'bg-[#fff0d7] text-[#b45309] dark:bg-[#3a2a17] dark:text-[#fbbf73]'],
-  chat: [ChatCircle, 'bg-[#dcf3e3] text-[#137333] dark:bg-[#163323] dark:text-[#81c995]'],
+  sheets: [Table, 'bg-success-bg text-success'],
+  gmail: [EnvelopeSimple, 'bg-danger-bg text-danger'],
+  drive: [GoogleDriveLogo, 'bg-tone-amber-bg text-tone-amber'],
+  docs: [FileText, 'bg-tone-blue-bg text-tone-blue'],
+  forms: [ClipboardText, 'bg-tone-violet-bg text-tone-violet'],
+  calendar: [CalendarBlank, 'bg-tone-blue-bg text-tone-blue'],
+  slides: [PresentationChart, 'bg-tone-amber-bg text-tone-amber'],
+  chat: [ChatCircle, 'bg-success-bg text-success'],
 }
 const TREND = {
-  rising: [TrendUp, 'text-[#3f7d1c] dark:text-[#a8d86e]'],
+  rising: [TrendUp, 'text-rise'],
   stable: [Minus, 'text-[var(--muted)]'],
-  declining: [TrendDown, 'text-[#9a3412] dark:text-[#fdba9a]'],
+  declining: [TrendDown, 'text-clay'],
 }
 // Priority and difficulty (CRM fields): badge colours and the filter's colour dots.
 const PRIORITY = {
-  high: ['bg-[#fde2e1] text-[#b42318] ring-[#f7c1bd] dark:bg-[#3d1a18] dark:text-[#fca5a0] dark:ring-[#6b2a25]', 'bg-[#e5484d]'],
-  medium: ['bg-[#f6e8b8] text-[#655419] ring-[#e8d48a] dark:bg-[#383017] dark:text-[#e8c867] dark:ring-[#56491f]', 'bg-[#e0a526]'],
-  low: ['bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)]', 'bg-[#94a3b8]'],
+  high: ['bg-danger-bg text-danger ring-danger-line', 'bg-danger-solid'],
+  medium: ['bg-warning-bg text-warning ring-warning-line', 'bg-warning-solid'],
+  low: ['bg-[var(--paper)] text-[var(--muted)] ring-[var(--line)]', 'bg-tone-slate-solid'],
 }
 const DIFFICULTY = {
-  easy: ['bg-(--lime)/40 text-[var(--ink)] ring-[var(--lime-dark)]/40', 'bg-[var(--lime-dark)]'],
-  medium: ['bg-[#f6e8b8] text-[#655419] ring-[#e8d48a] dark:bg-[#383017] dark:text-[#e8c867] dark:ring-[#56491f]', 'bg-[#e0a526]'],
-  hard: ['bg-[#fde2e1] text-[#b42318] ring-[#f7c1bd] dark:bg-[#3d1a18] dark:text-[#fca5a0] dark:ring-[#6b2a25]', 'bg-[#e5484d]'],
+  easy: ['bg-(--lime-tint)/40 text-[var(--ink)] ring-[var(--lime-dark)]/40', 'bg-[var(--lime-dark)]'],
+  medium: ['bg-warning-bg text-warning ring-warning-line', 'bg-warning-solid'],
+  hard: ['bg-danger-bg text-danger ring-danger-line', 'bg-danger-solid'],
 }
 // How an idea earns (earning_model keys).
 const EARNING_ICONS = { addon: PuzzlePiece, freelance_gig: Briefcase, template_sale: Tag, saas: Coins, internal_use: Users }
@@ -74,9 +74,9 @@ const OUTPUT_TYPES = OUTPUTS.map(([type]) => type)
 const PUBLISHED = ['script']
 // Trend chips in the filters: green rising, grey stable, red declining.
 const TREND_TONE = {
-  rising: 'bg-[#e9f6dc] text-[#3f7d1c] dark:bg-[#1f3315] dark:text-[#a8d86e]',
+  rising: 'bg-rise-bg text-rise',
   stable: 'bg-[var(--paper)] text-[var(--muted)]',
-  declining: 'bg-[#fbe1d8] text-[#9a3412] dark:bg-[#4a2318] dark:text-[#fdba9a]',
+  declining: 'bg-clay-bg text-clay',
 }
 const RANK = { high: 3, medium: 2, low: 1 }
 const EASE = { easy: 3, medium: 2, hard: 1 }
@@ -200,8 +200,8 @@ export default function AppScript() {
           : items.length
             ? <div className="mt-6 grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
               <ErrorBoundary name="appscript-index" fallbackProps={INDEX_ERROR} resetKey={items}><FeedIndex items={items} activeId={activeId} onJump={jumpTo} meta={indexMeta} mark={indexMark} /></ErrorBoundary>
-              <div className="min-w-0">
-                <section className={`grid content-start gap-4 transition-opacity min-[1400px]:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="appscript-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><IdeaCard item={item} labelOf={labelOf} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
+              <div className="@container min-w-0">
+                <section className={`grid content-start gap-4 transition-opacity @4xl:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="appscript-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><IdeaCard item={item} labelOf={labelOf} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
                 <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} />
               </div>
             </div>
@@ -268,7 +268,7 @@ function PriceValue({ prices, text, full = false }) {
 // Demand (score and bar), trend, build time and price, each with its icon.
 function Metrics({ item, labelOf }) {
   const [TrendIcon, trendTone] = TREND[item.trend] || TREND.stable
-  return <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+  return <div className={metricRow}>
     <Metric icon={Gauge} tone="text-[var(--lime-dark)]" caption="Demand" value={item.demandScore != null && <span className="font-mono">{item.demandScore}<span className="text-[11px] text-[var(--muted)]">/100</span></span>}>
       {item.demandScore != null && <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-[var(--line)]"><span className="block h-full rounded-full bg-[var(--lime-dark)]" style={{ width: `${Math.min(100, item.demandScore)}%` }} /></span>}
     </Metric>
@@ -280,9 +280,9 @@ function Metrics({ item, labelOf }) {
 
 // A highlighted line: the problem it solves, or our edge.
 function Callout({ icon: Icon, title, text, clamp = false, tone = 'lime' }) {
-  const colours = tone === 'lime' ? 'border-[var(--lime-dark)] bg-(--lime)/15' : 'border-[#e0a526] bg-[#fdf3d7] dark:bg-[#383017]/60'
+  const colours = tone === 'lime' ? 'border-[var(--lime-dark)] bg-(--lime-tint)/15' : 'border-warning-solid bg-warning-bg/60'
   return <div className={`flex gap-2.5 rounded-xl border-l-4 px-3.5 py-3 ${colours}`}>
-    <Icon size={17} weight="fill" className={`mt-0.5 shrink-0 ${tone === 'lime' ? 'text-[var(--lime-dark)]' : 'text-[#b7791f] dark:text-[#e8c867]'}`} />
+    <Icon size={17} weight="fill" className={`mt-0.5 shrink-0 ${tone === 'lime' ? 'text-[var(--lime-dark)]' : 'text-warning-icon'}`} />
     <div className="min-w-0"><p className={label}>{title}</p><p className={`mt-0.5 text-sm leading-6 ${clamp ? 'line-clamp-2' : ''}`}>{text}</p></div>
   </div>
 }
@@ -294,7 +294,7 @@ function Tags({ tags, labelOf }) {
 
 function IdeaCard({ item, labelOf, onOpen }) {
   const made = OUTPUTS.map(([type, icon, , short]) => [type, icon, short, stageOf(item.generation[type])]).filter(([, , , stage]) => stage !== 'idle')
-  return <article id={`feed-${item.id}`} data-feed-card={item.id} className={`flex scroll-mt-[calc(var(--shell-h)+1rem)] flex-col gap-3.5 rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(30,40,25,.1)]`}>
+  return <article id={`feed-${item.id}`} data-feed-card={item.id} className={`flex scroll-mt-[calc(var(--shell-h)+1rem)] flex-col gap-3.5 rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgb(var(--shadow-rgb)/.1)]`}>
     <header className="flex items-start gap-3">
       <Tile apps={item.apps} />
       <div className="min-w-0 flex-1">
@@ -382,17 +382,17 @@ function IdeaDetails({ item, labelOf, now, panelType, onPanel }) {
     <h2 className="mt-3 text-3xl font-semibold tracking-[-.05em]">{item.name}</h2>
     <div className="mt-4 flex flex-wrap items-center gap-2">
       <Badges item={item} labelOf={labelOf} />
-      {item.sourceUrl && <span className="ml-auto text-xs font-bold"><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--lime)] px-3.5 py-2 text-[#26320b] transition-transform hover:-translate-y-0.5"><Globe size={13} weight="bold" />Open on {labelOf('source', item.source)}<ArrowSquareOut size={12} weight="bold" /></a></span>}
+      {item.sourceUrl && <span className="ml-auto text-xs font-bold"><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--lime)] px-3.5 py-2 text-[var(--on-lime)] transition-transform hover:-translate-y-0.5"><Globe size={13} weight="bold" />Open on {labelOf('source', item.source)}<ArrowSquareOut size={12} weight="bold" /></a></span>}
     </div>
     <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{item.pitch}</p>
     <div className="mt-3"><AppChips apps={item.apps} labelOf={labelOf} /></div>
     <div className="mt-4"><Metrics item={item} labelOf={labelOf} /></div>
 
-    <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+    <div className="@container mt-5"><div className="grid gap-5 @xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
       <div className="space-y-4 text-sm leading-6">
         {item.problem && <Callout icon={Target} title="Problem it solves" text={item.problem} tone="amber" />}
         <HowItWorks steps={item.steps} text={item.description} />
-        {item.features.length > 0 && <section><p className={`${label} flex items-center gap-1.5`}><ListChecks size={13} weight="bold" />Key features</p><ul className="mt-1.5 grid gap-1 sm:grid-cols-2">{item.features.map((feature) => <li key={feature} className="flex gap-2"><CheckCircle size={15} weight="fill" className="mt-1 shrink-0 text-[var(--lime-dark)]" /><span className="first-letter:uppercase">{feature}</span></li>)}</ul></section>}
+        {item.features.length > 0 && <section><p className={`${label} flex items-center gap-1.5`}><ListChecks size={13} weight="bold" />Key features</p><ul className="mt-1.5 grid gap-1 @md:grid-cols-2">{item.features.map((feature) => <li key={feature} className="flex gap-2"><CheckCircle size={15} weight="fill" className="mt-1 shrink-0 text-[var(--lime-dark)]" /><span className="first-letter:uppercase">{feature}</span></li>)}</ul></section>}
         {item.edge && <Callout icon={Lightbulb} title="Our edge" text={item.edge} />}
         <ChipList icon={Plugs} title="Integrations" values={item.integrations} field="integrations" labelOf={labelOf} />
         <ChipList icon={Users} title="Target users" values={item.targetUsers} field="target_users" labelOf={labelOf} />
@@ -402,16 +402,11 @@ function IdeaDetails({ item, labelOf, now, panelType, onPanel }) {
       {/* Beside the long texts: the short facts, then the demand proof and the similar tools under them (as their own
           sections, not squeezed into a fact row). */}
       <div className="space-y-4 text-sm leading-6">
-        <dl className="rounded-2xl bg-[var(--paper)] p-3.5 text-[13px] ring-1 ring-[var(--line)]/70">
-          {facts.map(([Icon, title, value]) => <div key={title} className="flex items-start justify-between gap-3 border-t border-[var(--line)]/60 py-2 first:border-t-0 first:pt-0 last:pb-0">
-            <dt className="flex shrink-0 items-center gap-2.5 text-[var(--muted)]"><FactIcon icon={Icon} title={title} />{title}</dt>
-            <dd className="text-right font-semibold">{value}</dd>
-          </div>)}
-        </dl>
+        <FactList facts={facts} />
         <DemandProof proofs={item.demandProofs} />
         <TextBlock icon={Stack} title="Similar tools">{item.similarTools}</TextBlock>
       </div>
-    </div>
+    </div></div>
 
     {/* Generate: a suggestion first, then Start; the generator makes it and its status shows here as it goes. Each
         output's prompt and guidelines (CRM) can be read and edited first. */}

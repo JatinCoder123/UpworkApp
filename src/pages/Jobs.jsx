@@ -68,14 +68,14 @@ function useDebounced(value, delay) {
 function StatusTab({ active, onClick, count, ariaProps, children }) {
   return <button type="button" role="tab" aria-selected={active} onClick={onClick} {...ariaProps} className={`-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-sm font-semibold transition-colors duration-300 ${active ? "border-[var(--text)] text-[var(--text)]" : "border-transparent text-[var(--muted)] hover:text-[var(--text)]"}`}>
     {children}
-    {count != null && <span className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums ${active ? "bg-[var(--lime)] !text-[#26320b]" : "bg-[var(--paper)] text-[var(--muted)]"}`}>{count}</span>}
+    {count != null && <span className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums ${active ? "bg-[var(--lime)] !text-[var(--on-lime)]" : "bg-[var(--paper)] text-[var(--muted)]"}`}>{count}</span>}
   </button>;
 }
 
 // The job's own engagement flag when it was fetched with one, otherwise the user's id list.
 
 function FilterChip({ children, onClear }) {
-  return <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime)]/35 px-3 py-1.5 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
+  return <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--lime-tint)]/35 px-3 py-1.5 text-[10px] font-bold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/25">
     {children}
     <button type="button" onClick={onClear} aria-label={`Remove ${children} filter`} className="grid size-4 place-items-center rounded-full transition-colors hover:bg-black/10"><X size={11} /></button>
   </span>;
@@ -440,14 +440,14 @@ export default function Jobs() {
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[var(--line)]/70 px-4 py-4 sm:px-6">
               <h1 className="flex shrink-0 items-baseline gap-2 text-2xl font-semibold tracking-[-.04em]">Jobs<span className="font-mono text-xs font-semibold tracking-normal text-[var(--muted)] tabular-nums">{isFetchingStats && scopeCounts[scope] == null ? "…" : scopeCounts[scope] ?? 0} total</span></h1>
               <form onSubmit={(event) => { event.preventDefault(); commitSearch(); setSearchFocused(false); }} className="job-search relative order-last flex w-full min-w-0 items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-1.5 md:order-none md:w-auto md:max-w-xl md:flex-1">
-                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--lime)] text-[#26320b] shadow-[0_2px_8px_color-mix(in_srgb,var(--lime-dark)_35%,transparent)]">
-                  {searching ? <span className="size-4 animate-spin rounded-full border-2 border-[#26320b]/25 border-t-[#26320b]" aria-label="Searching" /> : <MagnifyingGlass size={15} weight="bold" />}
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--lime)] text-[var(--on-lime)] shadow-[0_2px_8px_color-mix(in_srgb,var(--lime-dark)_35%,transparent)]">
+                  {searching ? <span className="size-4 animate-spin rounded-full border-2 border-[var(--on-lime)]/25 border-t-[var(--on-lime)]" aria-label="Searching" /> : <MagnifyingGlass size={15} weight="bold" />}
                 </span>
                 <input ref={searchRef} value={searchInput} onChange={(event) => { setSearchInput(event.target.value); setSearchFocused(true); }} onFocus={() => setSearchFocused(true)} onBlur={() => { setSearchFocused(false); if (searchInput.trim()) commitSearch(); }} onKeyDown={(event) => event.key === "Escape" && (searchInput ? setSearchFocused(false) : event.currentTarget.blur())} placeholder="Search title, description, skills…" aria-label="Search jobs" aria-keyshortcuts="Control+K Meta+K" aria-expanded={searchFocused && searchHistory.length > 0} aria-controls="job-search-history" autoComplete="off" className="min-w-0 flex-1 bg-transparent py-1.5 text-sm outline-none placeholder:text-[var(--muted)]" />
                 {searchInput
                   ? <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setSearchInput(""); searchRef.current?.focus(); }} aria-label="Clear search" className="grid size-7 shrink-0 place-items-center rounded-full bg-black/[.06] text-[var(--muted)] hover:bg-black/15 hover:text-[var(--ink)] dark:bg-white/10"><X size={12} weight="bold" /></button>
                   : <kbd className="hidden shrink-0 rounded-lg bg-[var(--surface)] px-2 py-1 font-mono text-[10px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)] sm:inline-block">{searchShortcut}</kbd>}
-                {searchFocused && searchHistory.length > 0 && <div id="job-search-history" onMouseDown={(event) => event.preventDefault()} className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5">
+                {searchFocused && searchHistory.length > 0 && <div id="job-search-history" onMouseDown={(event) => event.preventDefault()} className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.2)] ring-1 ring-black/5">
                   <div className="rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
                     <div className="flex items-center justify-between px-2 pb-1.5 pt-1"><span className={label}>Recent searches</span><button type="button" onClick={() => { recentSearches.forEach((term) => forgetSearch(user?.email, term)); setRecentSearches([]); }} className="text-[10px] font-bold text-[var(--muted)] hover:text-[var(--ink)]">Clear history</button></div>
                     <ul>{searchHistory.map((term) => <li key={term} className="group/term flex items-center rounded-xl hover:bg-[var(--paper)]">
@@ -459,8 +459,8 @@ export default function Jobs() {
               </form>
               <div className="ml-auto flex shrink-0 items-center gap-2">
                 {/* Opens Live Jobs, so only for users with that permission. */}
-                {can("Live Jobs") && <button type="button" onClick={() => setLiveSearching(true)} className="inline-flex items-center gap-2 rounded-full bg-[var(--lime)] px-4 py-2.5 text-xs font-bold !text-[#26320b] ring-1 ring-[var(--lime-dark)]/35 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(105,130,32,.22)]">
-                  <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#3f5a12] opacity-60" /><span className="relative inline-flex size-2 rounded-full bg-[#3f5a12]" /></span>
+                {can("Live Jobs") && <button type="button" onClick={() => setLiveSearching(true)} className="inline-flex items-center gap-2 rounded-full bg-[var(--lime)] px-4 py-2.5 text-xs font-bold !text-[var(--on-lime)] ring-1 ring-[var(--lime-dark)]/35 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_var(--accent-glow)]">
+                  <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--on-lime)] opacity-60" /><span className="relative inline-flex size-2 rounded-full bg-[var(--on-lime)]" /></span>
                   <Broadcast size={14} weight="bold" />Live search
                 </button>}
                 <button type="button" onClick={() => setAdding(true)} className={`${primaryButton} !py-2.5 !pl-4 !pr-5`}><Plus size={14} weight="bold" /><span>Add job</span></button>
@@ -484,9 +484,9 @@ export default function Jobs() {
                       {current || "More"}<CaretDown size={12} weight="bold" className={`transition-transform ${moreTabsOpen ? "rotate-180" : ""}`} />
                     </StatusTab>;
                   })()}
-                  {moreTabsOpen && <div className="absolute left-0 top-[calc(100%-.25rem)] z-50 w-52 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5">
+                  {moreTabsOpen && <div className="absolute left-0 top-[calc(100%-.25rem)] z-50 w-52 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.2)] ring-1 ring-black/5">
                     <div role="menu" aria-label="More statuses" className="rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
-                      {moreTabs.map((item) => <button key={item} type="button" role="menuitem" onClick={() => { changeTab(item); setMoreTabsOpen(false); }} className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${tab === item ? "bg-[var(--lime)] !text-[#26320b]" : "text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]"}`}>
+                      {moreTabs.map((item) => <button key={item} type="button" role="menuitem" onClick={() => { changeTab(item); setMoreTabsOpen(false); }} className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${tab === item ? "bg-[var(--lime)] !text-[var(--on-lime)]" : "text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]"}`}>
                         {item}<span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] tabular-nums dark:bg-white/10">{pipelineCounts[item] ?? 0}</span>
                       </button>)}
                     </div>
@@ -496,7 +496,7 @@ export default function Jobs() {
               <div className="ml-auto flex shrink-0 items-center gap-2 py-3">
                 <SortMenu value={sort} options={JOB_SORTS} onChange={changeSort} />
                 <DateTimeRangeFilter value={dateFilter} onApply={setDateFilter} label="Job posting time" />
-                <button type="button" onClick={() => setSkillDialog(true)} aria-label="Open job filters" title="Filters" className={`relative ${iconButton} ${filterCount ? "bg-[var(--lime)] !text-[#26320b] ring-2 ring-[var(--lime-dark)]/40" : ""}`}>
+                <button type="button" onClick={() => setSkillDialog(true)} aria-label="Open job filters" title="Filters" className={`relative ${iconButton} ${filterCount ? "bg-[var(--lime)] !text-[var(--on-lime)] ring-2 ring-[var(--lime-dark)]/40" : ""}`}>
                   <Funnel size={16} weight={filterCount ? "fill" : "regular"} />
                   {filterCount > 0 && <span className="absolute -right-1 -top-1 grid size-4.5 place-items-center rounded-full bg-[var(--text)] text-[9px] font-bold text-[var(--paper)] ring-2 ring-[var(--surface)]">{filterCount}</span>}
                 </button>
@@ -507,27 +507,27 @@ export default function Jobs() {
             {/* Row 3: liked, saved and skills, with Clear and the skill settings at the end. */}
             <div className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-6 lg:flex-nowrap">
               <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:flex-nowrap">
-                <button type="button" aria-pressed={likedOnly} onClick={() => toggleReactionFilter("liked")} title={reactionsApply ? "Show liked jobs" : "Not used on the Applied tab, which shows every applied job"} disabled={!reactionsApply} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-45 ${likedOnly ? "bg-[#ffe4e6] text-[#e11d48] ring-[#fecdd3] shadow-sm dark:bg-[#fda4af]/20 dark:text-[#fda4af] dark:ring-[#fda4af]/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[#fecdd3]"}`}>
-                  <Heart size={14} weight={likedOnly || reactions.liked.length > 0 ? "fill" : "regular"} className={likedOnly || reactions.liked.length > 0 ? "text-[#fb7185] dark:text-[#fda4af]" : "text-[#e11d48]"} />Liked
+                <button type="button" aria-pressed={likedOnly} onClick={() => toggleReactionFilter("liked")} title={reactionsApply ? "Show liked jobs" : "Not used on the Applied tab, which shows every applied job"} disabled={!reactionsApply} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-45 ${likedOnly ? "bg-like-bg text-like ring-like-line shadow-sm dark:ring-like-icon/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-like-line"}`}>
+                  <Heart size={14} weight={likedOnly || reactions.liked.length > 0 ? "fill" : "regular"} className={likedOnly || reactions.liked.length > 0 ? "text-like-icon" : "text-like"} />Liked
                   {reactions.liked.length > 0 && <span className={`font-mono text-[10px] tabular-nums ${likedOnly ? "opacity-75" : "text-[var(--muted)]"}`}>{reactions.liked.length}</span>}
                 </button>
-                <button type="button" aria-pressed={savedOnly} onClick={() => toggleReactionFilter("saved")} title={reactionsApply ? "Show saved jobs" : "Not used on the Applied tab, which shows every applied job"} disabled={!reactionsApply} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-45 ${savedOnly ? "bg-[#e0f2fe] text-[#0369a1] ring-[#bae6fd] shadow-sm dark:bg-[#7dd3fc]/20 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-[#bae6fd]"}`}>
-                  <BookmarkSimple size={14} weight={savedOnly || reactions.saved.length > 0 ? "fill" : "regular"} className={savedOnly || reactions.saved.length > 0 ? "text-[#0284c7] dark:text-[#7dd3fc]" : "text-[#0369a1]"} />Saved
+                <button type="button" aria-pressed={savedOnly} onClick={() => toggleReactionFilter("saved")} title={reactionsApply ? "Show saved jobs" : "Not used on the Applied tab, which shows every applied job"} disabled={!reactionsApply} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold ring-1 transition-all duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-45 ${savedOnly ? "bg-info-bg text-info ring-info-line shadow-sm dark:ring-info-icon/40" : "bg-[var(--surface)] text-[var(--ink)] ring-[var(--line)] hover:ring-info-line"}`}>
+                  <BookmarkSimple size={14} weight={savedOnly || reactions.saved.length > 0 ? "fill" : "regular"} className={savedOnly || reactions.saved.length > 0 ? "text-info-icon" : "text-info"} />Saved
                   {reactions.saved.length > 0 && <span className={`font-mono text-[10px] tabular-nums ${savedOnly ? "opacity-75" : "text-[var(--muted)]"}`}>{reactions.saved.length}</span>}
                 </button>
                 {/* My preferences: ticked, matching jobs come first; the gear edits them (saved in the CRM). */}
-                <span className={`inline-flex shrink-0 items-center rounded-full ring-1 transition-colors ${usePreferences && activePreferences.length ? "bg-(--lime)/35 ring-[var(--lime-dark)]/40" : "bg-[var(--surface)] ring-[var(--line)]"}`}>
+                <span className={`inline-flex shrink-0 items-center rounded-full ring-1 transition-colors ${usePreferences && activePreferences.length ? "bg-(--lime-tint)/35 ring-[var(--lime-dark)]/40" : "bg-[var(--surface)] ring-[var(--line)]"}`}>
                   <label className="inline-flex cursor-pointer items-center gap-2 py-2 pl-3.5 pr-2 text-xs font-semibold text-[var(--ink)]" title={activePreferences.length ? "Show jobs that match my preferences first" : "No active preferences yet: use the gear to add one"}>
                     <input type="checkbox" checked={usePreferences} onChange={(event) => setUsePreferences(event.target.checked)} className="size-3.5 accent-[var(--lime-dark)]" />
                     My preferences
                   </label>
                   {/* How many hot jobs (matching the preferences) are at the top of the list. */}
-                  {preferencesApply && preferredJobsData && <span title={`${hotJobsCount} hot job${hotJobsCount === 1 ? "" : "s"} match your preferences`} className="mr-0.5 inline-flex items-center gap-1 rounded-full bg-[#fff1e6] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#c2410c] ring-1 ring-[#fed7aa] dark:bg-[#3b1d0e] dark:text-[#fdba74] dark:ring-[#7c2d12]"><Fire size={10} weight="fill" className="text-[#f97316]" />{hotJobsCount}</span>}
+                  {preferencesApply && preferredJobsData && <span title={`${hotJobsCount} hot job${hotJobsCount === 1 ? "" : "s"} match your preferences`} className="mr-0.5 inline-flex items-center gap-1 rounded-full bg-tone-orange-bg px-2 py-0.5 text-[10px] font-semibold tabular-nums text-tone-orange ring-1 ring-tone-orange-line"><Fire size={10} weight="fill" className="text-tone-orange-solid" />{hotJobsCount}</span>}
                   <button type="button" onClick={() => setPreferencesOpen(true)} aria-label="Edit my preferences" title="Edit my preferences" className="mr-1 grid size-7 place-items-center rounded-full text-[var(--muted)] transition-colors hover:bg-black/5 hover:text-[var(--ink)] dark:hover:bg-white/10"><GearSix size={14} weight="bold" /></button>
                 </span>
                 {/* My skills: ticked, only the jobs for the user's skills show; the gear picks the skills (saved in the CRM).
                     Ticking it with no skills yet opens the picker. */}
-                <span className={`inline-flex shrink-0 items-center rounded-full ring-1 transition-colors ${skillsOn && mySkills.length ? "bg-(--lime)/35 ring-[var(--lime-dark)]/40" : "bg-[var(--surface)] ring-[var(--line)]"}`}>
+                <span className={`inline-flex shrink-0 items-center rounded-full ring-1 transition-colors ${skillsOn && mySkills.length ? "bg-(--lime-tint)/35 ring-[var(--lime-dark)]/40" : "bg-[var(--surface)] ring-[var(--line)]"}`}>
                   <label className="inline-flex cursor-pointer items-center gap-2 py-2 pl-3.5 pr-2 text-xs font-semibold text-[var(--ink)]" title={mySkills.length ? `Show only the jobs for my skills: ${mySkills.map((skill) => skill.name).join(", ")}` : "No skills yet: tick to pick yours"}>
                     <input type="checkbox" checked={mySkillsChecked && mySkills.length > 0} onChange={(event) => toggleMySkills(event.target.checked)} className="size-3.5 accent-[var(--lime-dark)]" />
                     My skills
@@ -601,21 +601,21 @@ export default function Jobs() {
                   <div className="sticky top-[calc(var(--shell-h)+1rem)] max-h-[calc(100dvh-var(--shell-h)-2rem)] overflow-y-auto overscroll-contain rounded-[1.5rem] bg-[var(--surface)] p-3 ring-1 ring-[var(--line)]/70 [scrollbar-width:thin]">
                     {savedOnly && !likedOnly ? (
                       <div className="mb-2 flex items-center justify-between border-b border-[var(--line)]/70 px-2 pb-2">
-                        <p className={`${label} flex items-center gap-1.5 text-[#0369a1] dark:text-[#7dd3fc]`}>
-                          <BookmarkSimple size={12} weight="fill" className="text-[#0284c7] dark:text-[#7dd3fc]" />
+                        <p className={`${label} flex items-center gap-1.5 text-info`}>
+                          <BookmarkSimple size={12} weight="fill" className="text-info-icon" />
                           <span>Saved jobs</span>
                         </p>
-                        <span className="rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[#075985] ring-1 ring-[#bae6fd] dark:bg-[#7dd3fc]/15 dark:text-[#7dd3fc] dark:ring-[#7dd3fc]/30">
+                        <span className="rounded-full bg-info-bg px-2 py-0.5 text-[10px] font-bold tabular-nums text-info ring-1 ring-info-line">
                           {search ? `${filtered.length} matched` : `${filtered.length} ${filtered.length === 1 ? "job" : "jobs"}`}
                         </span>
                       </div>
                     ) : likedOnly && !savedOnly ? (
                       <div className="mb-2 flex items-center justify-between border-b border-[var(--line)]/70 px-2 pb-2">
-                        <p className={`${label} flex items-center gap-1.5 text-[#be123c] dark:text-[#fda4af]`}>
-                          <Heart size={12} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" />
+                        <p className={`${label} flex items-center gap-1.5 text-like`}>
+                          <Heart size={12} weight="fill" className="text-like-icon" />
                           <span>Liked jobs</span>
                         </p>
-                        <span className="rounded-full bg-[#ffe4e6] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[#be123c] ring-1 ring-[#fecdd3] dark:bg-[#fda4af]/15 dark:text-[#fda4af] dark:ring-[#fda4af]/30">
+                        <span className="rounded-full bg-like-bg px-2 py-0.5 text-[10px] font-bold tabular-nums text-like ring-1 ring-like-line">
                           {search ? `${filtered.length} matched` : `${filtered.length} ${filtered.length === 1 ? "job" : "jobs"}`}
                         </span>
                       </div>
@@ -625,15 +625,15 @@ export default function Jobs() {
                       </p>
                     )}
                     <ol className="space-y-0.5">{filtered.map((job, index) => <li key={job.id}>
-                      <button type="button" onClick={() => jumpTo(job.id)} aria-current={activeId === job.id ? "true" : undefined} className={`flex w-full gap-2.5 rounded-xl px-2 py-2 text-left transition-colors ${activeId === job.id ? "bg-[var(--lime)]/30" : "hover:bg-[var(--paper)]"}`}>
+                      <button type="button" onClick={() => jumpTo(job.id)} aria-current={activeId === job.id ? "true" : undefined} className={`flex w-full gap-2.5 rounded-xl px-2 py-2 text-left transition-colors ${activeId === job.id ? "bg-[var(--lime-tint)]/30" : "hover:bg-[var(--paper)]"}`}>
                         <span className={`mt-0.5 font-mono text-[10px] font-bold ${activeId === job.id ? "text-[var(--accent-strong)]" : "text-[var(--muted)]"}`}>{String(index + 1).padStart(2, "0")}</span>
                         <span className="min-w-0 flex-1">
                           <span className="line-clamp-2 text-[11px] font-semibold leading-4">{job.title}</span>
                           <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--muted)]">
                             <span>{timeAgo(job.postedAt, now)}</span>
                             {job.status === "New" && <span className="inline-block size-1.5 rounded-full bg-[var(--accent)] align-middle" />}
-                            {reactions.isLiked(job.id, job) && <Heart size={10} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" />}
-                            {reactions.isSaved(job.id, job) && <BookmarkSimple size={10} weight="fill" className="text-[#0284c7] dark:text-[#7dd3fc]" />}
+                            {reactions.isLiked(job.id, job) && <Heart size={10} weight="fill" className="text-like-icon" />}
+                            {reactions.isSaved(job.id, job) && <BookmarkSimple size={10} weight="fill" className="text-info-icon" />}
                           </span>
                         </span>
                       </button>
@@ -654,8 +654,8 @@ export default function Jobs() {
                 : <section ref={loadMoreRef} className="py-24 text-center">
                   <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--ink)]/5">
                     {isFetchingNextPage || isFetching ? <span className="size-5 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />
-                      : savedOnly ? <BookmarkSimple size={24} weight="fill" className="text-[#0284c7] dark:text-[#7dd3fc]" />
-                      : likedOnly ? <Heart size={24} weight="fill" className="text-[#fb7185] dark:text-[#fda4af]" />
+                      : savedOnly ? <BookmarkSimple size={24} weight="fill" className="text-info-icon" />
+                      : likedOnly ? <Heart size={24} weight="fill" className="text-like-icon" />
                       : <Briefcase size={22} />}
                   </div>
                   <h3 className="mt-5 text-xl font-semibold">
@@ -707,7 +707,7 @@ function FilterSelect({ label, value, placeholder, options, onChange }) {
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className={`h-9 max-w-[13rem] cursor-pointer appearance-none truncate rounded-full py-0 pl-3.5 pr-8 text-[13px] font-semibold outline-none ring-1 transition-colors focus-visible:ring-2 focus-visible:ring-[var(--lime-dark)] ${active ? "bg-(--lime)/40 text-[var(--ink)] ring-[var(--lime-dark)]/40" : "bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:ring-[var(--lime-dark)]/60"}`}
+      className={`h-9 max-w-[13rem] cursor-pointer appearance-none truncate rounded-full py-0 pl-3.5 pr-8 text-[13px] font-semibold outline-none ring-1 transition-colors focus-visible:ring-2 focus-visible:ring-[var(--lime-dark)] ${active ? "bg-(--lime-tint)/40 text-[var(--ink)] ring-[var(--lime-dark)]/40" : "bg-[var(--surface)] text-[var(--muted)] ring-[var(--line)] hover:ring-[var(--lime-dark)]/60"}`}
     >
       <option value="">{placeholder}</option>
       {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
@@ -718,7 +718,7 @@ function FilterSelect({ label, value, placeholder, options, onChange }) {
 
 // A chip with x, for skills picked before a sub category was chosen (so that filter is never hidden).
 function SkillCrumb({ label, onClear }) {
-  return <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-(--lime)/40 py-1 pl-3 pr-1 font-semibold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/40">
+  return <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-(--lime-tint)/40 py-1 pl-3 pr-1 font-semibold text-[var(--ink)] ring-1 ring-[var(--lime-dark)]/40">
     {label}
     <button type="button" onClick={onClear} aria-label={`Remove ${label}`} className="grid size-5 place-items-center rounded-full transition-colors hover:bg-black/10 dark:hover:bg-white/15"><X size={10} weight="bold" /></button>
   </span>;

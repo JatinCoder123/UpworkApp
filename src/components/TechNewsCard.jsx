@@ -5,7 +5,7 @@ export function SourceTypeBadge({ type }) {
   if (type === 'FirstParty') {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-        <span className="size-1.5 rounded-full bg-emerald-500" />
+        <span className="size-1.5 rounded-full bg-success-solid" />
         <span>FirstParty</span>
       </span>
     )
@@ -13,14 +13,14 @@ export function SourceTypeBadge({ type }) {
   if (type === 'YouBlogging') {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-        <YoutubeLogo size={13} weight="fill" className="text-red-500" />
+        <YoutubeLogo size={13} weight="fill" className="text-danger-solid" />
         <span>YouBlogging</span>
       </span>
     )
   }
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-      <span className="size-1.5 rounded-full bg-blue-500" />
+      <span className="size-1.5 rounded-full bg-tone-blue-solid" />
       <span>ThirdParty</span>
     </span>
   )
@@ -29,7 +29,7 @@ export function SourceTypeBadge({ type }) {
 export function ScoreBadge({ tier }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-      <span className={`size-2 rounded-xs ${tier?.squareClass || 'bg-purple-500'}`} />
+      <span className={`size-2 rounded-xs ${tier?.squareClass || 'bg-tone-violet-solid'}`} />
       <span>{tier?.label || 'NORMAL'}</span>
     </span>
   )
@@ -82,7 +82,7 @@ export default function TechNewsCard({ story, layout = 'grid' }) {
             </div>
 
             <Link to={`/tech-news/${story.id}`} className="mt-2 block group/title">
-              <h2 className="text-base sm:text-lg font-semibold leading-[1.3] tracking-[-.025em] text-[var(--ink)] transition-colors group-hover/title:text-[#668c16] line-clamp-2">
+              <h2 className="text-base sm:text-lg font-semibold leading-[1.3] tracking-[-.025em] text-[var(--ink)] transition-colors group-hover/title:text-[var(--accent)] line-clamp-2">
                 {story.title}
               </h2>
             </Link>
@@ -96,8 +96,8 @@ export default function TechNewsCard({ story, layout = 'grid' }) {
 
           <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-3 shrink-0 self-stretch border-t sm:border-t-0 border-black/[.06] dark:border-white/[.08] pt-3 sm:pt-0">
             {isHurry && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/30">
-                <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-solid/10 px-2.5 py-0.5 text-[10px] font-bold text-warning ring-1 ring-warning-solid/30">
+                <span className="size-1.5 rounded-full bg-warning-solid animate-pulse" />
                 <span>HurryUp</span>
               </span>
             )}
@@ -131,7 +131,7 @@ export default function TechNewsCard({ story, layout = 'grid' }) {
             </div>
 
             <Link to={`/tech-news/${story.id}`} className="mt-2.5 block group/title">
-              <h3 className="text-sm font-semibold leading-snug tracking-[-.02em] text-[var(--ink)] transition-colors group-hover/title:text-[#668c16] line-clamp-3">
+              <h3 className="text-sm font-semibold leading-snug tracking-[-.02em] text-[var(--ink)] transition-colors group-hover/title:text-[var(--accent)] line-clamp-3">
                 {story.title}
               </h3>
             </Link>
@@ -178,7 +178,7 @@ export default function TechNewsCard({ story, layout = 'grid' }) {
               <SourceTypeBadge type={story.sourceType} />
               {isHurry && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[10px] font-bold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
-                  <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="size-1.5 rounded-full bg-warning-solid animate-pulse" />
                   <span>HurryUp</span>
                 </span>
               )}
@@ -214,7 +214,7 @@ export default function TechNewsCard({ story, layout = 'grid' }) {
           </div>
 
           <Link to={`/tech-news/${story.id}`} className="mt-3 block group/title">
-            <h2 className="text-lg font-semibold leading-[1.3] tracking-[-.035em] text-[var(--ink)] transition-colors duration-300 group-hover/title:text-[#668c16] sm:text-xl">
+            <h2 className="text-lg font-semibold leading-[1.3] tracking-[-.035em] text-[var(--ink)] transition-colors duration-300 group-hover/title:text-[var(--accent)] sm:text-xl">
               {story.title}
             </h2>
           </Link>
@@ -226,7 +226,7 @@ export default function TechNewsCard({ story, layout = 'grid' }) {
           <div className="mt-6 flex items-center justify-between border-t border-black/[.07] dark:border-white/[.08] pt-4">
             <Link
               to={`/tech-news/${story.id}`}
-              className="inline-flex items-center gap-1 text-xs font-bold text-[var(--ink)] hover:text-[#668c16] transition-colors"
+              className="inline-flex items-center gap-1 text-xs font-bold text-[var(--ink)] hover:text-[var(--accent)] transition-colors"
             >
               <span>Read full story</span>
               <ArrowUpRight size={13} />

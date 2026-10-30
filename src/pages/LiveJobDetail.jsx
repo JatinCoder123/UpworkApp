@@ -44,7 +44,7 @@ function ActionPanel({ job, reactions, onShare, showApply }) {
 }
 
 function LivePill() {
-  return <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-3 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-[#c8e875]"><span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#c8e875] opacity-70" /><span className="relative size-1.5 rounded-full bg-[#c8e875]" /></span>Live</span>
+  return <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-3 py-1 text-[10px] font-bold uppercase tracking-[.14em] text-[var(--hero-accent)]"><span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--hero-accent)] opacity-70" /><span className="relative size-1.5 rounded-full bg-[var(--hero-accent)]" /></span>Live</span>
 }
 
 /** The full live job detail; `embedded` renders it as one column inside the preview drawer. */
@@ -97,7 +97,7 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
     <div className={embedded ? 'grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] xl:gap-8'}>
       <div className="min-w-0 space-y-5">
         <header data-detail className="relative overflow-hidden rounded-[1.8rem] bg-[var(--surface)] ring-1 ring-[var(--line)]/70">
-          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[var(--lime)]/25 to-transparent" />
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[var(--lime-tint)]/25 to-transparent" />
           <div className="relative p-5 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <LivePill />
@@ -129,7 +129,7 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
         </section>
 
         <Panel icon={Briefcase} title="Job description" subtitle="As posted on Upwork">
-          <ExpandableText collapsedHeight="12rem"><p className="whitespace-pre-wrap break-words text-[15px] leading-[1.8] text-[#3f413b]"><LinkifiedDescription text={job.description} /></p></ExpandableText>
+          <ExpandableText collapsedHeight="12rem"><p className="whitespace-pre-wrap break-words text-[15px] leading-[1.8] text-[var(--body-text)]"><LinkifiedDescription text={job.description} /></p></ExpandableText>
         </Panel>
 
         {/* Skills live in the right sidebar; the drawer hides that sidebar below xl, so show them here instead. */}

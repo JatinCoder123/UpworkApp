@@ -19,7 +19,7 @@ import { asArray, asObject, asText } from '../lib/safe'
 
 const AUTO_SCAN_MS = 5 * 60_000
 // Brighter versions of the card freshness tones, readable on the dark radar.
-const BLIP_COLORS = { 'var(--lime-dark)': '#c8e875', '#d9a53a': '#e8c867', 'var(--orange)': '#f39a6b' }
+const BLIP_COLORS = { 'var(--lime-dark)': 'var(--hero-accent)', 'var(--score-mid)': 'var(--hero-warn)', 'var(--orange)': 'var(--hero-hot)' }
 const label = 'text-[9px] font-bold uppercase tracking-[.18em]'
 // Live jobs come straight from Upwork, so they are sorted in the browser.
 const LIVE_SORTS = [
@@ -42,7 +42,7 @@ function LiveScope({ jobs, windowMinutes, scanning, now, onOpen }) {
   return <div className="mx-auto w-full max-w-[19rem]">
     <div className="live-scope" data-scanning={scanning}>
       {scanning && <><span className="live-ping" /><span className="live-ping" /><span className="live-sweep" /></>}
-      <span className="absolute left-1/2 top-1/2 z-[1] size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#c8e875] shadow-[0_0_24px_#c8e875]" />
+      <span className="absolute left-1/2 top-1/2 z-[1] size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--hero-accent)] shadow-[0_0_24px_var(--hero-accent)]" />
       {!scanning && jobs.map((job, index) => {
         const minutes = minutesSince(job.postedAt, now)
         const radius = 10 + Math.min(1, minutes / Math.max(windowMinutes, 1)) * 36
@@ -62,11 +62,11 @@ function SkillPicker({ skillRecords, loading, selected, onToggle, onAdd, onClear
   const known = new Set(skillRecords.map((record) => asText(record.name).toLowerCase()))
   const custom = selected.filter((skill) => !known.has(asText(skill).toLowerCase()))
   const add = () => { const value = draft.trim(); if (value) onAdd(value); setDraft('') }
-  const chip = (name, active) => `shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all duration-300 disabled:opacity-50 ${active ? 'bg-[#c8e875] text-[#1d2810] shadow-[0_6px_20px_rgba(200,232,117,.28)]' : 'bg-white/[.07] text-white/70 ring-1 ring-white/10 hover:bg-white/[.12] hover:text-white'}`
+  const chip = (name, active) => `shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all duration-300 disabled:opacity-50 ${active ? 'bg-[var(--hero-accent)] text-[var(--on-hero-accent)] shadow-[0_6px_20px_color-mix(in_srgb,var(--hero-accent)_28%,transparent)]' : 'bg-white/[.07] text-white/70 ring-1 ring-white/10 hover:bg-white/[.12] hover:text-white'}`
 
   return <div>
     <div className="flex items-center justify-between gap-3">
-      <p className={`${label} text-white/55`}>Skills to scan{selected.length > 0 && <span className="ml-2 rounded-full bg-[#c8e875] px-1.5 py-0.5 text-[#1d2810]">{selected.length}</span>}</p>
+      <p className={`${label} text-white/55`}>Skills to scan{selected.length > 0 && <span className="ml-2 rounded-full bg-[var(--hero-accent)] px-1.5 py-0.5 text-[var(--on-hero-accent)]">{selected.length}</span>}</p>
       {selected.length > 0 && <button type="button" disabled={disabled} onClick={onClear} className="text-[11px] font-bold text-white/55 hover:text-white">Clear</button>}
     </div>
     <div className="mt-3 flex max-h-[7.5rem] flex-wrap gap-1.5 overflow-y-auto pr-1 [scrollbar-width:thin]">
@@ -74,7 +74,7 @@ function SkillPicker({ skillRecords, loading, selected, onToggle, onAdd, onClear
       {custom.map((name) => <button key={name} type="button" disabled={disabled} aria-pressed="true" onClick={() => onToggle(name)} className={`${chip(name, true)} inline-flex items-center gap-1`}>{name}<X size={10} weight="bold" /></button>)}
       {loading && <span className="h-7 w-48 animate-pulse rounded-full bg-white/10" />}
     </div>
-    <form onSubmit={(event) => { event.preventDefault(); add() }} className="mt-3 flex items-center gap-2 rounded-full bg-white/[.06] py-1 pl-4 pr-1 ring-1 ring-white/10 focus-within:ring-[#c8e875]/60">
+    <form onSubmit={(event) => { event.preventDefault(); add() }} className="mt-3 flex items-center gap-2 rounded-full bg-white/[.06] py-1 pl-4 pr-1 ring-1 ring-white/10 focus-within:ring-[var(--hero-accent)]/60">
       <MagnifyingGlass size={14} className="shrink-0 text-white/50" />
       <input value={draft} disabled={disabled} onChange={(event) => setDraft(event.target.value)} placeholder="Add any skill, e.g. Laravel" aria-label="Add a skill" className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/40" />
       <button type="submit" disabled={!draft.trim() || disabled} aria-label="Add skill" className="grid size-7 place-items-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 disabled:opacity-40"><Plus size={13} weight="bold" /></button>
@@ -196,8 +196,8 @@ export default function LiveJobs() {
       <div className="live-hero rounded-[calc(2rem-.375rem)] p-5 sm:p-8">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-center xl:gap-12">
           <div className="min-w-0">
-            <p className={`${label} flex items-center gap-2 text-[#c8e875]`}><span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#c8e875] opacity-70" /><span className="relative size-2 rounded-full bg-[#c8e875]" /></span>Live from Upwork</p>
-            <h1 className="mt-3 max-w-2xl text-[clamp(1.9rem,3.6vw,3.2rem)] font-semibold leading-[1.05] tracking-[-.045em] text-white">Catch jobs the minute <span className="text-[#c8e875]">they drop.</span></h1>
+            <p className={`${label} flex items-center gap-2 text-[var(--hero-accent)]`}><span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[var(--hero-accent)] opacity-70" /><span className="relative size-2 rounded-full bg-[var(--hero-accent)]" /></span>Live from Upwork</p>
+            <h1 className="mt-3 max-w-2xl text-[clamp(1.9rem,3.6vw,3.2rem)] font-semibold leading-[1.05] tracking-[-.045em] text-white">Catch jobs the minute <span className="text-[var(--hero-accent)]">they drop.</span></h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-white/60">Scan Upwork directly for fresh posts in your skills, before they reach the feed and before the crowd shows up.</p>
 
             <div className="mt-6 rounded-[1.4rem] bg-white/[.04] p-4 ring-1 ring-white/10 backdrop-blur-sm sm:p-5">
@@ -207,12 +207,12 @@ export default function LiveJobs() {
                 <div className="min-w-0">
                   <p className={`${label} text-white/55`}>Posted within</p>
                   <div className="mt-2 flex flex-wrap gap-1 rounded-full bg-white/[.06] p-1 ring-1 ring-white/10" role="radiogroup" aria-label="Posted within">
-                    {LIVE_WINDOWS.map((item) => <button key={item.minutes} type="button" role="radio" aria-checked={settings.minutes === item.minutes} disabled={scanning} onClick={() => update({ minutes: item.minutes })} className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all duration-300 ${settings.minutes === item.minutes ? 'bg-white text-[#172015]' : 'text-white/60 hover:text-white'}`}>{item.label}</button>)}
+                    {LIVE_WINDOWS.map((item) => <button key={item.minutes} type="button" role="radio" aria-checked={settings.minutes === item.minutes} disabled={scanning} onClick={() => update({ minutes: item.minutes })} className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all duration-300 ${settings.minutes === item.minutes ? 'bg-white text-[var(--hero-deep)]' : 'text-white/60 hover:text-white'}`}>{item.label}</button>)}
                   </div>
                 </div>
                 <label className="flex cursor-pointer items-center gap-2.5 pb-1.5 text-[11px] font-semibold text-white/70">
                   <input type="checkbox" checked={settings.includeRenewed} disabled={scanning} onChange={(event) => update({ includeRenewed: event.target.checked })} className="peer sr-only" />
-                  <span className="relative h-5 w-9 rounded-full bg-white/15 transition-colors peer-checked:bg-[#c8e875] peer-focus-visible:ring-2 peer-focus-visible:ring-white/60 after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
+                  <span className="relative h-5 w-9 rounded-full bg-white/15 transition-colors peer-checked:bg-[var(--hero-accent)] peer-focus-visible:ring-2 peer-focus-visible:ring-white/60 after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
                   Include renewed posts
                 </label>
                 <div className="ml-auto flex items-center gap-2">
@@ -224,9 +224,9 @@ export default function LiveJobs() {
             </div>
 
             <div className="mt-4 min-h-6" aria-live="polite">
-              {scanning ? <p key={step} className="live-ticker flex items-center gap-2 text-xs font-semibold text-white/80"><span className="size-3.5 animate-spin rounded-full border-2 border-white/20 border-t-[#c8e875]" />{stepList[step]}<span className="font-mono text-white/40">{elapsed}s</span></p>
+              {scanning ? <p key={step} className="live-ticker flex items-center gap-2 text-xs font-semibold text-white/80"><span className="size-3.5 animate-spin rounded-full border-2 border-white/20 border-t-[var(--hero-accent)]" />{stepList[step]}<span className="font-mono text-white/40">{elapsed}s</span></p>
                 : !settings.skills.length ? <p className="text-xs text-white/50">Pick at least one skill to start scanning.</p>
-                  : <button type="button" onClick={() => setAutoScan((value) => !value)} aria-pressed={autoScan} className={`inline-flex items-center gap-2 text-xs font-semibold transition-colors ${autoScan ? 'text-[#c8e875]' : 'text-white/50 hover:text-white'}`}><Timer size={14} weight="bold" />{autoScan ? 'Auto-scan on · every 5 minutes' : 'Turn on auto-scan every 5 minutes'}</button>}
+                  : <button type="button" onClick={() => setAutoScan((value) => !value)} aria-pressed={autoScan} className={`inline-flex items-center gap-2 text-xs font-semibold transition-colors ${autoScan ? 'text-[var(--hero-accent)]' : 'text-white/50 hover:text-white'}`}><Timer size={14} weight="bold" />{autoScan ? 'Auto-scan on · every 5 minutes' : 'Turn on auto-scan every 5 minutes'}</button>}
             </div>
           </div>
           <LiveScope jobs={jobs} windowMinutes={resultWindow} scanning={scanning} now={now} onOpen={openPreview} />
@@ -263,7 +263,7 @@ export default function LiveJobs() {
           </section>
             : jobs.length ? <section className="mt-4 space-y-4">{visibleJobs.map((job, index) => <ErrorBoundary key={job.id} name="live-job-card" fallback={CardError} resetKey={job}><LiveJobCard job={job} index={index} now={now} windowMinutes={resultWindow} justIn={justIn.includes(job.id)} applied={reactions.isApplied(job.id)} dismissed={reactions.isDismissed(job.id)} onOpen={() => openPreview(job.id)} onSaveToCrm={() => crm.save(job)} crmSaved={crm.isSaved(job.id)} crmSaving={crm.pendingId === job.id} crmError={crm.errorId === job.id ? crm.error?.message || 'Could not save this job to the CRM.' : ''} /></ErrorBoundary>)}</section>
             : <section className="mt-4 rounded-[1.6rem] bg-[var(--surface)] px-6 py-16 text-center ring-1 ring-[var(--line)]/70">
-              <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--lime)]/30 text-[var(--accent-strong)]"><Crosshair size={24} weight="duotone" /></div>
+              <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--lime-tint)]/30 text-[var(--accent-strong)]"><Crosshair size={24} weight="duotone" /></div>
               <h3 className="mt-5 text-xl font-semibold">Quiet out there</h3>
               <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">No new posts for {asArray(result.skills).join(', ')} in the last {LIVE_WINDOWS.find((item) => item.minutes === resultWindow)?.label || `${resultWindow} min`}. Try a wider window or add more skills.</p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">{LIVE_WINDOWS.filter((item) => item.minutes > resultWindow).slice(0, 3).map((item) => <button key={item.minutes} type="button" onClick={() => { update({ minutes: item.minutes }); setStep(0); setElapsed(0); scan.mutate({ ...settings, minutes: item.minutes }) }} className="rounded-full bg-[var(--paper)] px-4 py-2 text-xs font-bold ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)]">Scan last {item.label}</button>)}</div>
@@ -271,7 +271,7 @@ export default function LiveJobs() {
         </>
           : <section className="mt-8 grid gap-3 md:grid-cols-3">
             {[[Sparkle, 'Pick your skills', 'Choose from your saved skills or type any Upwork skill.'], [Clock, 'Set the window', 'From the last 15 minutes up to a full day of posts.'], [Crosshair, 'Scan and pounce', 'Open any job for the full brief, client details and a cover letter.']].map(([Icon, title, text], index) => <div key={title} data-card className="rounded-[1.4rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
-              <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-[var(--lime)]/30 text-[var(--accent-strong)]"><Icon size={17} weight="duotone" /></span><span className="font-mono text-[11px] font-bold text-[var(--muted)]">0{index + 1}</span></div>
+              <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-[var(--lime-tint)]/30 text-[var(--accent-strong)]"><Icon size={17} weight="duotone" /></span><span className="font-mono text-[11px] font-bold text-[var(--muted)]">0{index + 1}</span></div>
               <p className="mt-4 text-sm font-semibold">{title}</p>
               <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{text}</p>
             </div>)}

@@ -17,8 +17,8 @@ function usePopover() {
   return { open, setOpen, root }
 }
 
-const trigger = (active) => `flex h-10 shrink-0 items-center gap-2 rounded-full px-3 text-xs font-semibold ring-1 transition-all duration-300 ${active ? 'bg-[var(--lime)] !text-[#26320b] ring-[var(--lime-dark)]/35' : 'bg-[var(--paper)] text-[var(--muted)] ring-black/5 hover:text-[var(--ink)]'}`
-const sheet = 'absolute right-0 top-12 z-50 rounded-[1.5rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5'
+const trigger = (active) => `flex h-10 shrink-0 items-center gap-2 rounded-full px-3 text-xs font-semibold ring-1 transition-all duration-300 ${active ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-[var(--lime-dark)]/35' : 'bg-[var(--paper)] text-[var(--muted)] ring-black/5 hover:text-[var(--ink)]'}`
+const sheet = 'absolute right-0 top-12 z-50 rounded-[1.5rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.2)] ring-1 ring-black/5'
 // A trigger on a --paper box (as fields there, see fieldTone): --surface, so it stands out in both themes.
 const triggerOnPaper = (active) => (active ? trigger(true) : 'flex h-10 shrink-0 items-center gap-2 rounded-full bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--muted)] ring-1 ring-[var(--line)] transition-all duration-300 hover:text-[var(--ink)]')
 
@@ -32,7 +32,7 @@ export function SortMenu({ value, options, onChange, label = 'Sort jobs' }) {
     {open && <div className={`${sheet} w-64`}>
       <ul role="listbox" aria-label={label} className="rounded-[calc(1.5rem-.375rem)] bg-[var(--surface)] p-2">
         <li className="px-3 pb-1.5 pt-1 text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">Sort by</li>
-        {options.map((option) => <li key={option.id}><button type="button" role="option" aria-selected={option.id === value} onClick={() => { onChange(option.id); setOpen(false) }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${option.id === value ? 'bg-[var(--lime)]/35 text-[var(--ink)]' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{option.label}{option.id === value && <Check size={13} weight="bold" />}</button></li>)}
+        {options.map((option) => <li key={option.id}><button type="button" role="option" aria-selected={option.id === value} onClick={() => { onChange(option.id); setOpen(false) }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${option.id === value ? 'bg-[var(--lime-tint)]/35 text-[var(--ink)]' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{option.label}{option.id === value && <Check size={13} weight="bold" />}</button></li>)}
       </ul>
     </div>}
   </div>
@@ -50,7 +50,7 @@ export function SelectMenu({ value, options, onChange, label, heading = label, i
     {open && <div className={`${sheet} ${align === 'left' ? '!left-0 !right-auto' : ''} w-60`}>
       <ul role="listbox" aria-label={label} className="rounded-[calc(1.5rem-.375rem)] bg-[var(--surface)] p-2">
         {heading && <li className="px-3 pb-1.5 pt-1 text-[9px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">{heading}</li>}
-        {options.map((option) => <li key={option.id}><button type="button" role="option" aria-selected={option.id === value} onClick={() => { onChange(option.id); setOpen(false) }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${option.id === value ? 'bg-[var(--lime)]/35 text-[var(--ink)]' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{option.label}{option.id === value && <Check size={13} weight="bold" />}</button></li>)}
+        {options.map((option) => <li key={option.id}><button type="button" role="option" aria-selected={option.id === value} onClick={() => { onChange(option.id); setOpen(false) }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${option.id === value ? 'bg-[var(--lime-tint)]/35 text-[var(--ink)]' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{option.label}{option.id === value && <Check size={13} weight="bold" />}</button></li>)}
       </ul>
     </div>}
   </div>
@@ -77,9 +77,9 @@ export function LocationSelect({ value, onChange, onPaper = false }) {
       <span className={`min-w-0 flex-1 truncate ${value === 'any' ? 'text-[var(--muted)]' : ''}`}>{current.label}</span>
       <CaretDown size={12} className={`shrink-0 text-[var(--muted)] transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
     </button>
-    {open && <div className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgba(30,32,25,.2)] ring-1 ring-black/5">
+    {open && <div className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.2)] ring-1 ring-black/5">
       <ul role="listbox" aria-label="Client location" className="max-h-64 overflow-y-auto rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
-        {CLIENT_LOCATIONS.map((option) => <li key={option.id}><button type="button" role="option" aria-selected={option.id === value} onClick={() => { onChange(option.id === value ? 'any' : option.id); setOpen(false) }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${option.id === value ? 'bg-[var(--lime)]/35 text-[var(--ink)]' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{option.label}{option.id === value && <Check size={13} weight="bold" />}</button></li>)}
+        {CLIENT_LOCATIONS.map((option) => <li key={option.id}><button type="button" role="option" aria-selected={option.id === value} onClick={() => { onChange(option.id === value ? 'any' : option.id); setOpen(false) }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${option.id === value ? 'bg-[var(--lime-tint)]/35 text-[var(--ink)]' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{option.label}{option.id === value && <Check size={13} weight="bold" />}</button></li>)}
       </ul>
     </div>}
   </div>

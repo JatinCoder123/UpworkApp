@@ -24,9 +24,9 @@ import {
 } from '../lib/newsClassification'
 
 function SourceIcon({ type }) {
-  if (type === 'FirstParty') return <span className="size-1.5 rounded-full bg-emerald-500" />
-  if (type === 'YouBlogging') return <YoutubeLogo size={14} weight="fill" className="text-red-500" />
-  return <span className="size-1.5 rounded-full bg-blue-500" />
+  if (type === 'FirstParty') return <span className="size-1.5 rounded-full bg-success-solid" />
+  if (type === 'YouBlogging') return <YoutubeLogo size={14} weight="fill" className="text-danger-solid" />
+  return <span className="size-1.5 rounded-full bg-tone-blue-solid" />
 }
 
 export default function TechNewsDetail() {
@@ -157,7 +157,7 @@ export default function TechNewsDetail() {
             <button
               type="button"
               onClick={() => setDocumentDialog(true)}
-              className="group inline-flex items-center justify-center gap-2 rounded-full bg-[var(--lime)] px-4 py-3 text-xs font-bold text-[#26320b] transition-all duration-300 hover:-translate-y-0.5 active:scale-[.98]"
+              className="group inline-flex items-center justify-center gap-2 rounded-full bg-[var(--lime)] px-4 py-3 text-xs font-bold text-[var(--on-lime)] transition-all duration-300 hover:-translate-y-0.5 active:scale-[.98]"
             >
               <FilePlus size={17} weight="bold" />
               <span>Generate Doc</span>
@@ -198,7 +198,7 @@ export default function TechNewsDetail() {
               {/* HurryUp Badge */}
               {hurryUp && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-3.5 py-1.5 text-xs font-bold text-[var(--ink)] ring-1 ring-black/10 dark:ring-white/10 shadow-xs">
-                  <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="size-1.5 rounded-full bg-warning-solid animate-pulse" />
                   <span>HurryUp</span>
                 </span>
               )}
@@ -313,7 +313,7 @@ export default function TechNewsDetail() {
                   <span className="text-[10px] font-bold uppercase tracking-[.18em] text-[var(--muted)]">
                     Intelligence Overview
                   </span>
-                  <ShieldCheck size={18} className="text-[#668c16]" />
+                  <ShieldCheck size={18} className="text-[var(--accent)]" />
                 </div>
 
                 <div className="space-y-4 text-xs">
@@ -392,15 +392,15 @@ export default function TechNewsDetail() {
                 <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] p-5 space-y-4">
                   <div className="flex items-center justify-between border-b border-black/[.06] dark:border-white/[.08] pb-3">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-[.2em] text-[#668c16] block">
+                      <span className="text-[10px] font-bold uppercase tracking-[.2em] text-[var(--accent)] block">
                         {story.category ? `More in ${story.category}` : 'Related Feed'}
                       </span>
                       <h3 className="text-base font-bold tracking-tight text-[var(--ink)]">
                         Related Latest News
                       </h3>
                     </div>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-1 text-[10px] font-extrabold text-emerald-950 dark:text-emerald-200 ring-1 ring-emerald-600/30 dark:ring-emerald-500/40 shadow-xs">
-                      <span className="size-2 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse" />
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-success-bg px-2.5 py-1 text-[10px] font-extrabold text-success ring-1 ring-success-solid/30 shadow-xs">
+                      <span className="size-2 rounded-full bg-success-solid animate-pulse" />
                       <span className="tracking-wide">
                         {isRelatedLoading && allUpNextStories.length === 0 ? 'Loading...' : 'Related'}
                       </span>
@@ -442,20 +442,20 @@ export default function TechNewsDetail() {
                           <div className="flex items-start gap-3">
                             <div className="min-w-0 flex-1 space-y-1">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] font-bold uppercase tracking-wider text-[#668c16]">
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--accent)]">
                                   {item.category}
                                 </span>
                                 <span className="text-[9px] text-[var(--muted)]">·</span>
                                 <span className="text-[9px] text-[var(--muted)]">{item.posted}</span>
                               </div>
-                              <h4 className="text-xs font-semibold leading-snug text-[var(--ink)] line-clamp-2 transition-colors duration-300 group-hover:text-[#668c16]">
+                              <h4 className="text-xs font-semibold leading-snug text-[var(--ink)] line-clamp-2 transition-colors duration-300 group-hover:text-[var(--accent)]">
                                 {item.title}
                               </h4>
                               <div className="flex items-center gap-2 pt-0.5">
                                 <span className="text-[10px] text-[var(--muted)] truncate max-w-[110px]">
                                   {item.source}
                                 </span>
-                                <span className={`inline-block size-1.5 rounded-full ${item.tier?.squareClass || 'bg-purple-500'}`} />
+                                <span className={`inline-block size-1.5 rounded-full ${item.tier?.squareClass || 'bg-tone-violet-solid'}`} />
                                 <span className="text-[9px] font-bold text-[var(--ink)]">{item.tier?.label}</span>
                               </div>
                             </div>
