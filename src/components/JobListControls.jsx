@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import { ArrowsDownUp, CaretDown, Check, MapPin, SlidersHorizontal } from '@phosphor-icons/react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { ArrowsDownUp, CaretDown, Check, MagnifyingGlass, MapPin, SlidersHorizontal } from '@phosphor-icons/react'
 import { EMPTY_EXTRA_FILTERS } from '../lib/preferences'
-import { CLIENT_LOCATIONS, clientLocation, countExtraFilters } from '../lib/jobSignals'
+import { CLIENT_LOCATIONS, POPULAR_CLIENT_LOCATIONS, clientLocation, countExtraFilters, searchClientLocations } from '../lib/jobSignals'
 
 function usePopover() {
   const [open, setOpen] = useState(false)
@@ -67,20 +67,67 @@ const fieldLabel = 'text-[10px] font-bold uppercase tracking-[.16em] text-[var(-
 // Fields sit on --paper inside surface menus, and on --surface inside paper boxes (like the dialog's skill chips).
 const fieldTone = (onPaper) => (onPaper ? { field: 'bg-[var(--surface)]', hover: 'hover:bg-[var(--paper)]' } : { field: 'bg-[var(--paper)]', hover: 'hover:bg-[var(--surface)]' })
 
+// Any country: type to search; without a search, Any location and the popular countries come before the full A–Z list.
 export function LocationSelect({ value, onChange, onPaper = false }) {
   const { open, setOpen, root } = usePopover()
+  const [term, setTerm] = useState('')
+  const [active, setActive] = useState(0)
+  const list = useRef(null)
+  const listId = useId()
   const current = clientLocation(value)
   const tone = fieldTone(onPaper)
+  const searching = term.trim().length > 0
+  // One flat list for the arrow keys; a section's first row carries its heading. A popular country is listed twice, so
+  // rows are keyed by section too.
+  const rows = useMemo(() => {
+    const sections = searching
+      ? [{ title: '', options: searchClientLocations(term) }]
+      : [{ title: '', options: [CLIENT_LOCATIONS[0]] }, { title: 'Popular', options: POPULAR_CLIENT_LOCATIONS }, { title: 'All countries', options: searchClientLocations('') }]
+    return sections.flatMap((section) => section.options.map((option, position) => ({ ...option, key: `${section.title}:${option.id}`, heading: position === 0 ? section.title : '' })))
+  }, [searching, term])
+
+  useEffect(() => { list.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' }) }, [active, open])
+
+  const toggle = () => { setTerm(''); setActive(0); setOpen((state) => !state) }
+  const choose = (option) => { onChange(option.id === value ? 'any' : option.id); setOpen(false) }
+  const onKeyDown = (event) => {
+    if (event.key === 'ArrowDown') { event.preventDefault(); setActive((index) => Math.min(index + 1, rows.length - 1)) }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); setActive((index) => Math.max(index - 1, 0)) }
+    else if (event.key === 'Enter' && rows[active]) { event.preventDefault(); choose(rows[active]) }
+  }
+
   return <div ref={root} className="relative">
-    <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label={`Client location: ${current.label}`} onClick={() => setOpen((state) => !state)} className={`flex h-11 w-full items-center gap-2.5 rounded-xl ${tone.field} px-3 text-left text-xs font-semibold ring-1 transition-shadow ${open ? 'ring-[var(--lime-dark)]' : 'ring-black/5 hover:ring-black/15 dark:ring-white/10'}`}>
+    <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label={`Client location: ${current.label}`} onClick={toggle} className={`flex h-11 w-full items-center gap-2.5 rounded-xl ${tone.field} px-3 text-left text-xs font-semibold ring-1 transition-shadow ${open ? 'ring-[var(--lime-dark)]' : 'ring-black/5 hover:ring-black/15 dark:ring-white/10'}`}>
       <MapPin size={15} weight={value === 'any' ? 'regular' : 'fill'} className={`shrink-0 ${value === 'any' ? 'text-[var(--muted)]' : 'text-[var(--accent-strong)]'}`} />
       <span className={`min-w-0 flex-1 truncate ${value === 'any' ? 'text-[var(--muted)]' : ''}`}>{current.label}</span>
       <CaretDown size={12} className={`shrink-0 text-[var(--muted)] transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
     </button>
     {open && <div className="absolute inset-x-0 top-[calc(100%+.5rem)] z-50 rounded-[1.4rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.2)] ring-1 ring-black/5">
-      <ul role="listbox" aria-label="Client location" className="max-h-64 overflow-y-auto rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)] p-2">
-        {CLIENT_LOCATIONS.map((option) => <li key={option.id}><button type="button" role="option" aria-selected={option.id === value} onClick={() => { onChange(option.id === value ? 'any' : option.id); setOpen(false) }} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${option.id === value ? 'bg-[var(--lime-tint)]/35 text-[var(--ink)]' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--ink)]'}`}>{option.label}{option.id === value && <Check size={13} weight="bold" />}</button></li>)}
-      </ul>
+      <div className="overflow-hidden rounded-[calc(1.4rem-.375rem)] bg-[var(--surface)]">
+        <label className="flex items-center gap-2 border-b border-[var(--line)] px-4 py-3">
+          <MagnifyingGlass size={14} className="shrink-0 text-[var(--muted)]" />
+          <input
+            autoFocus
+            value={term}
+            onChange={(event) => { setTerm(event.target.value); setActive(0) }}
+            onKeyDown={onKeyDown}
+            placeholder="Search countries"
+            aria-label="Search countries"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls={listId}
+            aria-activedescendant={rows[active] ? `${listId}-${active}` : undefined}
+            className="min-w-0 flex-1 bg-transparent text-xs outline-none"
+          />
+        </label>
+        <ul ref={list} id={listId} role="listbox" aria-label="Client location" className="max-h-64 overflow-y-auto p-2 [scrollbar-width:thin]">
+          {rows.map((option, row) => [
+            option.heading && <li key={`title:${option.heading}`} role="presentation" className="px-3 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">{option.heading}</li>,
+            <li key={option.key}><button type="button" id={`${listId}-${row}`} role="option" aria-selected={option.id === value} data-active={row === active} tabIndex={-1} onMouseEnter={() => setActive(row)} onClick={() => choose(option)} className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold transition-colors ${option.id === value ? 'bg-[var(--lime-tint)]/35 text-[var(--ink)]' : row === active ? 'bg-[var(--paper)] text-[var(--ink)]' : 'text-[var(--muted)]'}`}>{option.label}{option.id === value && <Check size={13} weight="bold" />}</button></li>,
+          ])}
+          {searching && !rows.length && <li role="presentation" className="px-3 py-4 text-center text-xs text-[var(--muted)]">No country matches “{term.trim()}”.</li>}
+        </ul>
+      </div>
     </div>}
   </div>
 }

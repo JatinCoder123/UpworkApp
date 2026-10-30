@@ -1,6 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { asArray, asObject, asText } from './safe'
+import { COUNTRIES, countryCode, countryNames, normalizeCountry } from './countries'
 
 const SKILL_HUES = [88, 142, 172, 198, 222, 256, 288, 322, 12, 34, 52]
 
@@ -206,24 +207,32 @@ export function usePreviewParam() {
 
 /* Extra list filters and "next similar", applied to jobs already loaded in the browser. */
 
-// Static client locations for the location filter; `match` runs against the client country the CRM or Upwork reports.
+// Client locations for the location filter: every country A–Z, with ids that are lower-case ISO codes. A job matches
+// when its client country (as the CRM or Upwork reports it) is that country under any of its names.
 export const CLIENT_LOCATIONS = [
-  { id: 'any', label: 'Any location' },
-  { id: 'us', label: 'United States', match: /^(usa|us|u\.s\.a?\.?)$|united states/i },
-  { id: 'gb', label: 'United Kingdom', match: /^(united kingdom|uk|u\.k\.|great britain|england|scotland|wales|northern ireland)$/i },
-  { id: 'ca', label: 'Canada', match: /^canada$/i },
-  { id: 'au', label: 'Australia', match: /^australia$/i },
-  { id: 'in', label: 'India', match: /^india$/i },
-  { id: 'de', label: 'Germany', match: /^(germany|deutschland)$/i },
+  { id: 'any', label: 'Any location', search: '' },
+  ...COUNTRIES.map((country) => ({ id: country[0], label: country[1], search: countryNames(country).join(' | ') })).sort((a, b) => a.label.localeCompare(b.label)),
 ]
 
+// Shown first in the location picker, ahead of the full list.
+export const POPULAR_CLIENT_LOCATIONS = ['us', 'gb', 'ca', 'au', 'in', 'de'].map((id) => CLIENT_LOCATIONS.find((item) => item.id === id))
+
 export const clientLocation = (id) => CLIENT_LOCATIONS.find((item) => item.id === id) || CLIENT_LOCATIONS[0]
+
+// Countries whose names contain the typed text; names that start with it come first.
+export function searchClientLocations(term) {
+  const query = normalizeCountry(term)
+  if (!query) return CLIENT_LOCATIONS.slice(1)
+  const found = CLIENT_LOCATIONS.slice(1).filter((item) => item.search.includes(query))
+  const startsWith = (item) => item.search.split(' | ').some((name) => name.startsWith(query))
+  return [...found.filter(startsWith), ...found.filter((item) => !startsWith(item))]
+}
 
 export function matchesExtraFilters(job, { jobType = 'any', location = 'any' } = {}) {
   if (jobType === 'hourly' && job.type !== 'Hourly') return false
   if (jobType === 'fixed' && job.type === 'Hourly') return false
-  const { match } = clientLocation(location)
-  return !match || match.test(String(job.clientStats?.country || '').trim())
+  const { id } = clientLocation(location)
+  return id === 'any' || countryCode(job.clientStats?.country) === id
 }
 
 export const countExtraFilters = ({ jobType = 'any', location = 'any' } = {}) => (jobType !== 'any' ? 1 : 0) + (location !== 'any' ? 1 : 0)

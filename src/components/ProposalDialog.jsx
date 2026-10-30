@@ -8,9 +8,12 @@ import { useAuth } from '../contexts/AuthContext'
 import { asArray, asObject, asText } from '../lib/safe'
 
 const fieldLabel = 'mb-1.5 block text-[10px] font-bold uppercase tracking-[.14em] text-[var(--muted)]'
-const inputClass = 'w-full min-w-0 rounded-xl bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none ring-1 ring-[var(--line)] placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--lime-dark)]'
+// index.css gives inputs, textareas and buttons `font: inherit` outside Tailwind's layers, which outranks text-* and
+// font-* classes on them: fields inherit 16px (so selects use it too, and phones do not zoom into a field) and buttons
+// mark their size with "!".
+const inputClass = 'w-full min-w-0 rounded-xl bg-[var(--paper)] px-3.5 py-2.5 text-base text-[var(--ink)] outline-none ring-1 ring-[var(--line)] placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--lime-dark)]'
 const selectClass = `${inputClass} cursor-pointer appearance-none pr-9`
-const addButton = 'inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-3.5 py-2 text-xs font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)]'
+const addButton = 'inline-flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-3.5 py-2 !text-xs !font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)]'
 const removeButton = 'grid size-10 shrink-0 place-items-center rounded-xl text-[var(--muted)] transition-colors hover:bg-[var(--bad-bg)] hover:text-[var(--bad)]'
 
 let lastRowKey = 0
@@ -192,9 +195,10 @@ function ProposalForm({ data, job, onBusy, onClose }) {
           : <div className="mt-4 space-y-2">
             {draft.milestones.map((row, index) => <div key={row.key} className="grid gap-2 rounded-2xl bg-[var(--paper)] p-2 ring-1 ring-[var(--line)] sm:grid-cols-[minmax(0,1fr)_7rem_10rem_auto] sm:items-center sm:bg-transparent sm:p-0 sm:ring-0">
               <input aria-label={`Milestone ${index + 1} description`} placeholder={`Milestone ${index + 1}, e.g. Diagnose the issue`} value={row.description} onChange={(event) => editRow('milestones', row.key, { description: event.target.value })} className={inputClass} />
-              <input type="number" min="0" step="0.01" inputMode="decimal" aria-label={`Milestone ${index + 1} amount (USD)`} placeholder="USD" value={row.amount} onChange={(event) => editRow('milestones', row.key, { amount: event.target.value })} className={inputClass} />
+              <span className="relative block"><span aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold text-[var(--muted)]">$</span><input type="number" min="0" step="0.01" inputMode="decimal" aria-label={`Milestone ${index + 1} amount (USD)`} placeholder="Amount" value={row.amount} onChange={(event) => editRow('milestones', row.key, { amount: event.target.value })} className={`${inputClass} pl-7`} /></span>
               <input type="date" min={today()} aria-label={`Milestone ${index + 1} due date`} value={row.dueDate} onChange={(event) => editRow('milestones', row.key, { dueDate: event.target.value })} className={inputClass} />
-              <button type="button" onClick={() => removeRow('milestones', row.key)} disabled={draft.milestones.length === 1} aria-label={`Remove milestone ${index + 1}`} className={`${removeButton} justify-self-end disabled:invisible`}><Trash size={14} /></button>
+              {/* A single milestone has no remove button, so it leaves no empty space on a phone. */}
+              {draft.milestones.length > 1 && <button type="button" onClick={() => removeRow('milestones', row.key)} aria-label={`Remove milestone ${index + 1}`} className={`${removeButton} justify-self-end`}><Trash size={14} /></button>}
             </div>)}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <button type="button" onClick={() => addRow('milestones', emptyMilestone())} className={addButton}><Plus size={12} weight="bold" />Add milestone</button>
@@ -259,7 +263,7 @@ function ProposalForm({ data, job, onBusy, onClose }) {
     </p>}
 
     <div className="mt-7 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-      <button type="button" onClick={confirming && checked ? () => setConfirming(false) : onClose} disabled={submit.isPending} className="rounded-full px-5 py-3 text-xs font-bold text-[var(--muted)] disabled:opacity-50">{confirming && checked ? 'Not yet' : 'Cancel'}</button>
+      <button type="button" onClick={confirming && checked ? () => setConfirming(false) : onClose} disabled={submit.isPending} className="rounded-full px-5 py-3 !text-xs !font-bold text-[var(--muted)] disabled:opacity-50">{confirming && checked ? 'Not yet' : 'Cancel'}</button>
       {!checked
         ? <button type="button" onClick={runCheck} disabled={check.isPending} className={primaryButton}>
           <span>{check.isPending ? 'Checking…' : 'Check proposal'}</span>

@@ -44,7 +44,9 @@ export default function JobApplySection({ job, statusLabel, dismissed, rejectRea
   const [proposing, setProposing] = useState(false)
   const canPropose = Boolean(job.applyUrl) && !['Live', 'Applied'].includes(job.status)
   const hasButtons = showApply || canPropose
-  const segment = (active, tone) => `flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 text-xs font-semibold transition-colors ${active ? tone : 'text-[var(--muted)] hover:text-[var(--ink)]'}`
+  // Buttons here mark their text size and weight with "!": index.css gives every button `font: inherit` outside
+  // Tailwind's layers, which otherwise outranks text-* and font-* classes on a button.
+  const segment = (active, tone) => `flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 !text-xs !font-semibold transition-colors ${active ? tone : 'text-[var(--muted)] hover:text-[var(--ink)]'}`
 
   return <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
     <div className="flex items-start justify-between gap-3">
@@ -57,9 +59,9 @@ export default function JobApplySection({ job, statusLabel, dismissed, rejectRea
     <div className="mt-3"><Chips job={job} /></div>
 
     {hasButtons && <div className="mt-5 grid gap-2">
-      {canPropose && <button type="button" onClick={() => setProposing(true)} className="upwork-apply-button flex h-11 items-center justify-center rounded-2xl text-sm font-bold"><span className="relative z-10 inline-flex items-center gap-2"><PaperPlaneTilt size={15} weight="fill" />Send proposal</span></button>}
+      {canPropose && <button type="button" onClick={() => setProposing(true)} className="upwork-apply-button flex h-11 items-center justify-center rounded-2xl !text-sm !font-bold"><span className="relative z-10 inline-flex items-center gap-2"><PaperPlaneTilt size={15} weight="fill" />Send proposal</span></button>}
       {showApply && (job.applyUrl
-        ? <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={onApplied} title={canPropose ? 'Opens the job on Upwork. Only a proposal sent from here marks it Applied.' : undefined} className={`${canPropose ? 'upwork-view-button h-10 text-xs' : 'upwork-apply-button h-11 text-sm'} flex min-w-0 items-center justify-center gap-2 rounded-2xl font-bold`}><span className="relative z-10 truncate">Apply on Upwork</span><ArrowSquareOut size={canPropose ? 13 : 15} weight="bold" className="relative z-10 shrink-0" /></a>
+        ? <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={onApplied} title={canPropose ? 'Opens the job on Upwork. Only a proposal sent from here marks it Applied.' : undefined} className={`${canPropose ? 'upwork-view-button' : 'upwork-apply-button'} flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl text-sm font-bold`}><span className="relative z-10 truncate">Apply on Upwork</span><ArrowSquareOut size={15} weight="bold" className="relative z-10 shrink-0" /></a>
         : <span className="flex h-11 items-center justify-center rounded-2xl bg-[var(--frame)] text-xs font-semibold text-[var(--muted)]">No Upwork link</span>)}
     </div>}
     {proposing && <ProposalDialog job={job} onClose={() => setProposing(false)} />}
@@ -71,7 +73,7 @@ export default function JobApplySection({ job, statusLabel, dismissed, rejectRea
           <p className="text-xs font-bold leading-4">{resolved === 'applied' ? 'Applied' : 'Not a fit'}</p>
           <p className="mt-0.5 truncate text-[11px] leading-4 opacity-75">{resolved === 'applied' ? 'In your Applied list' : rejectReason ? `Reason: ${rejectReason}` : 'In your Rejected list'}</p>
         </div>
-        <button type="button" onClick={onUndo} disabled={undoing} title="Move this job back to New" className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--surface)]/70 px-3 text-[11px] font-bold ring-1 transition-colors hover:bg-[var(--surface)] disabled:opacity-60 ${resolved === 'applied' ? 'ring-[var(--lime-dark)]/30' : 'ring-[var(--reject-line)]'}`}>
+        <button type="button" onClick={onUndo} disabled={undoing} title="Move this job back to New" className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--surface)]/70 px-3 !text-[11px] !font-bold ring-1 transition-colors hover:bg-[var(--surface)] disabled:opacity-60 ${resolved === 'applied' ? 'ring-[var(--lime-dark)]/30' : 'ring-[var(--reject-line)]'}`}>
           {undoing ? <span className="size-3 animate-spin rounded-full border-2 border-[var(--line)] border-t-current" /> : <ArrowUUpLeft size={13} weight="bold" />}
           {undoing ? 'Undoing…' : 'Undo'}
         </button>
@@ -148,7 +150,7 @@ function RejectReasonMenu({ dismissed, onReject }) {
   const item = 'flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-[var(--ink)] transition-colors hover:bg-[var(--paper)]'
 
   return <div ref={root} className="relative flex flex-1">
-    <button type="button" onClick={() => setOpen((value) => !value)} aria-pressed={dismissed} aria-haspopup="menu" aria-expanded={open} className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 text-xs font-semibold transition-colors ${dismissed || open ? 'bg-[var(--reject-bg)] text-[var(--reject-text)] ring-1 ring-[var(--reject-line)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}><X size={14} />Not a fit</button>
+    <button type="button" onClick={() => setOpen((value) => !value)} aria-pressed={dismissed} aria-haspopup="menu" aria-expanded={open} className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 !text-xs !font-semibold transition-colors ${dismissed || open ? 'bg-[var(--reject-bg)] text-[var(--reject-text)] ring-1 ring-[var(--reject-line)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}><X size={14} />Not a fit</button>
     {open && <div role="menu" aria-label="Why is this job not a fit?" className="absolute left-0 right-0 top-[calc(100%+.5rem)] z-30 rounded-2xl bg-[var(--surface)] p-1.5 shadow-[0_18px_50px_rgb(var(--shadow-rgb)/.18)] ring-1 ring-[var(--line)]">
       <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">Why is it not a fit?</p>
       {REJECT_REASONS.map((reason) => <button key={reason} type="button" role="menuitem" onClick={() => pick(reason)} className={item}>{reason}</button>)}
