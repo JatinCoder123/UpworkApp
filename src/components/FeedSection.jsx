@@ -14,6 +14,7 @@ import { ItemDrawer, OutputRow, StageChip } from './GenerateOutput'
 import { FactList, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow, stripRow } from './FeedParts'
 import { primaryButton } from './ui'
 import ErrorBoundary, { CardError, DialogError, SectionError } from './ErrorBoundary'
+import NotFound from '../pages/NotFound'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../services/api'
 import { EMPTY_DATE_RANGE } from '../lib/dateRange'
@@ -98,7 +99,7 @@ export default function FeedSection({ definition, onSettings }) {
   })
   const { activeId, jumpTo } = useFeedIndex(items)
   // The open record is in the link (?record=id), as in the other sections.
-  const { open, openItem, closeItem } = useOpenItem(feed, items, 'record')
+  const { open, openItem, closeItem, missing } = useOpenItem(feed, items, 'record')
   const watchedItems = useMemo(() => (open && !items.some((item) => item.id === open.id) ? [...items, open] : items), [items, open])
   const readGeneration = useMemo(() => (ids) => api.getModuleGeneration(module, outputs, ids), [module, outputs])
   useGenerationWatch({ feed, items: watchedItems, types: outputs, read: readGeneration })
@@ -113,6 +114,9 @@ export default function FeedSection({ definition, onSettings }) {
   const activeChips = Object.keys(filterFields).flatMap((key) => (filters[key] || []).map((value) => [key, value, labelOf(key, value)]))
   const listSection = filterSections.find((entry) => entry.key === listKey)
   const noun = title
+
+  // A ?record= link whose record does not open: the error page at that link, as /jobs/:id shows it.
+  if (missing) return <NotFound record="item" error={missing.error} onRetry={missing.retry} retrying={missing.retrying} backTo={`/feeds/${asText(definition.id)}`} backLabel={`Back to ${title}`} />
 
   return <Shell>
     <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-4 sm:px-6 md:pt-6">

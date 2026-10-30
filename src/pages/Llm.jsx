@@ -13,6 +13,7 @@ import FilterListDialog from '../components/FilterListDialog'
 import { FactList, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow, stripRow } from '../components/FeedParts'
 import { DialogHeader, Modal, primaryButton } from '../components/ui'
 import ErrorBoundary, { CardError, DialogError } from '../components/ErrorBoundary'
+import NotFound from './NotFound'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../services/api'
 import { EMPTY_DATE_RANGE } from '../lib/dateRange'
@@ -158,7 +159,10 @@ export default function Llm() {
   // A journey step can be opened from the strip or the details even when the filters leave it out of the list.
   // The open item (a card or a journey step) is in the link (?llm=id).
   const openable = useMemo(() => [...items, ...journeySteps], [items, journeySteps])
-  const { open, openItem, closeItem } = useOpenItem('llm', openable, 'llm')
+  const { open, openItem, closeItem, missing } = useOpenItem('llm', openable, 'llm')
+
+  // A ?llm= link whose item does not open: the error page at that link, as /jobs/:id shows it.
+  if (missing) return <NotFound record="item" error={missing.error} onRetry={missing.retry} retrying={missing.retrying} backTo="/llm" backLabel="Back to LLM" />
 
   return <Shell>
     <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-4 sm:px-6 md:pt-6">

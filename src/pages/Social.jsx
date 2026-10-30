@@ -12,6 +12,7 @@ import FilterListDialog from '../components/FilterListDialog'
 import { FactList, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow, stripRow } from '../components/FeedParts'
 import { DialogHeader, Modal, primaryButton } from '../components/ui'
 import ErrorBoundary, { CardError, DialogError } from '../components/ErrorBoundary'
+import NotFound from './NotFound'
 import { useAuth } from '../contexts/AuthContext'
 import { EMPTY_DATE_RANGE } from '../lib/dateRange'
 import { countFilters } from '../lib/feedView'
@@ -112,9 +113,12 @@ export default function Social() {
   // The picked post is in the link (?social=id). A wide screen shows it beside the queue (the first post until one is
   // picked); a phone opens it in a dialog.
   const wide = useWideScreen()
-  const { open, openItem, closeItem } = useOpenItem('social', items, 'social')
+  const { open, openItem, closeItem, missing } = useOpenItem('social', items, 'social')
   const shown = open || items[0]
   const pick = openItem
+
+  // A ?social= link whose post does not open: the error page at that link, as /jobs/:id shows it.
+  if (missing) return <NotFound record="item" error={missing.error} onRetry={missing.retry} retrying={missing.retrying} backTo="/social" backLabel="Back to Social" />
 
   return <Shell>
     <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-4 sm:px-6 md:pt-6">

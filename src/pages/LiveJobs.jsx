@@ -15,6 +15,7 @@ import { timeAgo, useNow } from '../lib/time'
 import { useSaveToCrm } from '../lib/crmSave'
 import { useAuth } from '../contexts/AuthContext'
 import ErrorBoundary, { CardError } from '../components/ErrorBoundary'
+import NotFound from './NotFound'
 import { asArray, asObject, asText } from '../lib/safe'
 
 const AUTO_SCAN_MS = 5 * 60_000
@@ -170,9 +171,8 @@ export default function LiveJobs() {
 
   const jobs = useMemo(() => asArray(result?.jobs), [result])
   const scanErrors = asArray(result?.errors)
-  // Live jobs only exist in this browser's last scan; a ?job= link to one that is gone is dropped.
+  // Live jobs only exist in this browser's last scan; a ?job= link to one that is not in it shows "Live job expired".
   const preview = previewId ? jobs.find((job) => job.id === previewId) || null : null
-  useEffect(() => { if (previewId && !preview) closePreview() }, [previewId, preview, closePreview])
   const visibleJobs = useMemo(() => {
     const compare = (LIVE_SORTS.find((item) => item.id === sort) || LIVE_SORTS[0]).compare
     return jobs
@@ -188,6 +188,9 @@ export default function LiveJobs() {
     const ctx = gsap.context(() => gsap.fromTo('[data-card]', { y: 8, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .35, stagger: .025, ease: 'power2.out', clearProps: 'transform' }), root)
     return () => ctx.revert()
   }, [result])
+
+  // A ?job= link to a live job that is not in this browser's last scan: the page at that link, as /live-jobs/:id shows it.
+  if (previewId && !preview) return <NotFound title="Live job expired." message="Live jobs are kept only for this browser session, so this link no longer opens it. Run a new live scan to find it again." backTo="/live-jobs" backLabel="Back to Live Jobs" />
 
   return <Shell><main ref={root} className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-4 sm:px-6 md:pt-6">
     {can('Jobs') && <Link to="/jobs" className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--muted)] transition-colors hover:text-[var(--ink)]"><span className="grid size-8 place-items-center rounded-full bg-[var(--surface)] ring-1 ring-[var(--line)]"><ArrowLeft size={14} /></span>Jobs feed</Link>}

@@ -174,6 +174,20 @@ function getErrorPreset(errorType, currentPath, roleLabel) {
         backLabel: 'Back to AI News',
         canRetry: false,
       }
+    case 'item-not-found':
+      return {
+        code: '404.',
+        heading: 'Item not found.',
+        description: (
+          <>
+            We couldn’t find an item matching {urlCode}. It may have been removed, or the link is incorrect.{' '}
+            <span className="font-semibold text-[var(--ink)]">That’s all we know.</span>
+          </>
+        ),
+        backTo: '',
+        backLabel: '',
+        canRetry: false,
+      }
     case 'feed-not-found':
       return {
         code: '404.',
@@ -277,15 +291,18 @@ function getErrorPreset(errorType, currentPath, roleLabel) {
 
 /**
  * The page for a URL that opens nothing, at that URL (never a redirect): an unknown address (404), a section the role
- * cannot open (403), or a record page whose id fails. For a record page pass `record` ('job', 'news', 'feed') and the
- * read's `error`: an id that opens nothing (deleted, expired, a wrong or malformed id) shows that record's "not found"
- * page; a read that failed (offline, timeout, server, session) shows that error, with Try again (`onRetry`).
+ * cannot open (403), or a record whose id fails, on its own page or in a link (?job=, ?record=). For a record pass
+ * `record` ('job', 'news', 'feed', 'item') and the read's `error`: an id that opens nothing (deleted, expired, a wrong or
+ * malformed id) shows that record's "not found" page; a read that failed (offline, timeout, server, session) shows that
+ * error, with Try again (`onRetry`). `retrying`: the record is being read (the first try or Try again), so a loader
+ * shows meanwhile instead of the page behind it.
  */
 export default function NotFound({
   type,
   record,
   error,
   onRetry,
+  retrying = false,
   title,
   message,
   backTo,
@@ -315,8 +332,9 @@ export default function NotFound({
   const resolvedBackLabel = backAllowed ? backLabel || preset.backLabel : 'Back to your workspace'
   const targetBackTo = isAuthenticated && resolvedType !== 'unauthorized' ? resolvedBackTo : '/login'
   const targetBackLabel = isAuthenticated && resolvedType !== 'unauthorized' ? resolvedBackLabel : 'Return to sign in'
-  // The session is still being checked: wait, rather than show a signed-in user the "Sign in" version for a moment.
-  if (status === 'loading') return <SessionLoader />
+  // The session is still being checked (rather than show a signed-in user the "Sign in" version for a moment), or
+  // Try again is under way.
+  if (status === 'loading' || retrying) return <SessionLoader />
 
   const content = (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-16 sm:px-6 md:py-24">

@@ -14,6 +14,7 @@ import { ItemDrawer, OutputRow, StageChip } from '../components/GenerateOutput'
 import { FactList, FeedIndex, FilterButton, FilterChip, FilterStrip, Metric, MoreLoader, metricRow, stripRow } from '../components/FeedParts'
 import { primaryButton } from '../components/ui'
 import ErrorBoundary, { CardError, DialogError, SectionError } from '../components/ErrorBoundary'
+import NotFound from './NotFound'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../services/api'
 import { EMPTY_DATE_RANGE } from '../lib/dateRange'
@@ -124,7 +125,7 @@ export default function AppScript() {
   })
   const { activeId, jumpTo } = useFeedIndex(items)
   // The open idea is in the link (?appscript=id); one opened from a link that is not in the list is followed too.
-  const { open, openItem, closeItem } = useOpenItem('appscript', items, 'appscript')
+  const { open, openItem, closeItem, missing } = useOpenItem('appscript', items, 'appscript')
   // A line per idea in the lists (the page's and the drawer's): app, category, age, and the demand score.
   const indexMeta = (item) => { const [AppIcon] = APPS[item.apps[0]] || [Stack]; return <><AppIcon size={10} /><span className="truncate">{labelOf('category', item.category)} · {timeAgo(item.publishedAt, now)}</span></> }
   const indexMark = (item) => item.demandScore != null && <span title={`Demand score ${item.demandScore}`} className="mt-0.5 shrink-0 self-start rounded-md bg-[var(--paper)] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{item.demandScore}</span>
@@ -156,6 +157,9 @@ export default function AppScript() {
   const removeFilter = (key, value) => setFilters((current) => ({ ...current, [key]: current[key].filter((entry) => entry !== value) }))
   const activeChips = Object.entries(FIELDS).flatMap(([key, [field]]) => filters[key].map((value) => [key, value, labelOf(field, value)]))
   const listSection = filterSections.find((entry) => entry.key === listKey)
+
+  // A ?appscript= link whose idea does not open: the error page at that link, as /jobs/:id shows it.
+  if (missing) return <NotFound record="item" error={missing.error} onRetry={missing.retry} retrying={missing.retrying} backTo="/appscript" backLabel="Back to AppScript" />
 
   return <Shell>
     <main className="mx-auto w-full max-w-[1500px] px-4 pb-20 pt-4 sm:px-6 md:pt-6">

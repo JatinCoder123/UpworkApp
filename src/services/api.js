@@ -1092,7 +1092,8 @@ export async function fetchJobs(options = {}) {
 export async function fetchJobById(id, userEmail) {
   if (!id || !String(id).trim()) throw createAppError("JOB_NOT_FOUND", "Job not found");
   const data = await smartGateway({ action: "fetch", module: JOBS_MODULE, filters: { id, ...(await engagementFilters(userEmail)) }, page: 1, per_page: 1 });
-  const record = asArray(data.records).find((item) => item?.id === id);
+  // Only the record with exactly this id (never one a partial or edited id happens to match), and not a deleted one.
+  const record = asArray(data.records).find((item) => item?.id === id && item.deleted !== "1");
   if (!record) throw createAppError("JOB_NOT_FOUND", "Job not found");
   return mapGatewayJob(record);
 }
@@ -1982,7 +1983,8 @@ export async function fetchTechNewsById(id) {
     per_page: 1,
   });
 
-  const record = asArray(data.records).find((item) => item?.id === id);
+  // Only the record with exactly this id (never one a partial or edited id happens to match), and not a deleted one.
+  const record = asArray(data.records).find((item) => item?.id === id && item.deleted !== "1");
   if (!record) throw createAppError("STORY_NOT_FOUND", "Story not found");
   return mapGatewayTechNews(record);
 }

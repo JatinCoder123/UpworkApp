@@ -25,7 +25,8 @@ import { useCrmReactions } from "../lib/crmReactions";
 import { useJobStatus } from "../lib/jobStatus";
 import ErrorBoundary, { CardError } from "../components/ErrorBoundary";
 import { LoadMoreError } from "../components/FeedParts";
-import { notify, openFailedNotice, useRefreshFailedNotice } from "../lib/notify";
+import { useRefreshFailedNotice } from "../lib/notify";
+import NotFound from "./NotFound";
 import { timeAgo, useNow } from "../lib/time";
 import { useAuth } from "../contexts/AuthContext";
 import { asArray, asObject, asText } from "../lib/safe";
@@ -335,19 +336,13 @@ export default function Jobs() {
 
   // A refreshed or shared ?job= link can point at a job outside the loaded pages; fetch that one on its own.
   const listedPreview = previewId ? allDisplayJobs.find((job) => job.id === previewId) : null;
-  const { data: fetchedPreview, isError: previewMissing, error: previewError } = useQuery({
+  const { data: fetchedPreview, isError: previewFailed, isFetching: previewFetching, error: previewError, refetch: refetchPreview } = useQuery({
     queryKey: ["job", previewId],
     queryFn: () => api.getJob(previewId, user?.email),
     enabled: Boolean(previewId) && !listedPreview,
     retry: false,
   });
   const preview = listedPreview || (fetchedPreview?.id === previewId ? fetchedPreview : null);
-  // A link to a job that is gone, or that could not be read, closes the preview with a toast saying which.
-  useEffect(() => {
-    if (!previewMissing) return;
-    notify(openFailedNotice("Job", previewError));
-    closePreview();
-  }, [previewMissing, previewError, closePreview]);
 
   // Text search runs on the gateway; status "New" (New + Seen), saved/liked and multi-skill selection are applied to the loaded pages.
   // Every active filter must match, so they all combine.
@@ -441,6 +436,11 @@ export default function Jobs() {
     setPreferenceToggle(false);
     window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   };
+
+  // A ?job= link to a job that is not in the loaded pages is read first, with a loader in place of the list, so a bad
+  // link goes straight to its error page (as /jobs/:id does) instead of showing the list first. A job that does not
+  // open (deleted, expired, a wrong id, or not readable now) shows that page; Back to Jobs and Go back leave it.
+  if (previewId && !preview && (previewFailed || previewFetching)) return <NotFound record="job" error={previewError} onRetry={() => refetchPreview()} retrying={previewFetching} backTo="/jobs" backLabel="Back to Jobs" />;
 
   return (
     <Shell>
