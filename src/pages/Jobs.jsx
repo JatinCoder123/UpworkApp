@@ -685,7 +685,7 @@ export default function Jobs() {
 
         {/* Feeder and applications alerts as the page opens; an extra, so a failure there hides them and nothing else. */}
         <ErrorBoundary name="job-alerts" fallback={NoAlerts}><JobAlerts userEmail={user?.email} allJobs={showAllJobs} onShowNew={showNewJobs} /></ErrorBoundary>
-        {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} onApply={jobStatus.markApplied} applyError={jobStatus.errorId === preview.id ? `Could not mark this job as applied: ${jobStatus.error?.message || "please try again."}` : ""} />}
+        {preview && <JobDrawer job={preview} jobs={filtered} onSelect={(job) => openPreview(job.id)} onClose={closePreview} />}
         {adding && <AddJobDialog onClose={() => setAdding(false)} />}
         {liveSearching && <LiveSearchDialog skillRecords={skillRecords} skillsLoading={skillsLoading || isFetchingMoreSkills} onClose={() => setLiveSearching(false)} />}
         {mySkillsOpen && <MySkillsDialog onClose={() => setMySkillsOpen(false)} onSaved={(saved) => saved.length && changeMySkills(true)} />}

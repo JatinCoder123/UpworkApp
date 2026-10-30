@@ -175,11 +175,12 @@ const lastStatusByContentId = new Map();
 
 /**
  * Normalizes status strings from backend payloads.
- * Handles 'compiliing', 'compiling', 'queued', 'processing', 'completed', 'failed'.
+ * Handles 'compiliing', 'compiling', 'queued', 'processing', 'completed', 'failed', also with the time the generator
+ * set it ("completed 2026-10-30 06:39 UTC", as the job PDF's status is kept).
  */
 export function normalizeDocStatus(rawStatus) {
   if (!rawStatus) return '';
-  const s = String(rawStatus).toLowerCase().trim();
+  const s = String(rawStatus).toLowerCase().trim().replace(/\s+\d{4}-\d{2}-\d{2}.*$/, '');
   if (s === 'compiliing' || s === 'compiling') return 'compiling';
   if (s === 'queued') return 'queued';
   if (s === 'processing' || s === 'process' || s === 'in_progress') return 'processing';

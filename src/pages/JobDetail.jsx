@@ -7,7 +7,7 @@ import Shell from '../components/Shell'
 import NotFound from './NotFound'
 import ExpandableText from '../components/ExpandableText'
 import AskAiSelection from '../components/AskAiSelection'
-import { AboutClient, CoverLetter, FactTile, LinkifiedDescription, Panel, Tips, card } from '../components/JobDetailParts'
+import { AboutClient, CoverLetter, FactTile, JobPdf, LinkifiedDescription, Panel, Tips, card } from '../components/JobDetailParts'
 import JobApplySection from '../components/JobApplySection'
 import ErrorBoundary from '../components/ErrorBoundary'
 import ShareJobDialog from '../components/ShareJobDialog'
@@ -99,7 +99,6 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
     job={job}
     statusLabel={job.status}
     dismissed={job.status === 'Rejected'}
-    onApplied={() => status.markApplied(job)}
     onDismiss={(reason) => status.markNotFit(job, reason)}
     rejectReason={rejectReason}
     statusError={status.errorId === job.id ? status.error?.message || 'Could not update this job.' : ''}
@@ -173,6 +172,8 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
         <ErrorBoundary name="tips" resetKey={job.id}><Tips job={job} onTips={setTips} /></ErrorBoundary>
 
         <ErrorBoundary name="cover-letter" resetKey={job.id}><CoverLetter job={job} onLetter={setLetter} /></ErrorBoundary>
+
+        <ErrorBoundary name="job-pdf" resetKey={job.id}><JobPdf job={job} /></ErrorBoundary>
 
         {embedded && <div data-detail className="xl:hidden">{activity}</div>}
       </div>

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowClockwise, Briefcase, Check, Clock, Copy, CurrencyDollar, FilePdf, FileText, FloppyDisk, Hourglass, Lightbulb, PencilSimple, Quotes, SealCheck, Sparkle, Star, Target, User, Users, WarningCircle } from '@phosphor-icons/react'
+import { ArrowClockwise, Briefcase, Check, Clock, Copy, CurrencyDollar, Eye, FilePdf, FileText, FloppyDisk, Hourglass, Lightbulb, PencilSimple, Quotes, SealCheck, Sparkle, Star, Target, User, Users, WarningCircle } from '@phosphor-icons/react'
+import DownloadButton from './DownloadButton'
 import ExpandableText from './ExpandableText'
-import { GenerateProgress } from './GenerateOutput'
+import { GenerateProgress, StageChip } from './GenerateOutput'
 import { api } from '../services/api'
 import { initDocSocket, subscribeDocStatus } from '../services/docSocket'
-import { downloadCoverLetterPdf } from '../lib/coverLetterPdf'
-import { isRunning, stageOf } from '../lib/generation'
+import { STAGES, isRunning, stageOf } from '../lib/generation'
 import { asObject, asText } from '../lib/safe'
+import { timeAgo, useNow } from '../lib/time'
 import { useAuth } from '../contexts/AuthContext'
 
 // Building blocks shared by the CRM job detail and the live Upwork job detail.
@@ -115,8 +116,20 @@ const SUGGESTION_PICKS = [
   'End with a clear call to action',
   'Add one smart question for the client',
 ]
-// A status event can come just before the CRM is saved; then the job is read once more this much later.
+// Quick picks for a PDF regenerate suggestion.
+const PDF_SUGGESTION_PICKS = [
+  'Keep it to one page',
+  'Use a more formal tone',
+  'Highlight relevant past projects',
+  'Add a clear project timeline',
+  'Add a cost breakdown',
+  'End with a clear call to action',
+]
+// A "completed" event can come just before the CRM is saved; then the job is read once more this much later.
 const RECHECK_MS = 3000
+// What a doc-status event's type ("type" in the socket payload) says for each output kept on the job.
+const OUTPUT_TYPES = { coverLetterGeneration: 'cover', pdfGeneration: 'pdf' }
+const pill = 'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[var(--line)] transition-colors disabled:pointer-events-none disabled:opacity-45'
 
 // Activity entries a cover letter change records; JobActivity shows them as "<user> generated the cover letter" etc.
 export const COVER_LETTER_ACTIVITY = {
@@ -125,9 +138,81 @@ export const COVER_LETTER_ACTIVITY = {
   edited: 'Cover letter edited',
   regenerated: 'Cover letter regenerated',
 }
+// Activity entries the job's PDF records, the same way.
+const PDF_ACTIVITY = {
+  generated: 'PDF generated',
+  regenerated: 'PDF regenerated',
+}
 
 /**
- * The job's cover letter. Without one: fetch it or write your own. With one: read it, copy it, download it, edit it,
+ * While a job's output (its cover letter or PDF: `field` on the job) is being made, the backend's WebSocket moves it on
+ * (the doc-status events AppScript follows); the page does not ask the CRM on a timer. An event for this job and output
+ * sets its status in place, with no CRM read, and an event that repeats the status changes nothing. The CRM is read only
+ * when it is completed (for the new letter, or the PDF's links when the event did not bring them) and when the socket
+ * comes back after a drop, for an event missed meanwhile.
+ */
+function useJobGenerationWatch(jobId, field, running) {
+  const queryClient = useQueryClient()
+  useEffect(() => {
+    if (!running) return undefined
+    const key = ['job', jobId]
+    let stopped = false
+    let dropped = false
+    const timers = new Set()
+    const current = () => asObject(queryClient.getQueryData(key)?.[field])
+    const patch = (changes) => queryClient.setQueryData(key, (data) => (data ? { ...data, [field]: { ...asObject(data[field]), ...changes } } : data))
+    // One read of the job; when an event said `status` but the CRM does not show it yet, one more a moment later.
+    const read = async (status) => {
+      await queryClient.invalidateQueries({ queryKey: key })
+      if (stopped || !status || current().status === status) return
+      const timer = window.setTimeout(() => { timers.delete(timer); queryClient.invalidateQueries({ queryKey: key }) }, RECHECK_MS)
+      timers.add(timer)
+    }
+    // Names this job, and is not about its other output (an event without a known type counts for both).
+    const ours = (event) => {
+      const values = [event.contentId, event.noteId, ...Object.values(asObject(event.raw))].map((value) => String(value ?? ''))
+      const type = String(event.raw?.type || event.raw?.doc_type || '').toLowerCase()
+      const known = Object.values(OUTPUT_TYPES).filter((name) => type.includes(name))
+      return values.includes(jobId) && (!known.length || known.includes(OUTPUT_TYPES[field]))
+    }
+    const unsubscribe = subscribeDocStatus((event) => {
+      if (!ours(event) || !STAGES.includes(event.status) || event.status === current().status) return
+      if (event.status !== 'completed') { patch({ status: event.status }); return }
+      if (field === 'pdfGeneration' && event.viewUrl && event.documentUrl) { patch({ status: 'completed', viewUrl: event.viewUrl, downloadUrl: event.documentUrl }); return }
+      read('completed')
+    })
+    const socket = initDocSocket()
+    const drop = () => { dropped = true }
+    const catchUp = () => { if (dropped) { dropped = false; read() } }
+    socket.on('disconnect', drop)
+    socket.on('connect', catchUp)
+    return () => {
+      stopped = true
+      unsubscribe()
+      socket.off('disconnect', drop)
+      socket.off('connect', catchUp)
+      timers.forEach(window.clearTimeout)
+    }
+  }, [running, jobId, field, queryClient])
+}
+
+// The box Regenerate opens: what should change (typed, or quick picks added one per line), then `onSubmit`.
+function SuggestionBox({ question, placeholder, picks, submitLabel, value, onChange, onCancel, onSubmit }) {
+  return <form onSubmit={onSubmit} className="mt-4 rounded-2xl bg-[var(--lime-tint)]/[.12] p-4 ring-1 ring-[var(--lime-dark)]/25">
+    <label className="block">
+      <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-strong)]"><Sparkle size={14} weight="fill" />{question}</span>
+      <textarea autoFocus rows={3} maxLength={2000} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-2 w-full resize-y rounded-xl bg-[var(--surface)] px-3 py-2 text-sm leading-6 outline-none ring-1 ring-[var(--line)] placeholder:text-[var(--muted)] focus:ring-[var(--lime-dark)]" />
+    </label>
+    <div className="mt-2 flex flex-wrap gap-1.5">{picks.map((item) => <button key={item} type="button" onClick={() => onChange(value.trim() ? `${value.trim()}\n${item}` : item)} className="rounded-full bg-[var(--surface)] px-3 py-1.5 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)] transition-colors hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]">{item}</button>)}</div>
+    <div className="mt-3 flex items-center justify-end gap-2">
+      <button type="button" onClick={onCancel} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>Cancel</button>
+      <button type="submit" disabled={!value.trim()} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--ink)] px-4 text-xs font-semibold text-white transition-opacity disabled:opacity-45"><ArrowClockwise size={13} weight="bold" />{submitLabel}</button>
+    </div>
+  </form>
+}
+
+/**
+ * The job's cover letter. Without one: fetch it or write your own. With one: read it, copy it, edit it,
  * or Regenerate it with a suggestion (CRM jobs): the suggestion, generate_cover_letter and "queued" are saved on the
  * job, the CRM generator writes the new letter, and the steps show here until it is ready (or failed).
  */
@@ -165,35 +250,8 @@ export function CoverLetter({ job, onLetter }) {
     // The new entry in the job's activity. The letter is not read again here: the WebSocket says when it changes.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['job-activity', job.id] }),
   })
-  // While the generator writes the new letter, the page does not ask the CRM on a timer: it listens to the backend's
-  // WebSocket (the doc-status events AppScript follows). An event that names this job reads the job once; so does the
-  // socket reconnecting, for an event missed while it was down.
-  useEffect(() => {
-    if (!running) return undefined
-    let stopped = false
-    const timers = new Set()
-    const read = async (event) => {
-      await queryClient.invalidateQueries({ queryKey: ['job', job.id] })
-      if (stopped) return
-      // The event can come just before the CRM is saved: if the job does not show that status yet, one more read later.
-      const status = queryClient.getQueryData(['job', job.id])?.coverLetterGeneration?.status
-      if (event?.status && status !== event.status) {
-        const timer = window.setTimeout(() => { timers.delete(timer); read() }, RECHECK_MS)
-        timers.add(timer)
-      }
-    }
-    const names = (event) => [event.contentId, event.noteId, ...Object.values(asObject(event.raw))].map((value) => String(value ?? '')).includes(job.id)
-    const unsubscribe = subscribeDocStatus((event) => { if (names(event)) read(event) })
-    const socket = initDocSocket()
-    const catchUp = () => read()
-    socket.on('connect', catchUp)
-    return () => {
-      stopped = true
-      unsubscribe()
-      socket.off('connect', catchUp)
-      timers.forEach(window.clearTimeout)
-    }
-  }, [running, job.id, queryClient])
+  // While the generator writes the new letter, the WebSocket says when the job changes.
+  useJobGenerationWatch(job.id, 'coverLetterGeneration', running)
   const startRegenerate = (event) => {
     event.preventDefault()
     const text = request.trim()
@@ -202,14 +260,11 @@ export function CoverLetter({ job, onLetter }) {
     // If it cannot be saved, the box opens again with what was written.
     regenerate.mutate(text, { onError: () => setRequest(text) })
   }
-  const pdf = useMutation({ mutationFn: () => downloadCoverLetterPdf(current, job.title) })
-  const pill = 'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-[var(--line)] transition-colors disabled:pointer-events-none disabled:opacity-45'
   // Edit and Regenerate: once there is a letter, while nothing else is changing it.
   const changeable = Boolean(job.coverLetter) && !editing && !running && !save.isPending && request === null
 
   const action = <div className="flex flex-wrap justify-end gap-2">
     {current && <button type="button" onClick={() => copy('letter', current)} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>{copied === 'letter' ? <Check size={13} weight="bold" /> : <Copy size={13} />}{copied === 'letter' ? 'Copied' : 'Copy'}</button>}
-    {current.trim() && <button type="button" disabled={pdf.isPending} onClick={() => pdf.mutate()} title={pdf.isError ? pdf.error?.message : 'Download as PDF'} className={`${pill} ${pdf.isError ? 'text-[var(--bad)]' : 'text-[var(--muted)] hover:text-[var(--ink)]'}`}>{pdf.isPending ? <span className="size-3 animate-spin rounded-full border-2 border-current/30 border-t-current" /> : <FilePdf size={13} />}{pdf.isPending ? 'Generating…' : pdf.isError ? 'Retry PDF' : 'PDF'}</button>}
     {changeable && <button type="button" onClick={() => setDraft(asText(job.coverLetter))} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}><PencilSimple size={13} />Edit</button>}
     {changeable && generation && <button type="button" onClick={() => { regenerate.reset(); setRequest('') }} title="Regenerate the cover letter with your suggestion" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs font-semibold text-white transition-transform hover:-translate-y-0.5"><ArrowClockwise size={13} weight="bold" />Regenerate</button>}
   </div>
@@ -247,23 +302,115 @@ export function CoverLetter({ job, onLetter }) {
         </div>}
 
     {/* Regenerate: what should change (typed, or quick picks added), then the generator writes a new letter. */}
-    {request !== null && <form onSubmit={startRegenerate} className="mt-4 rounded-2xl bg-[var(--lime-tint)]/[.12] p-4 ring-1 ring-[var(--lime-dark)]/25">
-      <label className="block">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-strong)]"><Sparkle size={14} weight="fill" />What should change in the cover letter?</span>
-        <textarea autoFocus rows={3} maxLength={2000} value={request} onChange={(event) => setRequest(event.target.value)} placeholder="e.g. Make it shorter and mention our Shopify work" className="mt-2 w-full resize-y rounded-xl bg-[var(--surface)] px-3 py-2 text-sm leading-6 outline-none ring-1 ring-[var(--line)] placeholder:text-[var(--muted)] focus:ring-[var(--lime-dark)]" />
-      </label>
-      <div className="mt-2 flex flex-wrap gap-1.5">{SUGGESTION_PICKS.map((item) => <button key={item} type="button" onClick={() => setRequest((text) => (text.trim() ? `${text.trim()}\n${item}` : item))} className="rounded-full bg-[var(--surface)] px-3 py-1.5 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--line)] transition-colors hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]">{item}</button>)}</div>
-      <div className="mt-3 flex items-center justify-end gap-2">
-        <button type="button" onClick={() => setRequest(null)} className={`${pill} text-[var(--muted)] hover:text-[var(--ink)]`}>Cancel</button>
-        <button type="submit" disabled={!request.trim()} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[var(--ink)] px-4 text-xs font-semibold text-white transition-opacity disabled:opacity-45"><ArrowClockwise size={13} weight="bold" />Regenerate cover letter</button>
-      </div>
-    </form>}
+    {request !== null && <SuggestionBox question="What should change in the cover letter?" placeholder="e.g. Make it shorter and mention our Shopify work" picks={SUGGESTION_PICKS} submitLabel="Regenerate cover letter" value={request} onChange={setRequest} onCancel={() => setRequest(null)} onSubmit={startRegenerate} />}
     {running && <div className="mt-4 rounded-2xl bg-[var(--paper)] p-4">
       <GenerateProgress stage={stage} name="cover letter" />
       {generation.suggestion && <p className="mt-2 flex gap-1.5 text-xs leading-5 text-[var(--muted)]"><Quotes size={12} weight="fill" className="mt-0.5 shrink-0" /><span className="min-w-0 whitespace-pre-wrap break-words">{generation.suggestion}</span></p>}
     </div>}
     {stage === 'failed' && request === null && <p role="alert" className="mt-3 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />The cover letter could not be regenerated this time. Regenerate it again, maybe with another suggestion.</p>}
     {regenerate.isError && <p role="alert" className="mt-3 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{regenerate.error?.message || 'It could not be started. Please try again.'}</p>}
+  </Panel>
+}
+
+// The PDF's file tile; red-tinted like a PDF, pulsing while it is made, in the failed colours when it could not be.
+function PdfTile({ busy = false, failed = false }) {
+  return <span className={`grid size-12 shrink-0 place-items-center rounded-2xl ring-1 ring-[var(--line)]/70 ${failed ? 'bg-danger-bg text-danger' : 'bg-tone-rose-bg text-tone-rose'}`}>
+    <FilePdf size={24} weight="duotone" className={busy ? 'animate-pulse' : ''} />
+  </span>
+}
+
+const pdfFileName = (title) => `${String(title || 'job').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'job'}.pdf`
+
+/**
+ * The job's PDF (CRM jobs). Generate PDF ticks generate_pdf with "queued" on the job; the CRM generator makes it and the
+ * steps show here as the WebSocket reports them; once completed it can be viewed or downloaded. Regenerate first asks
+ * what should change (a suggestion, typed or picked) and the generator makes a new one; the last PDF stays, faded,
+ * until the new one is ready.
+ */
+export function JobPdf({ job }) {
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const now = useNow()
+  // The regenerate suggestion being written; null while its box is closed.
+  const [request, setRequest] = useState(null)
+  const pdf = asObject(job.pdfGeneration)
+  const stage = stageOf(pdf)
+  const running = isRunning(stage)
+  const hasFile = Boolean(pdf.viewUrl || pdf.downloadUrl)
+  // Shown as queued straight away, put back if it cannot be saved.
+  const generate = useMutation({
+    mutationFn: ({ suggestion, activity }) => api.generateJobPdf(job, suggestion, { userEmail: user?.email, activity }),
+    onMutate: async ({ suggestion }) => {
+      // A read already on its way would bring back the old status.
+      await queryClient.cancelQueries({ queryKey: ['job', job.id] })
+      queryClient.setQueryData(['job', job.id], (data) => (data ? { ...data, pdfGeneration: { ...asObject(data.pdfGeneration), requested: true, status: 'queued', suggestion } } : data))
+      return { before: job.pdfGeneration }
+    },
+    onError: (_, __, context) => queryClient.setQueryData(['job', job.id], (data) => (data ? { ...data, pdfGeneration: context?.before } : data)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['job-activity', job.id] }),
+  })
+  useJobGenerationWatch(job.id, 'pdfGeneration', running)
+  // The first PDF (or another try after a failed one) starts straight away, without a suggestion box.
+  const start = () => generate.mutate({ suggestion: stage === 'failed' ? pdf.suggestion || '' : '', activity: hasFile ? PDF_ACTIVITY.regenerated : PDF_ACTIVITY.generated })
+  const startRegenerate = (event) => {
+    event.preventDefault()
+    const text = request.trim()
+    if (!text) return
+    setRequest(null)
+    // If it cannot be saved, the box opens again with what was written.
+    generate.mutate({ suggestion: text, activity: PDF_ACTIVITY.regenerated }, { onError: () => setRequest(text) })
+  }
+  const canRegenerate = (hasFile || stage === 'failed') && !running && !generate.isPending && request === null
+
+  const action = canRegenerate && <button type="button" onClick={() => { generate.reset(); setRequest('') }} title="Regenerate the PDF with your suggestion" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs font-semibold text-white transition-transform hover:-translate-y-0.5"><ArrowClockwise size={13} weight="bold" />Regenerate</button>
+  const subtitle = running ? (stage === 'queued' ? 'Queued · waiting for the generator…' : pdf.suggestion ? 'Regenerating with your suggestion…' : 'Generating…')
+    : stage === 'failed' ? 'Could not be generated this time'
+      : hasFile ? (pdf.suggestion ? 'Regenerated with your suggestion · saved in CRM' : 'Ready to view or download · saved in CRM')
+        : 'Not generated yet'
+  const button = 'inline-flex h-10 items-center gap-2 rounded-full px-4 text-xs font-semibold transition-transform hover:-translate-y-0.5'
+
+  return <Panel icon={FilePdf} title="PDF" subtitle={subtitle} action={action}>
+    {hasFile
+      // The file: View opens it in a new tab, Download saves it. While a new one is made it stays, faded.
+      ? <div aria-busy={running} className={`flex flex-col gap-4 rounded-2xl bg-[var(--paper)] p-4 transition-opacity duration-300 sm:flex-row sm:items-center ${running ? 'opacity-60' : ''}`}>
+        <div className="flex min-w-0 flex-1 items-center gap-3.5">
+          <PdfTile />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold" title={job.title}>{job.title}</p>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--muted)]">{running ? 'Previous version · replaced when the new one is ready' : <><StageChip stage="completed" />{stage === 'completed' && timeAgo(pdf.statusAt, now) ? `Generated ${timeAgo(pdf.statusAt, now).toLowerCase()}` : 'PDF'} · saved in CRM</>}</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs font-semibold">
+          {pdf.viewUrl && <a href={pdf.viewUrl} target="_blank" rel="noopener noreferrer" className={`${button} bg-[var(--lime)] text-[var(--on-lime)]`}><Eye size={15} weight="bold" />View PDF</a>}
+          {pdf.downloadUrl && <DownloadButton url={pdf.downloadUrl} filename={pdfFileName(job.title)} iconSize={15} className={`${button} bg-[var(--surface)] text-[var(--ink)] ring-1 ring-[var(--line)] hover:ring-[var(--lime-dark)] disabled:opacity-70`} />}
+        </div>
+      </div>
+      : !running && <div className="flex flex-col items-start gap-4 rounded-2xl border border-dashed border-[var(--line)] p-5 sm:flex-row sm:items-center">
+        <PdfTile failed={stage === 'failed'} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">{stage === 'failed' ? 'The PDF could not be generated' : stage === 'completed' ? 'The PDF has no links yet' : 'Generate a PDF for this job'}</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{stage === 'failed' ? 'Try again, or use Regenerate to tell the generator what to change.' : stage === 'completed' ? 'It is marked ready, but its view and download links are not in the CRM. Generate it again.' : 'Made from the job details. View or download it here once it is ready.'}</p>
+        </div>
+        <button type="button" disabled={generate.isPending} onClick={start} className={`${button} shrink-0 bg-[var(--ink)] text-white disabled:opacity-60`}>
+          {stage === 'idle' ? <FilePdf size={15} weight="bold" /> : <ArrowClockwise size={14} weight="bold" />}
+          {stage === 'idle' ? 'Generate PDF' : 'Try again'}
+        </button>
+      </div>}
+
+    {request !== null && <SuggestionBox question="What should change in the PDF?" placeholder="e.g. Keep it to one page and add a project timeline" picks={PDF_SUGGESTION_PICKS} submitLabel="Regenerate PDF" value={request} onChange={setRequest} onCancel={() => setRequest(null)} onSubmit={startRegenerate} />}
+    {running && <div className={`rounded-2xl bg-[var(--paper)] p-4 ${hasFile ? 'mt-4' : ''}`}>
+      {!hasFile && <div className="flex items-center gap-3.5">
+        <PdfTile busy />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">{stage === 'queued' ? 'Your PDF is in the queue' : 'Your PDF is being generated'}</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">It is made in the CRM, so you can leave this page meanwhile.</p>
+        </div>
+      </div>}
+      <GenerateProgress stage={stage} name="PDF" />
+      {pdf.suggestion && <p className="mt-2 flex gap-1.5 text-xs leading-5 text-[var(--muted)]"><Quotes size={12} weight="fill" className="mt-0.5 shrink-0" /><span className="min-w-0 whitespace-pre-wrap break-words">{pdf.suggestion}</span></p>}
+    </div>}
+    {stage === 'failed' && hasFile && request === null && <p role="alert" className="mt-3 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />The new PDF could not be generated this time. Regenerate it again, maybe with another suggestion.</p>}
+    {generate.isError && <p role="alert" className="mt-3 flex items-start gap-1.5 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={14} weight="fill" className="mt-0.5 shrink-0" />{generate.error?.message || 'It could not be started. Please try again.'}</p>}
   </Panel>
 }
 

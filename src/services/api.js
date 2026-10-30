@@ -2,6 +2,7 @@ import axios from "axios";
 import CryptoJS from "crypto-js";
 import { asArray, asObject, asText } from "../lib/safe";
 import { AUTH_ORIGIN } from "../lib/auth";
+import { normalizeDocStatus } from "./docSocket.js";
 
 export const CRM_BASE_URL = (import.meta.env?.VITE_CRM_BASE_URL || "https://upwork.outrightcrm.in").replace(/\/$/, "");
 export const SMART_GATEWAY_URL = import.meta.env?.VITE_SMART_GATEWAY_URL || `${CRM_BASE_URL}/index.php?entryPoint=smart_gateway`;
@@ -174,6 +175,13 @@ function parsePostedAt(record) {
 }
 
 const flag = (value) => value === true || /^(1|true|yes|verified)$/i.test(String(value ?? "").trim());
+// A generator's status as the CRM keeps it, "processing" or with the time it was set ("completed 2026-10-30 06:39 UTC"):
+// the status alone, and that time (ISO; "" without one).
+const generatorStatus = (value) => normalizeDocStatus(asText(value));
+const generatorTime = (value) => {
+  const match = asText(value).match(/(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)\s*UTC/i);
+  return match ? `${match[1]}T${match[2]}Z` : "";
+};
 const present = (value) => value !== undefined && value !== null && String(value).trim() !== "";
 // A client stat that is not a real number ("N/A", "") becomes null instead of NaN on screen.
 const numberOrNull = (value) => (present(value) && Number.isFinite(Number(value)) ? Number(value) : null);
@@ -364,9 +372,12 @@ export function mapGatewayJob(input) {
     // generate_cover_letter, cover_letter_status (queued / processing / completed / failed) and cover_letter_suggestion.
     coverLetterGeneration: {
       requested: flag(record.generate_cover_letter),
-      status: asText(record.cover_letter_status).trim().toLowerCase(),
+      status: generatorStatus(record.cover_letter_status),
       suggestion: decodeHtml(asText(record.cover_letter_suggestion)).trim(),
     },
+    // The job's PDF, made by the CRM generator like an AppScript output: generate_pdf, pdf_status, pdf_suggestion and,
+    // once made, pdf_view_url and pdf_download_url.
+    pdfGeneration: generationOf(record, ["pdf"]).pdf,
     clientStats,
     // The signed-in user's like/save state, when the job was fetched with engagement.
     engagement: mapEngagement(record.engagement),
@@ -1111,6 +1122,15 @@ export async function regenerateCoverLetter(job, suggestion, { userEmail, activi
   delete changes.coverLetter;
   localChanges.set(job.id, changes);
   if (activity && userEmail) await logJobActivity({ jobId: job.id, userEmail, description: activity }).catch((error) => console.warn("Could not record cover letter activity", error));
+}
+
+// Asks the CRM generator for the job's PDF, in one save: generate_pdf ticked, pdf_status "queued" and the user's
+// suggestion ("" for the first one). The generator sets processing and, at the end, completed (with pdf_view_url and
+// pdf_download_url) or failed. Then records `activity`, as regenerateCoverLetter does.
+export async function generateJobPdf(job, suggestion, { userEmail, activity } = {}) {
+  if (!job?.id || job.status === "Live") throw createAppError("PDF_INVALID", "A PDF cannot be generated for this job.");
+  await smartGateway({ action: "update", module: JOBS_MODULE, id: job.id, data: { pdf_suggestion: asText(suggestion).trim(), generate_pdf: 1, pdf_status: "queued" } });
+  if (activity && userEmail) await logJobActivity({ jobId: job.id, userEmail, description: activity }).catch((error) => console.warn("Could not record PDF activity", error));
 }
 
 // ----------------------------------------------------
@@ -2299,7 +2319,8 @@ export const APPSCRIPT_POSTED = ["script"];
 // The same fields serve any module that generates (a feed made with "+ New feed" too); `types` are its outputs.
 const generationOf = (record, types = APPSCRIPT_OUTPUTS) => Object.fromEntries(types.map((type) => [type, {
   requested: flag(record[`generate_${type}`]),
-  status: asText(record[`${type}_status`]).trim().toLowerCase(),
+  status: generatorStatus(record[`${type}_status`]),
+  statusAt: generatorTime(record[`${type}_status`]),
   suggestion: decodeHtml(asText(record[`${type}_suggestion`])).trim(),
   viewUrl: linkOf(record[`${type}_view_url`]),
   downloadUrl: linkOf(record[`${type}_download_url`]),
@@ -2908,6 +2929,7 @@ export const api = {
   getCoverLetter: (job) => fetchCoverLetter(job),
   saveCoverLetter,
   regenerateCoverLetter,
+  generateJobPdf,
   askAi,
   getStrategy: (job) => fetchStrategy(job),  getTeamMembers: () => fetchTeamMembers(),
   getLiveJobs: (params) => fetchLiveUpworkJobs(params),

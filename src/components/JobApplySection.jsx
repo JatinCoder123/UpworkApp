@@ -2,6 +2,7 @@ import { ArrowSquareOut, ArrowUUpLeft, BookmarkSimple, Check, Heart, LinkSimple,
 import { useEffect, useRef, useState } from 'react'
 import { useCopied } from './JobDetailParts'
 import UpworkLogo from './UpworkLogo'
+import ProposalDialog from './ProposalDialog'
 import { REJECT_REASONS } from '../lib/jobStatus'
 import { jobShareLink } from '../lib/jobSignals'
 
@@ -34,27 +35,37 @@ const squareButton = (active, activeStyle) => `grid h-11 min-w-11 place-items-ce
  * Price, apply, status and sharing controls for the job detail page and preview drawer.
  * `showApply` is off in the drawer, whose header already carries Apply on Upwork.
  */
-// `onApplied` runs when Apply on Upwork is clicked; the separate Applied button is commented out below.
+// `onApplied` runs when Apply on Upwork is clicked: live jobs track Applied with it. A CRM job becomes Applied only
+// when its proposal is sent: Send proposal (CRM jobs with an Upwork link, not applied yet) is then the main button and
+// Apply on Upwork, which only opens Upwork, the secondary one.
 // `resolved` ('applied' | 'rejected') swaps Not a fit for that status and an Undo button wired to `onUndo`.
 export default function JobApplySection({ job, statusLabel, dismissed, rejectReason = '', askReason = true, onApplied, onDismiss, liked, onLike, likeCount, saved, onSave, favorite, onFavorite, onShare, showApply = true, statusError, resolved = null, onUndo, undoing = false }) {
   const [copied, copy] = useCopied()
+  const [proposing, setProposing] = useState(false)
+  const canPropose = Boolean(job.applyUrl) && !['Live', 'Applied'].includes(job.status)
+  const hasButtons = showApply || canPropose
   const segment = (active, tone) => `flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 text-xs font-semibold transition-colors ${active ? tone : 'text-[var(--muted)] hover:text-[var(--ink)]'}`
 
   return <div className="rounded-[1.6rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70">
-    {showApply && <div className="mb-5 flex gap-2">
-      {job.applyUrl
-        ? <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={onApplied} className="upwork-apply-button flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl text-sm font-bold"><span className="relative z-10 truncate">Apply on Upwork</span><ArrowSquareOut size={15} weight="bold" className="relative z-10 shrink-0" /></a>
-        : <span className="flex h-11 flex-1 items-center justify-center rounded-2xl bg-[var(--frame)] text-xs font-semibold text-[var(--muted)]">No Upwork link</span>}
-    </div>}
-
     <div className="flex items-start justify-between gap-3">
-      <Price job={job} />
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[var(--muted)]">Client budget</p>
+        <Price job={job} className="mt-1" />
+      </div>
       {statusLabel && <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--frame)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.14em] text-[var(--muted)]"><span className="size-1.5 rounded-full bg-current" />{statusLabel}</span>}
     </div>
     <div className="mt-3"><Chips job={job} /></div>
 
+    {hasButtons && <div className="mt-5 grid gap-2">
+      {canPropose && <button type="button" onClick={() => setProposing(true)} className="upwork-apply-button flex h-11 items-center justify-center rounded-2xl text-sm font-bold"><span className="relative z-10 inline-flex items-center gap-2"><PaperPlaneTilt size={15} weight="fill" />Send proposal</span></button>}
+      {showApply && (job.applyUrl
+        ? <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={onApplied} title={canPropose ? 'Opens the job on Upwork. Only a proposal sent from here marks it Applied.' : undefined} className={`${canPropose ? 'upwork-view-button h-10 text-xs' : 'upwork-apply-button h-11 text-sm'} flex min-w-0 items-center justify-center gap-2 rounded-2xl font-bold`}><span className="relative z-10 truncate">Apply on Upwork</span><ArrowSquareOut size={canPropose ? 13 : 15} weight="bold" className="relative z-10 shrink-0" /></a>
+        : <span className="flex h-11 items-center justify-center rounded-2xl bg-[var(--frame)] text-xs font-semibold text-[var(--muted)]">No Upwork link</span>)}
+    </div>}
+    {proposing && <ProposalDialog job={job} onClose={() => setProposing(false)} />}
+
     {resolved && onUndo
-      ? <div className={`mt-5 flex items-center gap-3 rounded-2xl p-2.5 ring-1 ${resolved === 'applied' ? 'bg-[var(--lime-tint)]/20 text-[var(--accent-strong)] ring-[var(--lime-dark)]/25 dark:bg-[var(--lime-tint)]/10' : 'bg-[var(--reject-bg)] text-[var(--reject-text)] ring-[var(--reject-line)]'}`}>
+      ? <div className={`${hasButtons ? 'mt-2' : 'mt-5'} flex items-center gap-3 rounded-2xl p-2.5 ring-1 ${resolved === 'applied' ? 'bg-[var(--lime-tint)]/20 text-[var(--accent-strong)] ring-[var(--lime-dark)]/25 dark:bg-[var(--lime-tint)]/10' : 'bg-[var(--reject-bg)] text-[var(--reject-text)] ring-[var(--reject-line)]'}`}>
         <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${resolved === 'applied' ? 'bg-[var(--lime)] text-[var(--on-lime)]' : 'bg-[var(--reject-tile)]'}`}>{resolved === 'applied' ? <PaperPlaneTilt size={15} weight="fill" /> : <X size={15} weight="bold" />}</span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold leading-4">{resolved === 'applied' ? 'Applied' : 'Not a fit'}</p>
@@ -65,8 +76,8 @@ export default function JobApplySection({ job, statusLabel, dismissed, rejectRea
           {undoing ? 'Undoing…' : 'Undo'}
         </button>
       </div>
-      : <div className="mt-5 flex h-11 gap-1 rounded-2xl bg-[var(--raised)] p-1 ring-1 ring-[var(--line)]">
-        {/* Applied button disabled: clicking Apply on Upwork now marks the job as applied.
+      : <div className={`${hasButtons ? 'mt-2' : 'mt-5'} flex h-11 gap-1 rounded-2xl bg-[var(--raised)] p-1 ring-1 ring-[var(--line)]`}>
+        {/* Applied button disabled: a CRM job becomes Applied when its proposal is sent (Send proposal).
         <button type="button" onClick={onApplied} aria-pressed={applied} className={segment(applied, 'bg-[var(--lime-tint)]/45 text-[var(--lime-ink)]')}><PaperPlaneTilt size={14} weight={applied ? 'fill' : 'regular'} />Applied</button>
         */}
         {/* CRM jobs ask why (kept in the activity log); live jobs keep their simple on / off toggle. */}

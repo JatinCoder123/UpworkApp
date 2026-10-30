@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import gsap from 'gsap'
-import { ArrowSquareOut, DotsThree, Shuffle, WarningCircle, X } from '@phosphor-icons/react'
+import { ArrowSquareOut, DotsThree, Shuffle, X } from '@phosphor-icons/react'
 import { JobDetailView } from '../pages/JobDetail'
 import { LiveJobDetailView } from '../pages/LiveJobDetail'
 import { nextSimilarJob } from '../lib/jobSignals'
@@ -16,10 +16,10 @@ const menuItem = 'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-l
  * Right-hand preview of a job, showing the same content as its detail page.
  * `live` switches to the live Upwork detail; `jobs` is the loaded list used for "Next similar".
  */
-// `onApply(job)` runs when the header's Apply on Upwork is clicked, so the page can mark the job applied;
-// `applyError` shows under the header if that update failed.
-// An already-applied job has no Apply on Upwork in the header.
-export default function JobDrawer({ job, jobs = [], live = false, onSelect, onClose, onApply, applyError = '' }) {
+// `onApply(job)` runs when the header's Apply on Upwork is clicked, so the Live jobs page can mark the job applied.
+// A CRM job becomes Applied only through Send proposal (in the job's apply box), so its Apply on Upwork, which only
+// opens Upwork, is the secondary style. An already-applied job has no Apply on Upwork in the header.
+export default function JobDrawer({ job, jobs = [], live = false, onSelect, onClose, onApply }) {
   const panel = useRef(null)
   const body = useRef(null)
   const closeRef = useRef(onClose)
@@ -71,7 +71,7 @@ export default function JobDrawer({ job, jobs = [], live = false, onSelect, onCl
             <p className="text-[9px] font-bold uppercase tracking-[.16em] text-[var(--muted)]">{live ? 'Live job preview' : 'Job preview'}</p>
             <p className="truncate text-sm font-semibold" title={job.title}>{job.title}</p>
           </div>
-          {job.applyUrl && job.status !== 'Applied' && <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={() => onApply?.(job)} className="upwork-apply-button inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-4 text-xs font-bold"><span className="relative z-10"><span className="sm:hidden">Apply</span><span className="hidden sm:inline">Apply on Upwork</span></span><ArrowSquareOut size={14} weight="bold" className="relative z-10 shrink-0" /></a>}
+          {job.applyUrl && job.status !== 'Applied' && <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" onClick={() => onApply?.(job)} className={`${live ? 'upwork-apply-button' : 'upwork-view-button'} inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-4 text-xs font-bold`}><span className="relative z-10"><span className="sm:hidden">Apply</span><span className="hidden sm:inline">Apply on Upwork</span></span><ArrowSquareOut size={14} weight="bold" className="relative z-10 shrink-0" /></a>}
           <div ref={menuRoot} className="relative shrink-0">
             <button type="button" onClick={() => setMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={menuOpen} aria-label="More actions" title="More actions" className={`grid size-9 place-items-center rounded-full ring-1 transition-colors ${menuOpen ? 'bg-[var(--lime)] !text-[var(--on-lime)] ring-[var(--lime-dark)]/35' : 'text-[var(--muted)] ring-[var(--line)] hover:text-[var(--ink)] hover:ring-[var(--lime-dark)]'}`}><DotsThree size={18} weight="bold" /></button>
             {menuOpen && <div className="absolute right-0 top-11 z-50 w-64 rounded-[1.5rem] bg-black/5 p-1.5 shadow-[0_24px_70px_rgb(var(--shadow-rgb)/.2)] ring-1 ring-black/5">
@@ -82,7 +82,6 @@ export default function JobDrawer({ job, jobs = [], live = false, onSelect, onCl
           </div>
           <button type="button" onClick={onClose} aria-label="Close preview" className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--ink)] text-white transition-transform hover:scale-105"><X size={15} weight="bold" /></button>
         </header>
-        {applyError && <p role="alert" className="flex items-start gap-2 border-b border-[var(--line)]/70 bg-[var(--bad-bg)] px-4 py-2.5 text-xs font-semibold text-[var(--bad)] sm:px-6"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" />{applyError}</p>}
         <div ref={body} className="drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
           <ErrorBoundary name="job-drawer" resetKey={job.id} fallback={DrawerError}>
             {live ? <LiveJobDetailView key={job.id} id={job.id} job={job} embedded /> : <JobDetailView key={job.id} id={job.id} initialJob={job} embedded />}

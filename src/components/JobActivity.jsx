@@ -14,6 +14,9 @@ const ACTIONS = {
   'Cover letter written': 'wrote the cover letter',
   'Cover letter edited': 'edited the cover letter',
   'Cover letter regenerated': 'regenerated the cover letter',
+  // PDF requests (see PDF_ACTIVITY in JobDetailParts).
+  'PDF generated': 'generated the PDF',
+  'PDF regenerated': 'regenerated the PDF',
   // Older entries, from the Edit with AI box the cover letter had before Regenerate.
   'Cover letter edited with AI': 'edited the cover letter with AI',
   'Cover letter AI change undone': 'undid an AI change to the cover letter',
