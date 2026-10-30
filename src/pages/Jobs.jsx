@@ -24,6 +24,8 @@ import { clientLocation, countExtraFilters, forgetSearch, loadRecentSearches, ma
 import { useCrmReactions } from "../lib/crmReactions";
 import { useJobStatus } from "../lib/jobStatus";
 import ErrorBoundary, { CardError } from "../components/ErrorBoundary";
+import { LoadMoreError } from "../components/FeedParts";
+import { notify, openFailedNotice, useRefreshFailedNotice } from "../lib/notify";
 import { timeAgo, useNow } from "../lib/time";
 import { useAuth } from "../contexts/AuthContext";
 import { asArray, asObject, asText } from "../lib/safe";
@@ -154,7 +156,7 @@ export default function Jobs() {
   const jobIds = skillsApply && !skillJobsFailed ? skillJobs : null;
   const statsJobIds = skillsOn && !skillJobsFailed ? skillJobs : null;
   const waitingForSkills = skillsApply && !skillJobsReady;
-  const { data: jobPages, isLoading, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, isError, error, refetch } = useInfiniteQuery({
+  const { data: jobPages, isLoading, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage, isLoadingError, isFetchNextPageError, isRefetchError, error, errorUpdatedAt, refetch } = useInfiniteQuery({
     queryKey: ["jobs", status === "Applied" ? "mine" : showAllJobs ? "all" : user?.email, gatewayDateFilter, search, status, order.orderBy, order.orderDir, jobCategory, jobSubcategory, serverSkill, jobIds],
     queryFn: ({ pageParam }) => status === "Applied" ? queryClient.fetchQuery(myAppliedQuery(true)) : api.getJobsPage({ page: pageParam, perPage: 20, dateFilter: gatewayDateFilter, userEmail: user.email, allJobs: showAllJobs, search, status, orderBy: order.orderBy, orderDir: order.orderDir, category: jobCategory, subcategory: jobSubcategory, skill: serverSkill, jobIds }),
     initialPageParam: 1,
@@ -162,6 +164,10 @@ export default function Jobs() {
     enabled: Boolean(user?.email) && !waitingForSkills,
     placeholderData: (previous) => previous,
   });
+  // A failed refresh or next page keeps the jobs already loaded (the error screen is only for nothing to show). After a
+  // next page failed, scrolling stops asking (it would ask again and again) until Try again.
+  const hasMore = hasNextPage && !isFetchNextPageError;
+  useRefreshFailedNotice({ isRefetchError, error, errorUpdatedAt }, "jobs");
   const totalMatches = jobPages?.pages?.[0]?.total;
   const { data: jobStatsData, isFetching: isFetchingStats, refetch: refetchStats } = useQuery({
     queryKey: ["job-stats", user?.email, gatewayDateFilter, jobCategory, jobSubcategory, serverSkill, statsJobIds],
@@ -329,14 +335,19 @@ export default function Jobs() {
 
   // A refreshed or shared ?job= link can point at a job outside the loaded pages; fetch that one on its own.
   const listedPreview = previewId ? allDisplayJobs.find((job) => job.id === previewId) : null;
-  const { data: fetchedPreview, isError: previewMissing } = useQuery({
+  const { data: fetchedPreview, isError: previewMissing, error: previewError } = useQuery({
     queryKey: ["job", previewId],
     queryFn: () => api.getJob(previewId, user?.email),
     enabled: Boolean(previewId) && !listedPreview,
     retry: false,
   });
   const preview = listedPreview || (fetchedPreview?.id === previewId ? fetchedPreview : null);
-  useEffect(() => { if (previewMissing) closePreview(); }, [previewMissing, closePreview]);
+  // A link to a job that is gone, or that could not be read, closes the preview with a toast saying which.
+  useEffect(() => {
+    if (!previewMissing) return;
+    notify(openFailedNotice("Job", previewError));
+    closePreview();
+  }, [previewMissing, previewError, closePreview]);
 
   // Text search runs on the gateway; status "New" (New + Seen), saved/liked and multi-skill selection are applied to the loaded pages.
   // Every active filter must match, so they all combine.
@@ -373,11 +384,11 @@ export default function Jobs() {
 
   useEffect(() => {
     const target = loadMoreRef.current;
-    if (!target || !hasNextPage) return undefined;
+    if (!target || !hasMore) return undefined;
     const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting && !isFetchingNextPage) fetchNextPage(); }, { rootMargin: "500px 0px" });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, filtered.length]);
+  }, [fetchNextPage, hasMore, isFetchingNextPage, filtered.length]);
 
   // Highlight the job currently in view in the sidebar index.
   useEffect(() => {
@@ -590,7 +601,7 @@ export default function Jobs() {
 
         <div className="mt-6">
           {isLoading || waitingForSkills ? <LogoLoader className="min-h-[38dvh]" label="Loading jobs" />
-            : isError ? <section className="py-24 text-center">
+            : isLoadingError ? <section className="py-24 text-center">
               <div className="mx-auto grid size-14 place-items-center rounded-full bg-[var(--danger)]/10"><Briefcase size={22} /></div>
               <h3 className="mt-5 text-xl font-semibold">Could not load jobs</h3>
               <p className="mx-auto mt-2 max-w-lg text-sm text-[var(--muted)]">{error?.message || "Check the connection and try again."}</p>
@@ -647,7 +658,8 @@ export default function Jobs() {
                     undoError={jobStatus.errorId === job.id ? jobStatus.error?.message || "Could not undo. Try again." : ""} /></ErrorBoundary>)}</section>
                   <div ref={loadMoreRef} className="flex min-h-24 items-center justify-center py-8" aria-live="polite">
                     {isFetchingNextPage ? <div className="flex items-center gap-3 text-xs font-semibold text-[var(--muted)]"><span className="size-4 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />Loading more jobs</div>
-                      : <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--muted)]">{hasNextPage ? "Scroll for more jobs" : "All jobs loaded"}</span>}
+                      : isFetchNextPageError ? <LoadMoreError error={error} onRetry={() => fetchNextPage()} />
+                      : <span className="text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--muted)]">{hasMore ? "Scroll for more jobs" : "All jobs loaded"}</span>}
                   </div>
                 </div>
               </div>
@@ -663,7 +675,7 @@ export default function Jobs() {
                       : noLikedYet ? "No liked jobs yet"
                       : savedOnly || likedOnly ? "No liked or saved jobs match these filters"
                       : skillsApply ? "No jobs for your skills match these filters"
-                      : hasNextPage || isFetching ? "Looking for matching jobs"
+                      : hasMore || isFetching ? "Looking for matching jobs"
                       : "No matching jobs"}
                   </h3>
                   <p className="mt-2 text-sm text-[var(--muted)]">
@@ -671,7 +683,7 @@ export default function Jobs() {
                       : noLikedYet ? "Click the heart icon on any job card to save it to your liked jobs list."
                       : savedOnly || likedOnly ? "Try another status tab, skill or time window, or turn off Saved or Liked."
                       : skillsApply ? "Try another status tab, time window or search, or add more skills with My skills, or untick it."
-                      : hasNextPage ? "Loading more results from the next page."
+                      : hasMore ? "Loading more results from the next page."
                       : search ? `Nothing matches “${search}”. Try another word.`
                       : "Try another skill, time window, or search term."}
                   </p>
@@ -680,6 +692,7 @@ export default function Jobs() {
                       Browse all jobs
                     </button>
                   )}
+                  {isFetchNextPageError && <div className="mt-6"><LoadMoreError error={error} onRetry={() => fetchNextPage()} /></div>}
                 </section>}
         </div>
 

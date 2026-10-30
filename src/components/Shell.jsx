@@ -15,6 +15,7 @@ import NewFeedDialog from './NewFeedDialog'
 import FeedBuildStatus from './FeedBuildStatus'
 import { userInitials } from '../lib/auth'
 import { canSeeFeed, feedPath, useFeeds } from '../lib/feeds'
+import { notify } from '../lib/notify'
 import { useAuth } from '../contexts/AuthContext'
 import { accessNotice, canAccess, homePath, isAdminUser, roleLabel as labelForRole } from '../lib/permissions'
 
@@ -58,6 +59,11 @@ function FeedTile({ name, className = 'size-6 rounded-lg text-[10px]' }) {
   return <span aria-hidden="true" className={`skill-chip grid shrink-0 place-items-center font-bold uppercase ${className}`} style={{ '--skill-h': feedHue(name) }}>{(name || '?').trim().charAt(0)}</span>
 }
 
+// The feed list could not be read: said so, with a retry, instead of an empty list that looks like "no feeds yet".
+function FeedsFailed({ onRetry, className = '', ...props }) {
+  return <button {...props} type="button" onClick={onRetry} title="Try again" className={`flex items-center gap-3 rounded-xl px-3 text-left font-semibold text-[var(--danger)] transition-colors hover:bg-[var(--bad-bg)]/60 ${className}`}><WarningCircle size={16} weight="bold" className="shrink-0" /><span className="min-w-0 flex-1 truncate">Feeds could not load · Retry</span></button>
+}
+
 // One sidebar entry. The active entry's fill is the sliding pill behind it (Shell), so the link only changes colour.
 // In the rail (collapsed sidebar) it shows the icon only and reports hover/focus for the floating label.
 function SideLink({ to, label, icon: Icon, tile, active, rail, onTip, badge }) {
@@ -92,7 +98,7 @@ export default function Shell({ children }) {
   }, { replace })
   const { user, logout: endAuthSession } = useAuth()
   // The feeds this user sees: admins every feed, anyone else the built ones their role (or own permissions) opens.
-  const { data: allFeeds = [] } = useFeeds(user)
+  const { data: allFeeds = [], isError: feedsFailed, refetch: refetchFeeds } = useFeeds(user)
   const feeds = allFeeds.filter((feed) => canSeeFeed(user, feed))
   const menuRef = useRef(null)
   const navRef = useRef(null)
@@ -218,7 +224,7 @@ export default function Shell({ children }) {
       queryClient.clear()
       navigate('/login', { replace: true })
     } catch (error) {
-      window.alert(error.message)
+      notify({ title: 'Could not sign out', message: error.message })
     }
   }
   const active = (path) => location.pathname.startsWith(path)
@@ -294,7 +300,8 @@ export default function Shell({ children }) {
                 {feeds.map((feed) => <SideLink key={feed.id} to={feedPath(feed)} label={feed.name} tile={<FeedTile name={feed.name} />} active={location.pathname === feedPath(feed)} rail={rail} onTip={showTip} badge={feedBadge(feed)} />)}
                 {rail
                   ? <button type="button" onClick={openNewFeed} aria-label="New feed" onMouseEnter={(event) => showTip('New feed', event.currentTarget)} onMouseLeave={() => showTip(null)} onFocus={(event) => showTip('New feed', event.currentTarget)} onBlur={() => showTip(null)} className="relative z-10 mx-auto grid size-10 place-items-center rounded-xl border border-dashed border-[var(--line)] text-[var(--muted)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--text)]"><Plus size={16} weight="bold" /></button>
-                  : !feeds.length && <button type="button" onClick={openNewFeed} className="relative z-10 flex h-10 items-center gap-3 rounded-xl border border-dashed border-[var(--line)] px-3 text-[13px] font-semibold text-[var(--muted)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--text)]"><Plus size={16} weight="bold" />New feed</button>}
+                  : feedsFailed && !feeds.length ? <FeedsFailed onRetry={() => refetchFeeds()} className="relative z-10 h-10 text-[13px]" />
+                    : !feeds.length && <button type="button" onClick={openNewFeed} className="relative z-10 flex h-10 items-center gap-3 rounded-xl border border-dashed border-[var(--line)] px-3 text-[13px] font-semibold text-[var(--muted)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--text)]"><Plus size={16} weight="bold" />New feed</button>}
               </div>
             </div>
           </nav>
@@ -383,6 +390,7 @@ export default function Shell({ children }) {
             <p data-mobile-nav className={groupLabel}>Feeds{feeds.length > 0 && <span className="font-mono text-[10px] font-medium tracking-normal">{feeds.length}</span>}</p>
             <div className="grid gap-0.5">
               {feeds.map((feed) => <Link data-mobile-nav key={feed.id} to={feedPath(feed)} onClick={(event) => navigateFromMobile(event, feedPath(feed))} className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors ${location.pathname === feedPath(feed) ? 'side-pill !text-[var(--on-lime)]' : 'text-[var(--muted)] hover:bg-[var(--paper)] hover:text-[var(--text)]'}`}><FeedTile name={feed.name} /><span className="min-w-0 flex-1 truncate">{feed.name}</span>{feedBadge(feed)}</Link>)}
+              {feedsFailed && !feeds.length && <FeedsFailed data-mobile-nav onRetry={() => refetchFeeds()} className="h-11 text-sm" />}
               <button data-mobile-nav type="button" onClick={openNewFeed} className="flex h-11 items-center gap-3 rounded-xl border border-dashed border-[var(--line)] px-3 text-left text-sm font-semibold text-[var(--muted)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--text)]"><Plus size={16} weight="bold" />New feed</button>
             </div>
           </div>
@@ -403,6 +411,8 @@ export default function Shell({ children }) {
     {promptsTab && <ErrorBoundary name="prompt-management" fallback={DialogError} fallbackProps={{ onClose: () => setPrompts(null, null, true) }}>
       <PromptManagerDialog tab={promptsTab} onTab={(tab) => setPrompts(tab, null, true)} openId={params.get('prompt')} onOpen={(id) => setPrompts(promptsTab, id, Boolean(params.get('prompt')))} onClose={() => setPrompts(null, null, true)} />
     </ErrorBoundary>}
-    {newFeedOpen && <NewFeedDialog onClose={() => setNewFeedOpen(false)} onSaved={(id) => { setNewFeedOpen(false); if (id) navigate(`/feeds/${id}`) }} />}
+    {newFeedOpen && <ErrorBoundary name="new-feed" fallback={DialogError} fallbackProps={{ onClose: () => setNewFeedOpen(false) }}>
+      <NewFeedDialog onClose={() => setNewFeedOpen(false)} onSaved={(id) => { setNewFeedOpen(false); if (id) navigate(`/feeds/${id}`) }} />
+    </ErrorBoundary>}
   </div>
 }

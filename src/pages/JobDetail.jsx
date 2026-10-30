@@ -52,7 +52,7 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
   const status = useJobStatus()
   const reactions = useCrmReactions(user)
   const now = useNow()
-  const { data: job, isLoading, isError, error, refetch } = useQuery({ queryKey: ['job', id], queryFn: () => api.getJob(id, user?.email), enabled: Boolean(id), retry: false, placeholderData: initialJob })
+  const { data: job, isLoading, isFetching, error, refetch } = useQuery({ queryKey: ['job', id], queryFn: () => api.getJob(id, user?.email), enabled: Boolean(id), retry: false, placeholderData: initialJob })
   const jobId = job?.id
   // Why a rejected job was rejected: its latest "Rejected: …" activity entry (shared with the Activity panel's query).
   const { data: activityEntries } = useQuery({ queryKey: ['job-activity', id], queryFn: () => api.getJobActivity(id), enabled: Boolean(id) && job?.status === 'Rejected', staleTime: 30_000 })
@@ -85,9 +85,13 @@ export function JobDetailView({ id, initialJob, embedded = false }) {
     return () => window.clearTimeout(timer)
   }, [job?.status, id, markJobSeen])
   useEffect(() => { if (embedded || !jobId || !root.current) return; const ctx = gsap.context(() => gsap.fromTo('[data-detail]', { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .6, stagger: .05, ease: 'power3.out', clearProps: 'opacity,visibility,transform' }), root); return () => ctx.revert() }, [jobId, embedded])
-  if (isLoading) return embedded ? <DrawerDetailSkeleton /> : <Shell><JobDetailSkeleton /></Shell>
-  if (isError || !job) {
-    if (!embedded) return <NotFound type={error?.code ? undefined : 'job-not-found'} error={error} onRetry={refetch} backTo="/jobs" />
+  // Loading, or Try again after an error (the skeleton shows the retry is under way).
+  if (isLoading || (!job && isFetching)) return embedded ? <DrawerDetailSkeleton /> : <Shell><JobDetailSkeleton /></Shell>
+  // Only with nothing to show: a job already on screen stays when a later refresh of it fails.
+  if (!job) {
+    // At this URL: "Job not found" for an id that opens nothing (deleted, expired, wrong or malformed), or the error
+    // with Try again when the job could not be read. In the preview drawer, the error shows in place.
+    if (!embedded) return <NotFound record="job" error={error} onRetry={refetch} backTo="/jobs" backLabel="Back to Jobs" />
     return <div role="alert" className="m-5 flex items-start gap-2 rounded-2xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]"><WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" /><span className="flex-1">{error?.message || 'Could not load this job.'}</span><button type="button" onClick={() => refetch()} className="font-bold underline underline-offset-4">Try again</button></div>
   }
 

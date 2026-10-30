@@ -16,7 +16,7 @@ export default function SkillsPicker({ category, skills, onChange, allowNew = fa
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const panel = useRef(null)
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['skills', 'group', category || '', ''],
     queryFn: () => api.getSkillsInGroup({ category }),
     staleTime: 5 * 60_000,
@@ -80,7 +80,8 @@ export default function SkillsPicker({ category, skills, onChange, allowNew = fa
           </button>
         </li>}
         {isLoading && <li className="flex items-center gap-2 px-3 py-2.5 text-xs text-[var(--muted)]"><CircleNotch size={12} className="animate-spin" />Loading skills…</li>}
-        {!isLoading && !list.length && !canAddNew && <li className="px-3 py-2.5 text-xs text-[var(--muted)]">{term ? `No skill matches “${query.trim()}”.` : 'No skills in this department yet.'}</li>}
+        {isError && <li role="alert" className="px-3 py-2.5 text-xs text-[var(--bad)]">The skills could not be loaded: {error?.message} <button type="button" onClick={() => refetch()} className="font-bold underline underline-offset-4">Try again</button></li>}
+        {!isLoading && !isError && !list.length && !canAddNew && <li className="px-3 py-2.5 text-xs text-[var(--muted)]">{term ? `No skill matches “${query.trim()}”.` : 'No skills in this department yet.'}</li>}
         {list.map((skill) => {
           const on = picked(skill.id)
           return <li key={skill.id} role="option" aria-selected={on}>

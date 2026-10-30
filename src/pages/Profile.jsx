@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { canSeeFeed, feedPath, useFeeds } from '../lib/feeds'
 import { PAGE_PERMISSIONS, canAccess, isAdminUser, roleOf } from '../lib/permissions'
 import { asArray } from '../lib/safe'
+import { notify } from '../lib/notify'
 
 /*
  * The signed-in user's page: who they are (name, email, role, admin), the sections and feeds they can open (each a
@@ -32,7 +33,7 @@ export default function Profile() {
       queryClient.clear()
       navigate('/login', { replace: true })
     } catch (error) {
-      window.alert(error.message)
+      notify({ title: 'Could not sign out', message: error.message })
     }
   }
   const facts = [
@@ -84,6 +85,8 @@ export default function Profile() {
         <div className="mt-2 flex flex-wrap gap-2">
           {feeds.isLoading
             ? <span className="text-sm text-[var(--muted)]">Loading…</span>
+            : feeds.isError && !openFeeds.length
+              ? <p role="alert" className="text-sm text-[var(--bad)]">Your feeds could not be loaded: {feeds.error?.message} <button type="button" onClick={() => feeds.refetch()} className="font-semibold underline underline-offset-4">Try again</button></p>
             : openFeeds.length
               ? openFeeds.map((feed) => <Link key={feed.id} to={feedPath(feed)} className={chip}>{feed.name}</Link>)
               : <span className="text-sm text-[var(--muted)]">No feeds yet.</span>}

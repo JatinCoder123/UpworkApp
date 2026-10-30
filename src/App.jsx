@@ -66,7 +66,7 @@ export default function App() {
     {/* Toasts are extras: if one fails it disappears instead of taking the app down. */}
     <ErrorBoundary name="doc-toast" fallback={NoFallback}><DocNotificationToast /></ErrorBoundary>
     <ErrorBoundary name="error-toast" fallback={NoFallback}><GlobalErrorToast /></ErrorBoundary>
-    {/* A page that fails to render shows an error inside the normal header; changing route clears it. */}
+    {/* A page that fails to render shows a full-page error (no sidebar, like the 404 page); changing route clears it. */}
     <ErrorBoundary name="page" fallback={PageError} resetKey={location.pathname}>
     <Suspense fallback={<SessionLoader />}>
     <Routes>

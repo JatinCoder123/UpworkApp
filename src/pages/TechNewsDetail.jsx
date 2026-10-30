@@ -33,7 +33,7 @@ export default function TechNewsDetail() {
   const { id } = useParams()
   const [documentDialog, setDocumentDialog] = useState(false)
 
-  const { data: story, isLoading, isError, error, refetch } = useQuery({
+  const { data: story, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['tech-news-item', id],
     queryFn: () => api.getTechNewsItem(id),
     retry: false,
@@ -119,19 +119,12 @@ export default function TechNewsDetail() {
     return [...related, ...others]
   }, [allNews, story, id])
 
-  if (isLoading) return <Shell><JobDetailSkeleton /></Shell>
+  // Loading, or Try again after an error (the skeleton shows the retry is under way).
+  if (isLoading || (!story && isFetching)) return <Shell><JobDetailSkeleton /></Shell>
 
-  if (isError || !story) {
-    return (
-      <NotFound
-        type={error?.code ? undefined : 'news-not-found'}
-        error={error}
-        onRetry={refetch}
-        backTo="/tech-news"
-        backLabel="Back to AI News"
-      />
-    )
-  }
+  // At this URL: "Story not found" for an id that opens nothing (deleted, wrong or malformed), or the error with Try
+  // again when it could not be read. Only with nothing to show: a story on screen stays when a later refresh fails.
+  if (!story) return <NotFound record="news" error={error} onRetry={refetch} backTo="/tech-news" backLabel="Back to AI News" />
 
   const score = typeof story.score === 'number' ? story.score : 0
   const tier = classifyScoreTier(score)

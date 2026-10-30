@@ -1,9 +1,10 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowClockwise, ArrowLeft, ArrowRight, Briefcase } from '@phosphor-icons/react'
-import Shell from '../components/Shell'
-import ThemeToggle from '../components/ThemeToggle'
-import { Mark, primaryButton } from '../components/ui'
+import ErrorFrame from '../components/ErrorFrame'
+import SessionLoader from '../components/SessionLoader'
+import { primaryButton } from '../components/ui'
 import { useAuth } from '../contexts/AuthContext'
+import { isNotFoundError } from '../services/api'
 import { canAccess, homePath, roleLabel as labelForRole } from '../lib/permissions'
 
 function RobotIllustration({ className = 'size-72' }) {
@@ -92,7 +93,15 @@ function RobotIllustration({ className = 'size-72' }) {
   )
 }
 
-function normalizeErrorType({ type, stateType, error }) {
+function normalizeErrorType({ type, stateType, error, record }) {
+  // A record page (a job, a story, a feed opened by its id) whose id opens nothing, whatever the reason (deleted,
+  // expired, a wrong or malformed id): that record's own "not found" page. A read that failed is handled below.
+  if (!type && record && (!error || isNotFoundError(error))) return `${record}-not-found`
+  // The HTTP status, when the request has one, says it best (the gateway sends 401 and 403 with the same code).
+  const status = Number(error?.status)
+  if (!type && status === 401) return 'unauthorized'
+  if (!type && status === 403) return 'forbidden'
+  if (!type && status === 408) return 'timeout'
   const raw = String(type || stateType || error?.code || '')
     .trim()
     .toLowerCase()
@@ -123,9 +132,10 @@ function normalizeErrorType({ type, stateType, error }) {
 
   const msg = String(error?.message || '').toLowerCase()
   if (/timed out|timeout/.test(msg)) return 'timeout'
-  if (/internet connection|unable to reach|network/.test(msg)) return 'network-error'
+  if (/internet connection|unable to reach|could not be reached|network/.test(msg)) return 'network-error'
 
-  return '404'
+  // Any other failure is the server's, not a missing page.
+  return error ? 'server-error' : '404'
 }
 
 function getErrorPreset(errorType, currentPath, roleLabel) {
@@ -139,10 +149,10 @@ function getErrorPreset(errorType, currentPath, roleLabel) {
     case 'job-not-found':
       return {
         code: '404.',
-        heading: 'Job does not exist.',
+        heading: 'Job not found.',
         description: (
           <>
-            We couldn’t find a job matching {urlCode}. It may have been removed or the link is incorrect.{' '}
+            We couldn’t find a job matching {urlCode}. It may have been removed or expired, or the link is incorrect.{' '}
             <span className="font-semibold text-[var(--ink)]">That’s all we know.</span>
           </>
         ),
@@ -153,15 +163,29 @@ function getErrorPreset(errorType, currentPath, roleLabel) {
     case 'news-not-found':
       return {
         code: '404.',
-        heading: 'Story does not exist.',
+        heading: 'Story not found.',
         description: (
           <>
-            We couldn’t find an AI news story matching {urlCode}. It may have been moved or the link is incorrect.{' '}
+            We couldn’t find an AI news story matching {urlCode}. It may have been removed, or the link is incorrect.{' '}
             <span className="font-semibold text-[var(--ink)]">That’s all we know.</span>
           </>
         ),
         backTo: '/tech-news',
         backLabel: 'Back to AI News',
+        canRetry: false,
+      }
+    case 'feed-not-found':
+      return {
+        code: '404.',
+        heading: 'Feed not found.',
+        description: (
+          <>
+            We couldn’t find a feed matching {urlCode}. It may have been deleted, or the link is incorrect.{' '}
+            <span className="font-semibold text-[var(--ink)]">That’s all we know.</span>
+          </>
+        ),
+        backTo: '',
+        backLabel: '',
         canRetry: false,
       }
     case 'timeout':
@@ -174,8 +198,8 @@ function getErrorPreset(errorType, currentPath, roleLabel) {
             <span className="font-semibold text-[var(--ink)]">Please check your connection and try again.</span>
           </>
         ),
-        backTo: '/tech-news',
-        backLabel: 'Back to AI News',
+        backTo: '',
+        backLabel: '',
         canRetry: true,
       }
     case 'network-error':
@@ -188,8 +212,8 @@ function getErrorPreset(errorType, currentPath, roleLabel) {
             <span className="font-semibold text-[var(--ink)]">Please check your network connection and try again.</span>
           </>
         ),
-        backTo: '/tech-news',
-        backLabel: 'Back to AI News',
+        backTo: '',
+        backLabel: '',
         canRetry: true,
       }
     case 'server-error':
@@ -202,8 +226,8 @@ function getErrorPreset(errorType, currentPath, roleLabel) {
             <span className="font-semibold text-[var(--ink)]">Please try again in a moment.</span>
           </>
         ),
-        backTo: '/tech-news',
-        backLabel: 'Back to AI News',
+        backTo: '',
+        backLabel: '',
         canRetry: true,
       }
     case 'forbidden':
@@ -244,15 +268,22 @@ function getErrorPreset(errorType, currentPath, roleLabel) {
             <span className="font-semibold text-[var(--ink)]">That’s all we know.</span>
           </>
         ),
-        backTo: '/tech-news',
-        backLabel: 'Back to AI News',
+        backTo: '',
+        backLabel: '',
         canRetry: false,
       }
   }
 }
 
+/**
+ * The page for a URL that opens nothing, at that URL (never a redirect): an unknown address (404), a section the role
+ * cannot open (403), or a record page whose id fails. For a record page pass `record` ('job', 'news', 'feed') and the
+ * read's `error`: an id that opens nothing (deleted, expired, a wrong or malformed id) shows that record's "not found"
+ * page; a read that failed (offline, timeout, server, session) shows that error, with Try again (`onRetry`).
+ */
 export default function NotFound({
   type,
+  record,
   error,
   onRetry,
   title,
@@ -272,6 +303,7 @@ export default function NotFound({
   const currentPath = location.state?.fromPath || (location.pathname + (location.search || ''))
   const resolvedType = normalizeErrorType({
     type,
+    record,
     stateType: location.state?.type,
     error: error || location.state?.error,
   })
@@ -283,20 +315,14 @@ export default function NotFound({
   const resolvedBackLabel = backAllowed ? backLabel || preset.backLabel : 'Back to your workspace'
   const targetBackTo = isAuthenticated && resolvedType !== 'unauthorized' ? resolvedBackTo : '/login'
   const targetBackLabel = isAuthenticated && resolvedType !== 'unauthorized' ? resolvedBackLabel : 'Return to sign in'
+  // The session is still being checked: wait, rather than show a signed-in user the "Sign in" version for a moment.
+  if (status === 'loading') return <SessionLoader />
 
   const content = (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-16 sm:px-6 md:py-24">
       <div className="grid items-center gap-12 md:grid-cols-[1.1fr_auto] lg:gap-20">
-        {/* Left: Branding, Heading, URL details & Actions */}
+        {/* Left: Heading, URL details & Actions (the brand is in the frame's top bar) */}
         <div className="max-w-xl space-y-6">
-          <Link
-            to={home}
-            className="inline-flex items-center gap-2.5 text-base font-bold tracking-tight text-[var(--ink)]"
-          >
-            <Mark />
-            <span>Outright Feed Portal</span>
-          </Link>
-
           <div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--ink)]">
               {title ? (
@@ -370,33 +396,6 @@ export default function NotFound({
     </main>
   )
 
-  if (isAuthenticated) {
-    return <Shell>{content}</Shell>
-  }
-
-  return (
-    <div className="min-h-[100dvh] bg-[var(--paper)]">
-      <header className="px-4 pt-4 sm:px-6 md:pt-6">
-        <div className="mx-auto flex max-w-[1200px] items-center justify-between rounded-full bg-[var(--surface)]/90 px-4 py-2 ring-1 ring-black/5 shadow-xs backdrop-blur-xl">
-          <Link
-            to="/login"
-            className="flex items-center gap-2.5 pr-3 text-sm font-bold tracking-[-.02em] text-[var(--ink)]"
-          >
-            <Mark />
-            <span>Outright Feed Portal</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Link
-              to="/login"
-              className="rounded-full bg-[var(--ink)] px-4 py-1.5 text-xs font-semibold text-white shadow-xs"
-            >
-              Sign in
-            </Link>
-          </div>
-        </div>
-      </header>
-      {content}
-    </div>
-  )
+  // Standalone for everyone, signed in or not: an error page never shows the sidebar.
+  return <ErrorFrame>{content}</ErrorFrame>
 }

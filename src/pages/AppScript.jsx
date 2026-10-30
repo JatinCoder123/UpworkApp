@@ -118,7 +118,7 @@ export default function AppScript() {
   const [listKey, setListKey] = useState(null)
 
   // Counts: the strips all the time, every group while the universal filter or a full list is open.
-  const { options, labelOf, items, total, grandTotal, countOf, refresh, loading, isError, error, updating, hasMore, loadingMore, loadMoreRef } = useGatewayFeed({
+  const { options, labelOf, items, total, grandTotal, countOf, refresh, loading, isError, error, updating, hasMore, loadingMore, loadMoreRef, loadMoreError, retryMore } = useGatewayFeed({
     feed: 'appscript', fields: FIELDS, filters, search, dateFilter, dateField: 'posted_date', sort, localSorts: LOCAL_SORTS,
     stripKeys: STRIP_KEYS, openKeys: filterDialog || listKey ? ALL_KEYS : undefined,
   })
@@ -202,10 +202,10 @@ export default function AppScript() {
               <ErrorBoundary name="appscript-index" fallbackProps={INDEX_ERROR} resetKey={items}><FeedIndex items={items} activeId={activeId} onJump={jumpTo} meta={indexMeta} mark={indexMark} /></ErrorBoundary>
               <div className="@container min-w-0">
                 <section className={`grid content-start gap-4 transition-opacity @4xl:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="appscript-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><IdeaCard item={item} labelOf={labelOf} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
-                <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} />
+                <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} error={loadMoreError} onRetry={retryMore} />
               </div>
             </div>
-            : grandTotal
+            : grandTotal || hasFilters
               ? <NothingMatches onClear={clearAll} />
               : <p className="mt-8 rounded-[1.6rem] bg-[var(--surface)] px-6 py-12 text-center text-sm text-[var(--muted)] ring-1 ring-[var(--line)]/70">No AppScript ideas yet.</p>}
 

@@ -94,7 +94,7 @@ export default function Wordpress() {
   const [listKey, setListKey] = useState(null)
 
   // Counts: the strips all the time, every group while the universal filter or a full list is open.
-  const { options, labelOf, items, total, grandTotal, countOf, refresh, loading, isError, error, updating, hasMore, loadingMore, loadMoreRef } = useGatewayFeed({
+  const { options, labelOf, items, total, grandTotal, countOf, refresh, loading, isError, error, updating, hasMore, loadingMore, loadMoreRef, loadMoreError, retryMore } = useGatewayFeed({
     feed: 'wordpress', fields: FIELDS, filters, search, dateFilter, dateField: 'published_date', sort,
     stripKeys: STRIP_KEYS, openKeys: filterDialog || listKey ? ALL_KEYS : undefined,
   })
@@ -173,10 +173,10 @@ export default function Wordpress() {
                 mark={(item) => item.demandScore != null && <span title={`Demand score ${item.demandScore}`} className="mt-0.5 shrink-0 self-start rounded-md bg-[var(--paper)] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[var(--muted)] ring-1 ring-[var(--line)]/70">{item.demandScore}</span>} /></ErrorBoundary>
               <div className="@container min-w-0">
                 <section className={`grid content-start gap-4 transition-opacity @4xl:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="wordpress-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><FeedCard item={item} labelOf={labelOf} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
-                <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} />
+                <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} error={loadMoreError} onRetry={retryMore} />
               </div>
             </div>
-            : grandTotal
+            : grandTotal || hasFilters
               ? <NothingMatches onClear={clearAll} />
               : <p className="mt-8 rounded-[1.6rem] bg-[var(--surface)] px-6 py-12 text-center text-sm text-[var(--muted)] ring-1 ring-[var(--line)]/70">The WordPress feed is empty.</p>}
 

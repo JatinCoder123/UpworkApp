@@ -18,6 +18,8 @@ import DateTimeRangeFilter from '../components/DateTimeRangeFilter'
 import { ActiveDateFilterChip, RefreshFilterButton } from '../components/FilterToolbarControls'
 import LogoLoader from '../components/LogoLoader'
 import HScroll from '../components/HScroll'
+import { LoadMoreError } from '../components/FeedParts'
+import { useRefreshFailedNotice } from '../lib/notify'
 import { iconButton } from '../components/ui'
 import { api } from '../services/api'
 import {
@@ -101,8 +103,11 @@ export default function TechNews() {
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
-    isError,
+    isLoadingError,
+    isFetchNextPageError,
+    isRefetchError,
     error,
+    errorUpdatedAt,
     refetch,
   } = useInfiniteQuery({
     queryKey: [
@@ -126,6 +131,10 @@ export default function TechNews() {
       lastPage?.page < lastPage?.totalPages ? lastPage.page + 1 : undefined,
     placeholderData: (previous) => previous,
   })
+  // A failed refresh or next page keeps the stories already loaded (the error screen is only for nothing to show).
+  // After a next page failed, scrolling stops asking (it would ask again and again) until Try again.
+  const hasMore = hasNextPage && !isFetchNextPageError
+  useRefreshFailedNotice({ isRefetchError, error, errorUpdatedAt }, 'stories')
 
   // Fast lightweight stats query for accurate total and badge counts from Smart Gateway
   const {
@@ -296,7 +305,7 @@ export default function TechNews() {
   // Automatic Infinite Scroll observer (hits Smart Gateway for next page on scroll)
   useEffect(() => {
     const sentinel = loadMoreRef.current
-    if (!sentinel || !hasNextPage) return undefined
+    if (!sentinel || !hasMore) return undefined
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -309,7 +318,7 @@ export default function TechNews() {
 
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage, filteredArticles.length])
+  }, [hasMore, isFetchingNextPage, fetchNextPage, filteredArticles.length])
 
   useEffect(() => {
     if (!isLoading && !isRefreshing && root.current) {
@@ -603,7 +612,7 @@ export default function TechNews() {
                   label={isRefreshing ? 'Refreshing AI news feed...' : 'Loading AI news feed...'}
                 />
               </div>
-            ) : isError ? (
+            ) : isLoadingError ? (
               <div className="rounded-[2rem] bg-[var(--frame)] p-1.5 ring-1 ring-[var(--line)]/70">
                 <div className="rounded-[calc(2rem-.375rem)] bg-[var(--surface)] py-20 text-center">
                   <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-[var(--paper)] text-danger-solid">
@@ -664,7 +673,9 @@ export default function TechNews() {
                   <span className="size-2 rounded-full bg-success-solid animate-pulse" />
                   <span>Loading more stories from gateway...</span>
                 </div>
-              ) : hasNextPage ? (
+              ) : isFetchNextPageError ? (
+                <LoadMoreError error={error} onRetry={() => fetchNextPage()} />
+              ) : hasMore ? (
                 <div className="flex items-center gap-2.5 rounded-full bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink)] shadow-xs ring-1 ring-black/10 dark:ring-white/10">
                   <span className="size-2 rounded-full bg-success-solid animate-pulse" />
                   <span>Scroll for more stories</span>

@@ -7,6 +7,7 @@ import SessionLoader from '../components/SessionLoader'
 import NewFeedDialog from '../components/NewFeedDialog'
 import FeedBuildStatus from '../components/FeedBuildStatus'
 import FeedSection from '../components/FeedSection'
+import ErrorBoundary, { DialogError } from '../components/ErrorBoundary'
 import { Modal, iconButton } from '../components/ui'
 import { sectionLabel } from '../components/SectionControls'
 import { BUILDING, canSeeFeed, useFeedBuild, useFeedDefinition, useFeeds } from '../lib/feeds'
@@ -27,7 +28,6 @@ const ACTION_LABELS = { doc: 'Document', blog: 'Blog post', video: 'Video', imag
 const ACCESS_LABELS = { full: 'Full access', no_delete: 'All except delete', read_only: 'Read only' }
 const card = 'rounded-[1.5rem] bg-[var(--surface)] p-5 ring-1 ring-[var(--line)]/70 sm:p-6'
 const optionsOf = (options) => (Array.isArray(options) ? options : Object.values(asObject(options))).map(asText).filter(Boolean)
-
 export default function CustomFeed() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -38,26 +38,30 @@ export default function CustomFeed() {
   const [editing, setEditing] = useState(false)
   const [settings, setSettings] = useState(false)
 
-  if (definition.isLoading || feeds.isLoading) return <SessionLoader />
-  if (definition.error) {
-    if (/not found/i.test(definition.error.message)) return <NotFound />
-    return <Shell>
-      <main className="mx-auto w-full max-w-[1200px] px-4 pb-24 pt-4 sm:px-6 md:pt-6">
-        <p role="alert" className="rounded-2xl bg-[var(--bad-bg)] px-4 py-3 text-xs font-semibold text-[var(--bad)]">This feed could not be loaded: {definition.error.message} <button type="button" onClick={() => definition.refetch()} className="ml-2 underline">Try again</button></p>
-      </main>
-    </Shell>
-  }
+  // Loading, or Try again after an error (the loader shows the retry is under way).
+  if (definition.isLoading || feeds.isLoading || (!definition.data && definition.isFetching)) return <SessionLoader />
+  // At this URL: "Feed not found" for an id that opens nothing (deleted, wrong or malformed), or the error with Try
+  // again when it could not be read. Only with nothing to show: a feed on screen stays when a refresh fails.
+  if (!definition.data) return <NotFound record="feed" error={definition.error} onRetry={() => definition.refetch()} />
 
   const feed = definition.data
-  const listed = feeds.data?.find((item) => item.id === id)
-  if (listed?.buildStatus === 'built' && !canSeeFeed(user, listed)) return <NotFound type="forbidden" />
   const status = build.data?.status || feed.build_status || 'draft'
+  // Who may open a built feed: from the feed list, or from the definition when the list could not be read, so a
+  // failed list never opens a feed to someone without its permission.
+  const listed = feeds.data?.find((item) => item.id === id) || { buildStatus: status, name: asText(feed.module_label) || asText(feed.name) }
+  if (listed.buildStatus === 'built' && !canSeeFeed(user, listed)) return <NotFound type="forbidden" />
   const edit = () => { setSettings(false); setEditing(true) }
-  const editor = editing && <NewFeedDialog feedId={id} onClose={() => setEditing(false)} onSaved={(savedId) => { setEditing(false); if (savedId && savedId !== id) navigate(`/feeds/${savedId}`) }} />
+  const closeEditor = () => setEditing(false)
+  // The dialogs fail on their own (error, Retry and close), like the other dialogs; the feed's page keeps working.
+  const editor = editing && <ErrorBoundary name="feed-editor" fallback={DialogError} fallbackProps={{ onClose: closeEditor }}>
+    <NewFeedDialog feedId={id} onClose={closeEditor} onSaved={(savedId) => { closeEditor(); if (savedId && savedId !== id) navigate(`/feeds/${savedId}`) }} />
+  </ErrorBoundary>
   // Built: the feed's records, like the other sections; admins open its settings (build, fields, roles) from there.
   if (status === 'built') return <>
     <FeedSection definition={feed} onSettings={isAdminUser(user) ? () => setSettings(true) : null} />
-    {settings && <Modal onClose={() => setSettings(false)} full contained><FeedOverview feed={feed} build={build} status={status} onEdit={edit} onClose={() => setSettings(false)} /></Modal>}
+    {settings && <ErrorBoundary name="feed-settings" fallback={DialogError} fallbackProps={{ onClose: () => setSettings(false) }}>
+      <Modal onClose={() => setSettings(false)} full contained><FeedOverview feed={feed} build={build} status={status} onEdit={edit} onClose={() => setSettings(false)} /></Modal>
+    </ErrorBoundary>}
     {editor}
   </>
   return <Shell>

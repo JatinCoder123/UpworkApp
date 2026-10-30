@@ -60,7 +60,7 @@ export function LiveJobDetailView({ id, job: passedJob, embedded = false }) {
 
   if (!stored) {
     if (embedded) return <p className="m-5 rounded-2xl bg-[var(--warn-bg)] px-4 py-3 text-xs font-semibold text-[var(--warn)]">This live job has expired. Run a new live scan to find it again.</p>
-    return <NotFound title="Live job expired." message="Live jobs are kept only for this browser session. Run a new live scan to find it again." backTo="/live-jobs" backLabel="Back to live jobs" />
+    return <NotFound title="Live job expired." message="Live jobs are kept only for this browser session, so this link no longer opens it. Run a new live scan to find it again." backTo="/live-jobs" backLabel="Back to Live Jobs" />
   }
 
   const job = { ...stored, coverLetter }

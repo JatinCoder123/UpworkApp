@@ -4,6 +4,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { api } from '../services/api'
 import { toGatewayDateFilter } from './dateRange'
 import { labeller, picked } from './feedView'
+import { notify, openFailedNotice, useRefreshFailedNotice } from './notify'
 
 /*
  * A feed section's data (WordPress, LLM, AppScript, Social), filtered, searched, sorted, paged and counted by the
@@ -95,7 +96,8 @@ export function useGatewayFeed({ feed, fields, filters, search, dateFilter, date
   // The next page loads as the end of the list comes into view.
   const loadMoreRef = useRef(null)
   const { fetchNextPage, isFetchingNextPage } = paged
-  const hasMore = !listFromAll && Boolean(paged.hasNextPage)
+  // After a next page failed, scrolling stops asking (it would ask again and again) until Try again (retryMore).
+  const hasMore = !listFromAll && Boolean(paged.hasNextPage) && !paged.isFetchNextPageError
   useEffect(() => {
     const target = loadMoreRef.current
     if (!target || !hasMore) return undefined
@@ -127,14 +129,18 @@ export function useGatewayFeed({ feed, fields, filters, search, dateFilter, date
   }
 
   const refresh = () => queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith(`${feed}-`) })
+  useRefreshFailedNotice(list, 'the list')
 
   return {
     // grandTotal: how many items the module has in all (undefined until known).
     options, labelOf, items, total, grandTotal: meta?.total, countOf, refresh,
-    loading: list.isLoading, isError: list.isError, error: list.error,
+    // isError only when there is nothing to show: a failed refresh or next page keeps the items already loaded.
+    loading: list.isLoading, isError: list.isLoadingError, error: list.error,
     // New results on the way (not the next page): the list fades until they come.
     updating: list.isFetching && !isFetchingNextPage,
     hasMore, loadingMore: isFetchingNextPage, loadMoreRef,
+    // The next page failed: shown at the end of the list (MoreLoader) with Try again.
+    loadMoreError: paged.isFetchNextPageError ? paged.error : null, retryMore: () => fetchNextPage(),
   }
 }
 
@@ -148,13 +154,14 @@ export function patchFeedItem(queryClient, feed, id, changes) {
 
 // The item whose details are open, kept in the link (?param=id, as the Jobs page does with ?job=), so the view can be
 // shared and survives a reload. The item comes from the list loaded, or is read on its own when it is not in it
-// (further down, or filtered out); a link to an item that is gone just closes. Opening one while another is open
-// replaces it in the history, so Back leaves the details instead of stepping through them.
+// (further down, or filtered out); a link to an item that is gone, or that could not be read, closes with a toast
+// saying which. Opening one while another is open replaces it in the history, so Back leaves the details instead of
+// stepping through them.
 export function useOpenItem(feed, items, param) {
   const [params, setParams] = useSearchParams()
   const openId = params.get(param)
   const listed = openId ? items.find((item) => item.id === openId) || null : null
-  const { data: fetched, isSuccess, isError } = useQuery({
+  const { data: fetched, isSuccess, isError, error } = useQuery({
     queryKey: [`${feed}-item`, openId],
     queryFn: () => api.getFeedItem(feed, openId),
     enabled: Boolean(openId) && !listed,
@@ -170,6 +177,10 @@ export function useOpenItem(feed, items, param) {
   const openItem = useCallback((id) => update(id, Boolean(openId)), [update, openId])
   const closeItem = useCallback(() => update(null, true), [update])
   const gone = Boolean(openId) && !listed && (isError || (isSuccess && !fetched))
-  useEffect(() => { if (gone) closeItem() }, [gone, closeItem])
+  useEffect(() => {
+    if (!gone) return
+    notify(openFailedNotice('Item', isError ? error : null))
+    closeItem()
+  }, [gone, isError, error, closeItem])
   return { openId, open, openItem, closeItem }
 }

@@ -7,6 +7,7 @@ import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 import ErrorBoundary, { AppError } from './components/ErrorBoundary.jsx'
 import { storedPalette } from './lib/palette.js'
+import { isRetryable } from './services/api.js'
 
 // Runs before React mounts, so no error boundary can catch it: blocked storage must not stop the app loading.
 let storedTheme = null
@@ -18,7 +19,9 @@ document.documentElement.style.colorScheme = initialTheme
 document.documentElement.dataset.palette = storedPalette()
 
 // Cached data is kept 10 minutes (default 5), so going back to a page shows it at once while it refreshes in the background.
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, gcTime: 10 * 60_000, refetchOnWindowFocus: false } } })
+// A failed read is tried twice more, unless a retry cannot help (not found, no permission, a refused request): those
+// show at once instead of after several slow attempts.
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, gcTime: 10 * 60_000, refetchOnWindowFocus: false, retry: (failures, error) => failures < 2 && isRetryable(error) } } })
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

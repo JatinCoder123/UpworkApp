@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Check, Funnel, GearSix, X } from '@phosphor-icons/react'
+import { ArrowClockwise, Check, Funnel, GearSix, WarningCircle, X } from '@phosphor-icons/react'
 import HScroll from './HScroll'
 import { skillStyle } from '../lib/jobSignals'
 import { iconButton } from './ui'
@@ -122,13 +122,23 @@ export function FilterChip({ children, onClear }) {
 }
 
 // The end of a paged list: the next page loads as it comes into view (`ref`); says "Loading more", "Scroll for more"
-// or "All N loaded".
-export function MoreLoader({ ref, loading, more, total }) {
+// or "All N loaded", or, when the next page failed (`error`), says so with Try again (`onRetry`).
+export function MoreLoader({ ref, loading, more, total, error, onRetry }) {
   return <div ref={ref} className="flex min-h-16 items-center justify-center py-6" aria-live="polite">
     {loading
       ? <span className="flex items-center gap-3 text-[13px] font-semibold text-[var(--muted)]"><span className="size-4 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--lime-dark)]" />Loading more</span>
-      : <span className={label}>{more ? 'Scroll for more' : `All ${total} loaded`}</span>}
+      : error ? <LoadMoreError error={error} onRetry={onRetry} />
+        : <span className={label}>{more ? 'Scroll for more' : `All ${total} loaded`}</span>}
   </div>
+}
+
+// A next page that failed, at the end of any paged list (the feed sections, Jobs, AI News): what is loaded stays, and
+// scrolling stops asking until Try again.
+export function LoadMoreError({ error, onRetry }) {
+  return <p role="alert" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-xs font-semibold text-danger">
+    <span className="inline-flex items-center gap-1.5"><WarningCircle size={14} weight="fill" className="shrink-0" />Could not load more{error?.message ? `: ${error.message}` : '.'}</span>
+    <button type="button" onClick={onRetry} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--paper)] px-3 py-1.5 text-[11px] font-bold text-[var(--ink)] ring-1 ring-[var(--line)] transition-colors hover:ring-[var(--lime-dark)]"><ArrowClockwise size={12} weight="bold" />Try again</button>
+  </p>
 }
 
 // Round icon button for a quick status change on a card.

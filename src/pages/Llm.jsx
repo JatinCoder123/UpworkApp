@@ -108,7 +108,7 @@ export default function Llm() {
 
   // The tab is one more filter (content_group).
   const picks = useMemo(() => ({ ...filters, group: group === 'all' ? NONE : [group] }), [filters, group])
-  const { options, labelOf, items, total, grandTotal, countOf, refresh, loading, isError, error, updating, hasMore, loadingMore, loadMoreRef } = useGatewayFeed({
+  const { options, labelOf, items, total, grandTotal, countOf, refresh, loading, isError, error, updating, hasMore, loadingMore, loadMoreRef, loadMoreError, retryMore } = useGatewayFeed({
     feed: 'llm', fields: FIELDS, filters: picks, search, dateFilter, dateField: 'published_date', sort, localSorts: LOCAL_SORTS,
     stripKeys: STRIP_KEYS, openKeys: filterDialog || listKey ? FILTER_KEYS : undefined, allCountKeys: TAB_KEYS,
   })
@@ -219,10 +219,10 @@ export default function Llm() {
               <div className="@container min-w-0 space-y-4">
                 {journeys.map(([name, steps]) => <ErrorBoundary key={name} name="llm-journey" fallbackProps={JOURNEY_ERROR} resetKey={steps}><JourneyStrip name={name} steps={steps} labelOf={labelOf} onOpen={openItem} /></ErrorBoundary>)}
                 <section className={`grid content-start gap-4 transition-opacity @4xl:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="llm-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><LlmCard item={item} labelOf={labelOf} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
-                <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} />
+                <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} error={loadMoreError} onRetry={retryMore} />
               </div>
             </div>
-            : grandTotal
+            : grandTotal || hasFilters
               ? <NothingMatches onClear={() => { clearAll(); setGroup('all') }} />
               : <p className="mt-8 rounded-[1.6rem] bg-[var(--surface)] px-6 py-12 text-center text-sm text-[var(--muted)] ring-1 ring-[var(--line)]/70">The LLM feed is empty.</p>}
 

@@ -81,7 +81,7 @@ export default function Social() {
   const [listKey, setListKey] = useState(null)
 
   // Counts: the strips all the time, every group while the universal filter or a full list is open.
-  const { options, labelOf, items, total, grandTotal, countOf, refresh, loading, isError, error, updating, hasMore, loadingMore, loadMoreRef } = useGatewayFeed({
+  const { options, labelOf, items, total, grandTotal, countOf, refresh, loading, isError, error, updating, hasMore, loadingMore, loadMoreRef, loadMoreError, retryMore } = useGatewayFeed({
     feed: 'social', fields: FIELDS, filters, search, dateFilter, dateField: 'published_date', sort,
     stripKeys: STRIP_KEYS, openKeys: filterDialog || listKey ? ALL_KEYS : undefined,
   })
@@ -163,14 +163,14 @@ export default function Social() {
                 <p className={`${label} mb-2.5 shrink-0 px-1`}>{total} {total === 1 ? 'post' : 'posts'} in the queue</p>
                 <div data-feed-queue className="min-h-0 lg:-m-1 lg:flex-1 lg:overflow-y-auto lg:p-1 lg:[scrollbar-width:thin]">
                   <ol className={`space-y-2 transition-opacity ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <li key={item.id}><ErrorBoundary name="social-row" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><PostRow item={item} labelOf={labelOf} selected={item.id === shown?.id} onPick={() => pick(item.id)} /></ErrorBoundary></li>)}</ol>
-                  <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} />
+                  <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} error={loadMoreError} onRetry={retryMore} />
                 </div>
               </div>
               {shown && <div className="sticky top-[calc(var(--shell-h)+1rem)] hidden max-h-[calc(100dvh-var(--shell-h)-2rem)] overflow-y-auto rounded-[1.6rem] [scrollbar-width:thin] lg:block">
                 <ErrorBoundary name="social-details-panel" fallbackProps={DETAILS_ERROR} resetKey={shown}><PostPanel item={shown} labelOf={labelOf} now={now} /></ErrorBoundary>
               </div>}
             </div>
-            : grandTotal
+            : grandTotal || hasFilters
               ? <NothingMatches onClear={clearAll} />
               : <p className="mt-8 rounded-[1.6rem] bg-[var(--surface)] px-6 py-12 text-center text-sm text-[var(--muted)] ring-1 ring-[var(--line)]/70">No social posts yet.</p>}
 

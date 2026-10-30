@@ -101,6 +101,26 @@ export function createAppError(code, message, meta = {}) {
   return error;
 }
 
+// Errors a retry cannot fix: a record that is not there, no permission, a request the app could not build or one that
+// was cancelled, and any other refused request (4xx). The rest (offline, timeout, 5xx) may pass on a retry.
+const FINAL_ERROR_CODES = /NOT_FOUND|UNAUTHORIZED|ABORTED|FEED_UNKNOWN|_INVALID$|_REQUIRED$|_MISSING$/;
+export function isRetryable(error) {
+  if (FINAL_ERROR_CODES.test(asText(error?.code))) return false;
+  const status = Number(error?.status);
+  return !(status >= 400 && status < 500 && status !== 408 && status !== 429);
+}
+
+// For a record read by its id (a job, a story, a feed): whether the error means the id opens nothing, whatever the
+// reason (deleted, expired, a wrong or malformed id), as opposed to a read that failed (offline, timeout, 5xx,
+// session) and may work on a retry. A refused request (4xx) or the server saying so counts as nothing to open.
+const NOT_FOUND_MESSAGE = /not found|does not exist|doesn't exist|no such|no record|invalid (?:\w+ )?id\b/i;
+export function isNotFoundError(error) {
+  if (/NOT_FOUND$/.test(asText(error?.code))) return true;
+  const status = Number(error?.status);
+  if (status >= 400 && status < 500) return ![401, 403, 408, 429].includes(status);
+  return asText(error?.code) !== "UNAUTHORIZED" && NOT_FOUND_MESSAGE.test(asText(error?.message));
+}
+
 export async function smartGateway(payload, { timeout, signal } = {}) {
   const token = generateToken();
   let response;
@@ -899,7 +919,7 @@ async function autoFeed(query = "", init = undefined) {
   const data = await response.json().catch(() => null);
   if (!data?.success) {
     const errors = asArray(data?.errors).map(asText).filter(Boolean);
-    throw createAppError("AUTO_FEED_FAILED", errors.join("\n") || `The feed service failed (${response.status}).`, { errors });
+    throw createAppError("AUTO_FEED_FAILED", errors.join("\n") || `The feed service failed (${response.status}).`, { errors, status: response.status });
   }
   return data;
 }

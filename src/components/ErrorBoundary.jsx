@@ -1,7 +1,7 @@
 import { Component } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowClockwise, ArrowUpRight, Bug, CaretDown, WarningCircle } from '@phosphor-icons/react'
-import Shell from './Shell'
+import ErrorFrame from './ErrorFrame'
 import { DialogHeader, Mark, Modal, primaryButton } from './ui'
 import { useAuth } from '../contexts/AuthContext'
 import { homePath } from '../lib/permissions'
@@ -38,6 +38,11 @@ export default class ErrorBoundary extends Component {
 const secondaryButton = 'inline-flex items-center gap-2 rounded-full bg-[var(--paper)] px-5 py-2.5 text-xs font-semibold text-[var(--ink)] ring-1 ring-black/10 transition-all hover:bg-black/5 dark:ring-white/10 dark:hover:bg-white/5'
 
 const errorMessage = (error) => (error?.message ? String(error.message) : 'An unexpected error occurred.')
+
+// A page's code could not be downloaded: the portal was updated since this tab opened, or the connection dropped.
+// React keeps that failure for the page, so Try again fails the same way; only a reload fetches the files again.
+const CHUNK_ERROR = /dynamically imported module|Importing a module script failed|error loading dynamically imported/i
+const isChunkError = (error) => CHUNK_ERROR.test(errorMessage(error))
 
 // Message always; the component stack only in development, where it helps and is not noise.
 function ErrorDetails({ error, componentStack }) {
@@ -92,24 +97,29 @@ export function AppError({ error, componentStack }) {
   </main>
 }
 
-/** One page failed; the header and navigation stay usable. */
+/** One page failed. Standalone like the 404 page (no sidebar, which may be what failed): Try again or go back. */
 export function PageError({ error, componentStack, onReset }) {
   const { user } = useAuth()
-  return <Shell>
+  const outdated = isChunkError(error)
+  return <ErrorFrame>
     <main className="mx-auto grid w-full max-w-[1200px] place-items-center px-4 pb-24 pt-14 sm:px-6 md:pt-20">
       <ErrorCard
-        eyebrow="This page could not load"
-        title="Something went wrong here."
-        description="An error stopped this page from rendering. Try again, or head back to your workspace while we sort it out."
+        eyebrow={outdated ? 'This page needs a reload' : 'This page could not load'}
+        title={outdated ? 'Reload to open this page.' : 'Something went wrong here.'}
+        description={outdated
+          ? 'Its files could not be downloaded: the portal may have been updated since this tab was opened, or the connection dropped. Reloading fixes it; your saved filters and preferences are kept.'
+          : 'An error stopped this page from rendering. Try again, or head back to your workspace while we sort it out.'}
         error={error}
         componentStack={componentStack}
         actions={<>
-          <button type="button" onClick={onReset} className={primaryButton}><span>Try again</span><span className="grid size-7 place-items-center rounded-full bg-white/15"><ArrowClockwise size={13} /></span></button>
+          {outdated
+            ? <button type="button" onClick={() => window.location.reload()} className={primaryButton}><span>Reload page</span><span className="grid size-7 place-items-center rounded-full bg-white/15"><ArrowClockwise size={13} /></span></button>
+            : <button type="button" onClick={onReset} className={primaryButton}><span>Try again</span><span className="grid size-7 place-items-center rounded-full bg-white/15"><ArrowClockwise size={13} /></span></button>}
           <Link to={homePath(user)} onClick={onReset} className={secondaryButton}>Back to your workspace<ArrowUpRight size={13} /></Link>
         </>}
       />
     </main>
-  </Shell>
+  </ErrorFrame>
 }
 
 /** A panel or the preview drawer failed; the rest of the page keeps working. */

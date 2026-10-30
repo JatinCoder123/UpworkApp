@@ -852,6 +852,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
   // Endpoint is queried once on initial load, or when websocket signals completion
   const {
     data: fetchedNote,
+    error: noteError,
     refetch: refetchNote,
   } = useQuery({
     queryKey: ['site-content-note', activeNoteId],
@@ -1147,6 +1148,7 @@ function IdeaDetail({ item, onClose, onDocUpdated, bare = false }) {
           userName={liveUserName || note?.userName}
           isTriggering={isTriggering}
           triggerError={triggerError}
+          noteError={fetchedNote ? null : noteError}
           justCompleted={justCompleted}
           onDismissCompleted={() => setJustCompleted(false)}
           onGenerateDoc={() => setAskGenerate({ regenerate: false, text: '' })}
@@ -1314,6 +1316,7 @@ function DocSection({
   userName,
   isTriggering,
   triggerError,
+  noteError,
   justCompleted,
   onDismissCompleted,
   onGenerateDoc,
@@ -1539,6 +1542,13 @@ function DocSection({
           <span>Generate doc</span>
         </button>
       </div>
+      {/* The item's document could not be read: say so, rather than look as if it had none. */}
+      {noteError && (
+        <p role="alert" className="mt-2 text-xs font-medium text-[var(--bad)]">
+          This item’s document could not be read: {noteError.message}{' '}
+          <button type="button" onClick={onRefresh} className="font-bold underline underline-offset-4">Try again</button>
+        </p>
+      )}
       {triggerError && (
         <p className="mt-2 text-xs font-medium text-[var(--bad)]">{triggerError}</p>
       )}

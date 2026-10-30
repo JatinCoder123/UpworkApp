@@ -92,7 +92,7 @@ export default function FeedSection({ definition, onSettings }) {
   const [listKey, setListKey] = useState(null)
   const allKeys = Object.keys(filterFields)
 
-  const { options, labelOf, items, total, grandTotal, countOf, refresh, loading, isError, error, updating, hasMore, loadingMore, loadMoreRef } = useGatewayFeed({
+  const { options, labelOf, items, total, grandTotal, countOf, refresh, loading, isError, error, updating, hasMore, loadingMore, loadMoreRef, loadMoreError, retryMore } = useGatewayFeed({
     feed, fields: filterFields, filters, search, dateFilter, dateField: 'date_entered', sort,
     stripKeys, openKeys: filterDialog || listKey ? allKeys : undefined,
   })
@@ -159,10 +159,10 @@ export default function FeedSection({ definition, onSettings }) {
               <ErrorBoundary name="feed-index" fallbackProps={INDEX_ERROR} resetKey={items}><FeedIndex items={items} activeId={activeId} onJump={jumpTo} meta={indexMeta} /></ErrorBoundary>
               <div className="@container min-w-0">
                 <section className={`grid content-start gap-4 transition-opacity @4xl:grid-cols-2 ${updating ? 'opacity-60' : ''}`}>{items.map((item) => <ErrorBoundary key={item.id} name="feed-card" fallback={CardError} fallbackProps={CARD_ERROR} resetKey={item}><RecordCard item={item} fields={fields} outputs={outputs} labelOf={labelOf} lead={lead} onOpen={() => openItem(item.id)} /></ErrorBoundary>)}</section>
-                <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} />
+                <MoreLoader ref={loadMoreRef} loading={loadingMore} more={hasMore} total={total} error={loadMoreError} onRetry={retryMore} />
               </div>
             </div>
-            : grandTotal
+            : grandTotal || hasFilters
               ? <NothingMatches onClear={clearAll} />
               : <div className="mt-8 rounded-[1.6rem] bg-[var(--surface)] px-6 py-14 text-center ring-1 ring-[var(--line)]/70">
                 <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-(--lime-tint)/35 text-[var(--accent-strong)]"><Tray size={22} weight="bold" /></span>
